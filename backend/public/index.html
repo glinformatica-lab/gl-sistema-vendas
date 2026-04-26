@@ -428,14 +428,24 @@
           <div class="card-footer" id="card-vendas-mes-footer">0 vendas no mês</div>
         </div>
         <div class="card">
+          <div class="card-title">Ticket Médio (mês)</div>
+          <div class="card-value" id="card-ticket-medio-valor" style="color:var(--azul);">R$ 0,00</div>
+          <div class="card-footer" id="card-ticket-medio-footer">média por venda</div>
+        </div>
+        <div class="card">
+          <div class="card-title">vs. Mês Anterior</div>
+          <div class="card-value" id="card-comparativo-valor" style="color:#888;">—</div>
+          <div class="card-footer" id="card-comparativo-footer">comparação</div>
+        </div>
+        <div class="card">
           <div class="card-title">Contas a Receber</div>
           <div class="card-value yellow" id="card-receber-valor">R$ 0,00</div>
           <div class="card-footer" id="card-receber-footer">0 pendentes</div>
         </div>
         <div class="card">
           <div class="card-title">Contas a Pagar</div>
-          <div class="card-value red" id="card-pagar-valor">R$ 1.320,00</div>
-          <div class="card-footer" id="card-pagar-footer">3 em aberto</div>
+          <div class="card-value red" id="card-pagar-valor">R$ 0,00</div>
+          <div class="card-footer" id="card-pagar-footer">0 em aberto</div>
         </div>
       </div>
       <!-- Últimas Vendas -->
@@ -485,9 +495,21 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
-      <!-- Gráfico de evolução de vendas -->
-      <h3 style="margin-bottom:10px;">Evolução de Vendas — Últimos 3 Meses</h3>
-      <canvas id="grafico-vendas" style="max-width:500px;background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001"></canvas>
+      <!-- Gráficos do Dashboard -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:20px;margin-top:24px;">
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--azul);">📈 Evolução de Vendas — 6 Meses</h3>
+          <canvas id="grafico-vendas" style="max-height:260px;"></canvas>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--azul);">🏆 Top 5 Produtos — Últimos 30 dias</h3>
+          <canvas id="grafico-top-produtos" style="max-height:260px;"></canvas>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--azul);">💳 Formas de Pagamento — Mês Atual</h3>
+          <canvas id="grafico-formas-pagamento" style="max-height:260px;"></canvas>
+        </div>
+      </div>
     </div>
 
     <!-- Clientes (INTEGRADO) -->
@@ -1650,31 +1672,155 @@
       Object.assign(empresaLocal, empresaCompleta);
       localStorage.setItem('empresa', JSON.stringify(empresaLocal));
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
-    const meses = ["Fevereiro", "Março", "Abril"];
-    const vendasMes = [12000, 17500, 25900];
-    const ctx = document.getElementById('grafico-vendas').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: meses,
-        datasets: [{
-          label: 'Total Vendas (R$)',
-          data: vendasMes,
-          borderColor: '#3960f9',
-          backgroundColor: 'rgba(57,96,249,0.10)',
-          tension: 0.18,
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') } }
-        }
-      }
-    });
+    renderGraficosDashboard();
   });
+
+  // ====== GRÁFICOS DO DASHBOARD ======
+  let _chartVendas = null;
+  let _chartTopProdutos = null;
+  let _chartFormasPagamento = null;
+  function renderGraficosDashboard() {
+    // === Gráfico 1: Evolução de vendas (últimos 6 meses) ===
+    const hoje = new Date();
+    const meses = [];
+    const valoresPorMes = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const ym = d.toISOString().slice(0, 7); // YYYY-MM
+      const nomeMes = d.toLocaleString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+      meses.push(nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1));
+      const total = (dbVendas || [])
+        .filter(v => (v.data || '').slice(0, 7) === ym)
+        .reduce((s, v) => s + (Number(v.total) || 0), 0);
+      valoresPorMes.push(total);
+    }
+    const canvasVendas = document.getElementById('grafico-vendas');
+    if (canvasVendas) {
+      if (_chartVendas) _chartVendas.destroy();
+      _chartVendas = new Chart(canvasVendas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: meses,
+          datasets: [{
+            label: 'Total Vendas (R$)',
+            data: valoresPorMes,
+            borderColor: '#3960f9',
+            backgroundColor: 'rgba(57,96,249,0.10)',
+            tension: 0.25,
+            fill: true,
+            pointBackgroundColor: '#3960f9',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => 'R$ ' + Number(ctx.parsed.y).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') } }
+          }
+        }
+      });
+    }
+    // === Gráfico 2: Top 5 Produtos mais vendidos (últimos 30 dias) ===
+    const dataLimite = new Date(hoje.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const contagemProdutos = {};
+    (dbVendas || []).forEach(v => {
+      if ((v.data || '') < dataLimite) return;
+      (v.itens || []).forEach(i => {
+        const nome = i.produto || 'Sem nome';
+        const valor = Number(i.qtd || 0) * Number(i.preco || 0);
+        if (!contagemProdutos[nome]) contagemProdutos[nome] = { qtd: 0, valor: 0 };
+        contagemProdutos[nome].qtd += Number(i.qtd) || 0;
+        contagemProdutos[nome].valor += valor;
+      });
+    });
+    const topProdutos = Object.entries(contagemProdutos)
+      .sort((a, b) => b[1].valor - a[1].valor)
+      .slice(0, 5);
+    const canvasTop = document.getElementById('grafico-top-produtos');
+    if (canvasTop) {
+      if (_chartTopProdutos) _chartTopProdutos.destroy();
+      _chartTopProdutos = new Chart(canvasTop.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: topProdutos.length ? topProdutos.map(p => p[0].length > 20 ? p[0].slice(0,20)+'...' : p[0]) : ['Sem dados'],
+          datasets: [{
+            label: 'Faturamento (R$)',
+            data: topProdutos.length ? topProdutos.map(p => p[1].valor) : [0],
+            backgroundColor: ['#3960f9','#18c29c','#ffd43b','#f97316','#ec4899'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const item = topProdutos[ctx.dataIndex];
+                  if (!item) return '';
+                  return `${item[1].qtd} un · R$ ${Number(item[1].valor).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+                }
+              }
+            }
+          },
+          scales: { x: { ticks: { callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') } } }
+        }
+      });
+    }
+    // === Gráfico 3: Distribuição por Forma de Pagamento (mês atual) ===
+    const mesAtual = hoje.toISOString().slice(0, 7);
+    const contagemPagamento = {};
+    (dbVendas || []).filter(v => (v.data || '').slice(0, 7) === mesAtual).forEach(v => {
+      const forma = v.pagamento || 'Outros';
+      if (!contagemPagamento[forma]) contagemPagamento[forma] = 0;
+      contagemPagamento[forma] += Number(v.total) || 0;
+    });
+    const labelsPag = Object.keys(contagemPagamento);
+    const valoresPag = Object.values(contagemPagamento);
+    const labelLegivel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'Cartao':'Cartão' };
+    const canvasPag = document.getElementById('grafico-formas-pagamento');
+    if (canvasPag) {
+      if (_chartFormasPagamento) _chartFormasPagamento.destroy();
+      _chartFormasPagamento = new Chart(canvasPag.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: labelsPag.length ? labelsPag.map(l => labelLegivel[l] || l) : ['Sem vendas no mês'],
+          datasets: [{
+            data: valoresPag.length ? valoresPag : [1],
+            backgroundColor: ['#3960f9','#18c29c','#ffd43b','#f97316','#ec4899','#a855f7'],
+            borderWidth: 2,
+            borderColor: '#fff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  if (!labelsPag.length) return 'Sem vendas';
+                  const total = valoresPag.reduce((s,v)=>s+v,0);
+                  const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                  return `${ctx.label}: R$ ${Number(ctx.parsed).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
 
   // ====== MÓDULO CLIENTES ======
   // Máscara CPF/CNPJ
@@ -3312,16 +3458,45 @@
   function renderCardsVendas() {
     const hoje = new Date().toISOString().slice(0, 10);
     const mesAtual = hoje.slice(0, 7);
+    // Calcula mês anterior (formato YYYY-MM)
+    const dHoje = new Date();
+    const dMesAnt = new Date(dHoje.getFullYear(), dHoje.getMonth() - 1, 1);
+    const mesAnterior = dMesAnt.toISOString().slice(0, 7);
     const vendasHoje = dbVendas.filter(v => v.data === hoje);
     const vendasMes  = dbVendas.filter(v => (v.data || '').slice(0, 7) === mesAtual);
+    const vendasMesAnt = dbVendas.filter(v => (v.data || '').slice(0, 7) === mesAnterior);
     const totalHoje = vendasHoje.reduce((s, v) => s + (v.total || 0), 0);
     const totalMes  = vendasMes.reduce((s, v) => s + (v.total || 0), 0);
+    const totalMesAnt = vendasMesAnt.reduce((s, v) => s + (v.total || 0), 0);
+    const ticketMedio = vendasMes.length > 0 ? totalMes / vendasMes.length : 0;
 
     const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
     setTxt('card-vendas-dia-valor', formatarBRL(totalHoje));
     setTxt('card-vendas-dia-footer', `${vendasHoje.length} vendas realizadas`);
     setTxt('card-vendas-mes-valor', formatarBRL(totalMes));
     setTxt('card-vendas-mes-footer', `${vendasMes.length} vendas no mês`);
+    setTxt('card-ticket-medio-valor', formatarBRL(ticketMedio));
+    setTxt('card-ticket-medio-footer', vendasMes.length === 0 ? 'sem vendas no mês' : `de ${vendasMes.length} venda(s)`);
+    // Comparativo com mês anterior
+    const cardCompValor = document.getElementById('card-comparativo-valor');
+    const cardCompFooter = document.getElementById('card-comparativo-footer');
+    if (cardCompValor && cardCompFooter) {
+      if (totalMesAnt === 0 && totalMes === 0) {
+        cardCompValor.textContent = '—';
+        cardCompValor.style.color = '#888';
+        cardCompFooter.textContent = 'sem dados';
+      } else if (totalMesAnt === 0) {
+        cardCompValor.textContent = '+100%';
+        cardCompValor.style.color = '#16a34a';
+        cardCompFooter.textContent = `mês anterior: R$ 0,00`;
+      } else {
+        const variacao = ((totalMes - totalMesAnt) / totalMesAnt) * 100;
+        const sinal = variacao >= 0 ? '+' : '';
+        cardCompValor.textContent = `${sinal}${variacao.toFixed(1)}%`;
+        cardCompValor.style.color = variacao >= 0 ? '#16a34a' : '#dc2626';
+        cardCompFooter.textContent = `mês anterior: ${formatarBRL(totalMesAnt)}`;
+      }
+    }
 
     // Últimas 5 vendas no dashboard
     const tbody = document.getElementById('tbody-ultimas-vendas');
@@ -3344,6 +3519,10 @@
               </tr>
             `;
           }).join('');
+    }
+    // Atualiza gráficos do dashboard sempre que cards forem recarregados
+    if (typeof renderGraficosDashboard === 'function') {
+      try { renderGraficosDashboard(); } catch(e) { console.warn('Gráficos:', e.message); }
     }
   }
 
