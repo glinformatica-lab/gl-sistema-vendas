@@ -198,4 +198,22 @@ router.get('/me', autenticar, async (req, res) => {
   }
 });
 
+router.put('/me/senha', autenticar, async (req, res) => {
+  const { senhaAtual, novaSenha } = req.body || {};
+  if (!senhaAtual || !novaSenha) return res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias.' });
+  if (String(novaSenha).length < 6) return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
+  try {
+    const r = await db.query('SELECT senha_hash FROM usuarios WHERE id=$1 LIMIT 1', [req.user.userId]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const ok = await bcrypt.compare(senhaAtual, r.rows[0].senha_hash);
+    if (!ok) return res.status(400).json({ error: 'Senha atual incorreta.' });
+    const novoHash = await bcrypt.hash(novaSenha, 10);
+    await db.query('UPDATE usuarios SET senha_hash=$1 WHERE id=$2', [novoHash, req.user.userId]);
+    res.json({ ok: true, mensagem: 'Senha alterada com sucesso.' });
+  } catch (err) {
+    console.error('[auth/me/senha]', err);
+    res.status(500).json({ error: 'Erro ao trocar a senha.' });
+  }
+});
+
 module.exports = router;

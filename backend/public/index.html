@@ -394,6 +394,7 @@
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
     <button class="menu-btn admin-only" onclick="showPage('usuarios')">&#128101; Usuários</button>
     <button class="menu-btn admin-only" onclick="showPage('configuracoes')">&#9881;&#65039; Configurações</button>
+    <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
     <div style="flex:1;"></div>
     <div id="info-usuario" style="padding:14px 24px;border-top:1px solid var(--cinza-borda);font-size:12px;color:#668;"></div>
     <a href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20GL%20Sistema%20de%20Vendas"
@@ -847,6 +848,82 @@
         </div>
       </form>
     </div>
+  </div>
+
+    <!-- Minha Conta -->
+    <div id="page-minha-conta" style="display:none;">
+      <div class="page-title">Minha Conta</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;">
+        <!-- Card Usuário -->
+        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;">👤 Meus dados</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><strong>Nome:</strong> <span id="mc-nome">—</span></div>
+            <div><strong>E-mail:</strong> <span id="mc-email">—</span></div>
+            <div><strong>Papel:</strong> <span id="mc-papel">—</span></div>
+            <button class="btn" onclick="openTrocarSenha()" style="margin-top:10px;">🔑 Trocar minha senha</button>
+          </div>
+        </div>
+
+        <!-- Card Empresa -->
+        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;">🏢 Empresa</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><strong>Nome:</strong> <span id="mc-empresa-nome">—</span></div>
+            <div><strong>Plano:</strong> <span id="mc-plano">—</span></div>
+            <div><strong>Status:</strong> <span id="mc-status">—</span></div>
+            <div><strong>Vencimento:</strong> <span id="mc-vencimento">—</span></div>
+          </div>
+          <p style="margin-top:14px;font-size:13px;color:#668;">
+            Para alterar dados da empresa (CNPJ, endereço, logo etc.), peça ao administrador acessar <strong>Configurações</strong>.
+          </p>
+        </div>
+
+        <!-- Card Suporte -->
+        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;">💬 Suporte</h3>
+          <p style="color:#445;margin-bottom:12px;">
+            Precisa de ajuda? Estamos no WhatsApp:
+          </p>
+          <a href="https://wa.me/5562992347572" target="_blank"
+             style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">
+             📱 (62) 99234-7572
+          </a>
+        </div>
+      </div>
+
+      <!-- Histórico de Pagamentos -->
+      <h3 style="margin-top:28px;margin-bottom:10px;color:var(--azul);">💰 Histórico de Pagamentos</h3>
+      <div style="background:#fff;border-radius:10px;padding:6px;box-shadow:0 2px 10px #0001;">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Valor</th>
+              <th>Forma</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-pagamentos-mc">
+            <tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  <!-- Modal Trocar Senha -->
+  <div id="modal-trocar-senha" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <form id="form-trocar-senha" autocomplete="off" style="background:#fff;padding:32px;border-radius:12px;max-width:420px;width:92%;">
+      <h2 style="color:var(--azul);margin-bottom:18px;">🔑 Trocar Senha</h2>
+      <div style="display:flex;flex-direction:column;gap:13px;">
+        <label>Senha atual*<input type="password" id="ts-atual" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <label>Nova senha* (mín. 6 caracteres)<input type="password" id="ts-nova" minlength="6" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <label>Confirme a nova senha*<input type="password" id="ts-confirma" minlength="6" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <div id="ts-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
+        <button type="submit" class="btn">Salvar nova senha</button>
+        <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeTrocarSenha()">Cancelar</button>
+      </div>
+    </form>
   </div>
 
   <!-- Modal Novo/Editar Usuário -->
@@ -1661,6 +1738,7 @@
     // Carrega usuários sob demanda
     if(pg === 'usuarios') carregarUsuarios();
     if(pg === 'configuracoes') carregarConfigEmpresa();
+    if(pg === 'minha-conta') carregarMinhaConta();
   }
 
   // ====== Dashboard - gráfico de evolução de vendas ======
@@ -4824,6 +4902,88 @@ ${conteudo}
       }
       closeUsuario();
       await carregarUsuarios();
+    } catch(err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  });
+
+  // ====== MINHA CONTA ======
+  async function carregarMinhaConta() {
+    try {
+      const me = await api('GET', '/api/auth/me');
+      const u = me.usuario || {};
+      const e = me.empresa || {};
+      // Card usuário
+      document.getElementById('mc-nome').textContent  = u.nome || '—';
+      document.getElementById('mc-email').textContent = u.email || '—';
+      document.getElementById('mc-papel').textContent = u.papel === 'admin' ? 'Administrador' : (u.papel === 'vendedor' ? 'Vendedor' : (u.papel || '—'));
+      // Card empresa
+      document.getElementById('mc-empresa-nome').textContent = e.nome || '—';
+      const planoLabel = { 'mensal':'Mensal (R$ 99,00/mês)', 'anual':'Anual (R$ 999,00/ano)', 'trial':'Trial (7 dias)' };
+      document.getElementById('mc-plano').textContent = planoLabel[e.plano] || (e.plano || '—');
+      const statusLabel = { 'ativa':'✅ Ativa', 'trial':'🟡 Trial', 'aguardando-pagamento':'⏳ Aguardando pagamento', 'vencida':'❌ Vencida', 'bloqueada':'🚫 Bloqueada' };
+      const elStatus = document.getElementById('mc-status');
+      elStatus.textContent = statusLabel[e.status] || (e.status || '—');
+      elStatus.style.color = e.status === 'ativa' ? '#16a34a' : e.status === 'trial' ? '#ca8a04' : '#dc2626';
+      if (e.dataVencimento) {
+        const venc = new Date(String(e.dataVencimento).slice(0,10) + 'T00:00:00');
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const dias = Math.round((venc - hoje) / 86400000);
+        let txt = formatarDataBR(e.dataVencimento);
+        if (dias > 0) txt += ` (em ${dias} dia${dias>1?'s':''})`;
+        else if (dias === 0) txt += ` (hoje)`;
+        else txt += ` (vencida há ${-dias} dia${-dias>1?'s':''})`;
+        document.getElementById('mc-vencimento').textContent = txt;
+      } else {
+        document.getElementById('mc-vencimento').textContent = '—';
+      }
+    } catch(err) {
+      console.warn('Erro ao carregar dados:', err.message);
+    }
+    // Pagamentos
+    try {
+      const pagamentos = await api('GET', '/api/empresa/pagamentos');
+      const tbody = document.getElementById('tbody-pagamentos-mc');
+      if (!pagamentos || pagamentos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Nenhum pagamento registrado ainda.</td></tr>';
+      } else {
+        tbody.innerHTML = pagamentos.map(p => `
+          <tr>
+            <td>${formatarDataBR(p.dataPagamento)}</td>
+            <td><strong style="color:var(--verde);">${formatarBRL(p.valor)}</strong></td>
+            <td>${p.forma || '—'}</td>
+            <td style="color:#668;">${p.observacao || '—'}</td>
+          </tr>
+        `).join('');
+      }
+    } catch(err) {
+      const tbody = document.getElementById('tbody-pagamentos-mc');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Erro ao carregar pagamentos.</td></tr>';
+    }
+  }
+  function openTrocarSenha() {
+    document.getElementById('modal-trocar-senha').style.display = 'flex';
+    document.getElementById('form-trocar-senha').reset();
+    document.getElementById('ts-erro').style.display = 'none';
+  }
+  function closeTrocarSenha() {
+    document.getElementById('modal-trocar-senha').style.display = 'none';
+  }
+  document.getElementById('form-trocar-senha').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const erro = document.getElementById('ts-erro');
+    erro.style.display = 'none';
+    const atual = document.getElementById('ts-atual').value;
+    const nova = document.getElementById('ts-nova').value;
+    const confirma = document.getElementById('ts-confirma').value;
+    if (nova.length < 6) { erro.textContent = 'A nova senha deve ter pelo menos 6 caracteres.'; erro.style.display = 'block'; return; }
+    if (nova !== confirma) { erro.textContent = 'A confirmação da senha não confere.'; erro.style.display = 'block'; return; }
+    if (atual === nova) { erro.textContent = 'A nova senha deve ser diferente da atual.'; erro.style.display = 'block'; return; }
+    try {
+      await api('PUT', '/api/auth/me/senha', { senhaAtual: atual, novaSenha: nova });
+      alert('Senha alterada com sucesso!');
+      closeTrocarSenha();
     } catch(err) {
       erro.textContent = err.message;
       erro.style.display = 'block';

@@ -66,4 +66,29 @@ router.put('/', exigirAdmin, async (req, res) => {
   }
 });
 
+// Histórico de pagamentos da própria empresa (qualquer usuário logado pode ver)
+router.get('/pagamentos', async (req, res) => {
+  try {
+    // Tenta buscar da tabela pagamentos (criada pelo master) - se não existir, retorna array vazio
+    const r = await db.query(
+      `SELECT id, valor, data_pagamento, forma, observacao, criado_em
+       FROM pagamentos
+       WHERE empresa_id=$1
+       ORDER BY data_pagamento DESC, id DESC`,
+      [req.user.empresaId]
+    ).catch(() => ({ rows: [] }));
+    res.json(r.rows.map(p => ({
+      id: p.id,
+      valor: Number(p.valor) || 0,
+      dataPagamento: formatarDataIso(p.data_pagamento),
+      forma: p.forma,
+      observacao: p.observacao,
+      criadoEm: p.criado_em
+    })));
+  } catch (err) {
+    console.error('[empresa/pagamentos]', err);
+    res.json([]);
+  }
+});
+
 module.exports = router;
