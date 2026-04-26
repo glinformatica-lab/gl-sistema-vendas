@@ -514,13 +514,17 @@
 
     <!-- Fornecedores -->
     <div id="page-fornecedores" style="display:none;">
-      <div class="page-title">Fornecedores <button class="btn" style="margin-left:16px;" onclick="openEntradaMercadoria()">Entrada de Mercadoria</button></div>
+      <div class="page-title">
+        Fornecedores
+        <button class="btn" style="margin-left:16px;" onclick="openNovoFornecedor()">+ Novo Fornecedor</button>
+        <button class="btn" style="margin-left:8px;background:#eceef2;color:var(--azul);" onclick="openEntradaMercadoria()">Entrada de Mercadoria</button>
+      </div>
       <table>
         <thead>
-          <tr><th>Nome</th><th>CNPJ</th><th>Cidade</th><th>Telefone</th><th>Ações</th></tr>
+          <tr><th>Nome</th><th>CNPJ/CPF</th><th>Cidade</th><th>Telefone</th><th>Ações</th></tr>
         </thead>
-        <tbody>
-          <tr><td>Distribuidora ABC</td><td>12.345.678/0001-11</td><td>Anápolis</td><td>(62) 98888-0000</td><td>Editar | Excluir</td></tr>
+        <tbody id="tbody-fornecedores">
+          <tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Carregando...</td></tr>
         </tbody>
       </table>
 
@@ -777,6 +781,22 @@
         <div id="usu-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
         <button type="submit" class="btn" id="usu-btn-salvar" style="margin-top:6px;">Criar Usuário</button>
         <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeUsuario()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal/Novo ou Editar Fornecedor -->
+  <div id="modal-fornecedor" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <form id="form-fornecedor" autocomplete="off" style="background:#fff;padding:32px;border-radius:12px;max-width:460px;width:92%;">
+      <h2 id="forn-titulo" style="color:var(--azul);margin-bottom:18px;">Novo Fornecedor</h2>
+      <div style="display:flex;flex-direction:column;gap:13px;">
+        <label>Nome*<input type="text" id="forn-nome" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <label>CNPJ ou CPF<input type="text" id="forn-doc" maxlength="18" placeholder="00.000.000/0000-00" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <label>Telefone<input type="tel" id="forn-tel" maxlength="15" placeholder="(00) 00000-0000" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <label>Cidade<input type="text" id="forn-cidade" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+        <div id="forn-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
+        <button type="submit" class="btn" id="forn-btn-salvar">Salvar Fornecedor</button>
+        <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeFornecedor()">Cancelar</button>
       </div>
     </form>
   </div>
@@ -1544,6 +1564,7 @@
     renderClientes();
     renderListaClientes();
     renderListaFornecedores();
+    renderFornecedores();
     renderListaProdutos();
     renderVendas();
     renderContasReceber();
@@ -2354,6 +2375,7 @@
       });
       dbFornecedores.push(novo);
       renderListaFornecedores();
+      if (typeof renderFornecedores === 'function') renderFornecedores();
       // Preenche o campo do formulário de origem
       if(_origemNovoFornecedor === 'cnf') {
         document.getElementById('cnf-fornecedor').value = nome;
@@ -4243,6 +4265,107 @@ ${conteudo}
       }
       closeUsuario();
       await carregarUsuarios();
+    } catch(err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  });
+
+  // ====== GERENCIAMENTO DE FORNECEDORES ======
+  let _fornecedorEditandoId = null;
+
+  function renderFornecedores() {
+    const tbody = document.getElementById('tbody-fornecedores');
+    if(!tbody) return;
+    if(!dbFornecedores || dbFornecedores.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum fornecedor cadastrado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = dbFornecedores.map(f => `
+      <tr>
+        <td>${f.nome}</td>
+        <td>${f.doc || '-'}</td>
+        <td>${f.cidade || '-'}</td>
+        <td>${f.telefone || '-'}</td>
+        <td>
+          <button class="btn-link" onclick="editarFornecedor(${f.id})">Editar</button> |
+          <button class="btn-link danger" onclick="excluirFornecedor(${f.id})">Excluir</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openNovoFornecedor() {
+    _fornecedorEditandoId = null;
+    document.getElementById('forn-titulo').textContent = 'Novo Fornecedor';
+    document.getElementById('forn-btn-salvar').textContent = 'Salvar Fornecedor';
+    document.getElementById('form-fornecedor').reset();
+    document.getElementById('forn-erro').style.display = 'none';
+    document.getElementById('modal-fornecedor').style.display = 'flex';
+  }
+
+  function editarFornecedor(id) {
+    const f = dbFornecedores.find(x => x.id === id);
+    if(!f) return;
+    _fornecedorEditandoId = id;
+    document.getElementById('forn-titulo').textContent = 'Editar Fornecedor';
+    document.getElementById('forn-btn-salvar').textContent = 'Salvar Alterações';
+    document.getElementById('forn-nome').value   = f.nome || '';
+    document.getElementById('forn-doc').value    = f.doc || '';
+    document.getElementById('forn-tel').value    = f.telefone || '';
+    document.getElementById('forn-cidade').value = f.cidade || '';
+    document.getElementById('forn-erro').style.display = 'none';
+    document.getElementById('modal-fornecedor').style.display = 'flex';
+  }
+
+  function closeFornecedor() {
+    document.getElementById('modal-fornecedor').style.display = 'none';
+    document.getElementById('form-fornecedor').reset();
+    _fornecedorEditandoId = null;
+  }
+
+  async function excluirFornecedor(id) {
+    const f = dbFornecedores.find(x => x.id === id);
+    if(!f) return;
+    if(!confirm(`Excluir o fornecedor "${f.nome}"?\n\nEssa ação não pode ser desfeita.`)) return;
+    try {
+      await api('DELETE', `/api/fornecedores/${id}`);
+      const idx = dbFornecedores.findIndex(x => x.id === id);
+      if(idx !== -1) dbFornecedores.splice(idx, 1);
+      renderFornecedores();
+      renderListaFornecedores();
+    } catch(err) {
+      alert('Erro ao excluir: ' + err.message);
+    }
+  }
+
+  // Máscaras nos campos do modal de fornecedor
+  document.getElementById('forn-doc').addEventListener('input', function(){ this.value = maskDoc(this.value); });
+  document.getElementById('forn-tel').addEventListener('input', function(){ this.value = maskPhone(this.value); });
+
+  document.getElementById('form-fornecedor').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const erro = document.getElementById('forn-erro');
+    erro.style.display = 'none';
+    const payload = {
+      nome:     document.getElementById('forn-nome').value.trim(),
+      doc:      document.getElementById('forn-doc').value.trim() || null,
+      telefone: document.getElementById('forn-tel').value.trim() || null,
+      cidade:   document.getElementById('forn-cidade').value.trim() || null
+    };
+    if(!payload.nome) { erro.textContent = 'Informe o nome.'; erro.style.display = 'block'; return; }
+    try {
+      if(_fornecedorEditandoId !== null) {
+        const atualizado = await api('PUT', `/api/fornecedores/${_fornecedorEditandoId}`, payload);
+        const idx = dbFornecedores.findIndex(x => x.id === _fornecedorEditandoId);
+        if(idx !== -1) dbFornecedores[idx] = atualizado;
+      } else {
+        const novo = await api('POST', '/api/fornecedores', payload);
+        dbFornecedores.push(novo);
+      }
+      closeFornecedor();
+      renderFornecedores();
+      renderListaFornecedores();
     } catch(err) {
       erro.textContent = err.message;
       erro.style.display = 'block';
