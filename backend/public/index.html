@@ -608,7 +608,32 @@
 
     <!-- Vendas -->
     <div id="page-vendas" style="display:none;">
-      <div class="page-title">Vendas <button class="btn" style="margin-left:16px;" onclick="openNovaVenda()">+ Nova Venda</button></div>
+      <div class="page-title">Vendas</div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+        <button class="btn" onclick="openNovaVenda()">+ Nova Venda</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;background:#f6f8fc;padding:12px 16px;border-radius:10px;">
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
+          Mês
+          <input type="month" id="filtro-vd-mes" onchange="renderVendas()"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
+          Cliente
+          <select id="filtro-vd-cliente" onchange="renderVendas()"
+                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;min-width:200px;">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
+          Buscar (produto, código, pagamento)
+          <input type="text" id="filtro-vd-busca" oninput="renderVendas()" placeholder="🔍 ex: 1234, mouse, PIX"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+        </label>
+        <button class="btn" type="button" onclick="limparFiltrosVendas()"
+                style="background:#eceef2;color:var(--azul);font-size:13px;padding:8px 14px;align-self:flex-end;">Limpar</button>
+        <span id="contador-vendas" style="color:#668;font-size:13px;align-self:flex-end;margin-left:auto;"></span>
+      </div>
       <table>
         <thead>
           <tr>
@@ -2956,13 +2981,63 @@
   function renderVendas() {
     const tbody = document.getElementById('tbody-vendas');
     if(!tbody) return;
+    // Atualiza opções do select de cliente (mantém o valor atual)
+    const selCliente = document.getElementById('filtro-vd-cliente');
+    if (selCliente) {
+      const valorAtual = selCliente.value;
+      const clientesUnicos = [...new Set(dbVendas.map(v => v.cliente).filter(Boolean))].sort();
+      selCliente.innerHTML = '<option value="">Todos</option>' +
+        clientesUnicos.map(c => `<option value="${c.replace(/"/g,'&quot;')}"${c===valorAtual?' selected':''}>${c}</option>`).join('');
+    }
     if(dbVendas.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma venda registrada.</td></tr>';
+      const c = document.getElementById('contador-vendas');
+      if(c) c.textContent = '';
+      agendarSalvar();
       return;
     }
-    const vendas = [...dbVendas].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    // Aplica filtros
+    const filtroMes = document.getElementById('filtro-vd-mes')?.value || '';
+    const filtroCliente = document.getElementById('filtro-vd-cliente')?.value || '';
+    const filtroBusca = (document.getElementById('filtro-vd-busca')?.value || '').trim().toLowerCase();
+    let lista = [...dbVendas];
+    if (filtroMes) {
+      lista = lista.filter(v => (v.data || '').slice(0, 7) === filtroMes);
+    }
+    if (filtroCliente) {
+      lista = lista.filter(v => v.cliente === filtroCliente);
+    }
+    if (filtroBusca) {
+      // Indexa código→nome a partir de dbProdutos para permitir busca por código
+      const nomeParaCodigo = new Map();
+      (dbProdutos || []).forEach(p => {
+        if (p.nome) nomeParaCodigo.set(p.nome, String(p.codigo || ''));
+      });
+      lista = lista.filter(v => {
+        const itensTxt = (v.itens || []).map(i => {
+          const nomeProduto = i.produto || i.nome || '';
+          const codigoProduto = nomeParaCodigo.get(nomeProduto) || i.codigo || '';
+          return `${nomeProduto} ${codigoProduto}`;
+        }).join(' ').toLowerCase();
+        return itensTxt.includes(filtroBusca) ||
+               (v.cliente && v.cliente.toLowerCase().includes(filtroBusca)) ||
+               (v.pagamento && v.pagamento.toLowerCase().includes(filtroBusca));
+      });
+    }
+    lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    const c = document.getElementById('contador-vendas');
+    if(c) {
+      const totalFiltrado = lista.reduce((s, v) => s + (Number(v.total) || 0), 0);
+      c.textContent = (filtroMes || filtroCliente || filtroBusca)
+        ? `${lista.length} de ${dbVendas.length} · Total: ${formatarBRL(totalFiltrado)}`
+        : `${dbVendas.length} venda(s) · Total: ${formatarBRL(totalFiltrado)}`;
+    }
+    if(lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma venda encontrada com os filtros aplicados.</td></tr>';
+      return;
+    }
     const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' };
-    tbody.innerHTML = vendas.map(v => {
+    tbody.innerHTML = lista.map(v => {
       const pag = pagamentoLabel[v.pagamento] || v.pagamento;
       const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
       const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
@@ -2981,6 +3056,12 @@
       `;
     }).join('');
     agendarSalvar();
+  }
+  function limparFiltrosVendas() {
+    const m = document.getElementById('filtro-vd-mes');     if(m) m.value = '';
+    const c = document.getElementById('filtro-vd-cliente'); if(c) c.value = '';
+    const b = document.getElementById('filtro-vd-busca');   if(b) b.value = '';
+    renderVendas();
   }
 
   // ====== RENDERIZAÇÃO: CONTAS A RECEBER ======
