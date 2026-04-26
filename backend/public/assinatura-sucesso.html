@@ -81,7 +81,7 @@
           <div class="lbl">Login</div>
           <div class="val">${escapeHtml(data.emailContato || '')}</div>
         </div>
-        <a href="/login.html" class="btn">Acessar o Sistema →</a>
+        <a href="/login" class="btn">Acessar o Sistema →</a>
         <div class="suporte">
           Em caso de dúvidas: <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
         </div>
@@ -92,7 +92,7 @@
         <h1 style="color:var(--vermelho);">Pagamento recusado</h1>
         <p>Não foi possível concluir o pagamento. Você pode tentar novamente ou entrar em contato com o suporte.</p>
         ${data.linkPagamento ? `<a href="${data.linkPagamento}" class="btn">Tentar Pagar Novamente</a>` : ''}
-        <a href="/assinar.html" class="btn btn-ghost">Voltar aos Planos</a>
+        <a href="/assinar" class="btn btn-ghost">Voltar aos Planos</a>
         <div class="suporte">
           Precisa de ajuda? <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
         </div>
@@ -102,7 +102,7 @@
         <div class="icon">⌛</div>
         <h1>Pagamento expirado</h1>
         <p>O prazo para pagamento desta solicitação venceu. Você pode iniciar uma nova assinatura.</p>
-        <a href="/assinar.html" class="btn">Nova Assinatura</a>
+        <a href="/assinar" class="btn">Nova Assinatura</a>
       `;
     } else {
       // Pendente
@@ -133,7 +133,7 @@
       <div class="icon">⚠️</div>
       <h1 style="color:var(--vermelho);">Algo deu errado</h1>
       <p>${escapeHtml(msg)}</p>
-      <a href="/assinar.html" class="btn">Voltar aos Planos</a>
+      <a href="/assinar" class="btn">Voltar aos Planos</a>
       <div class="suporte" style="margin-top:18px;">
         Suporte: <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
       </div>

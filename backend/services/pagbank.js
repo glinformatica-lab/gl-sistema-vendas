@@ -71,8 +71,8 @@ async function criarCheckout({ referencia, valor, descricao, email, nome, formas
 
   // URLs de retorno e webhook - só se APP_URL for HTTPS público
   if (urlsValidas) {
-    payload.redirect_url = `${APP_URL}/assinatura-sucesso.html?ref=${encodeURIComponent(referencia)}`;
-    payload.return_url   = `${APP_URL}/assinatura-sucesso.html?ref=${encodeURIComponent(referencia)}`;
+    payload.redirect_url = `${APP_URL}/assinatura-sucesso?ref=${encodeURIComponent(referencia)}`;
+    payload.return_url   = `${APP_URL}/assinatura-sucesso?ref=${encodeURIComponent(referencia)}`;
     payload.notification_urls = [`${APP_URL}/api/assinaturas/webhook`];
     payload.payment_notification_urls = [`${APP_URL}/api/assinaturas/webhook`];
   }

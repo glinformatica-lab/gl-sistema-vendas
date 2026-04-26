@@ -32,6 +32,12 @@ app.use('/api/master', autenticarMaster, require('./routes/master'));
 // Healthcheck (Render usa)
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
+// URLs amigáveis (sem .html)
+app.get('/assinar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinar.html')));
+app.get('/assinatura-sucesso', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinatura-sucesso.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/master', (req, res) => res.sendFile(path.join(__dirname, 'public', 'master.html')));
+
 // Frontend estático
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
