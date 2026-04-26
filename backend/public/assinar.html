@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Assinar — GL Sistema de Vendas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --azul:#3960f9; --verde:#18c29c; --vermelho:#e8556a; --amarelo:#ffd43b;
+      --cinza:#eceef2; --bg:#f6f8fc; --txt:#2a3140; --cinza-borda:#d2d6df;
+      --master:#7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:linear-gradient(135deg,#f6f8fc 0%, #e8eef9 100%); color:var(--txt); font-family:'Segoe UI',Arial,sans-serif; min-height:100vh; }
+    .container { max-width:1100px; margin:0 auto; padding:32px 20px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:34px; }
+    .topbar .logo { font-size:22px; font-weight:900; color:var(--azul); }
+    .topbar .logo span { color:var(--verde); }
+    .topbar a { color:var(--azul); text-decoration:none; font-weight:600; font-size:14px; }
+    .topbar a:hover { text-decoration:underline; }
+
+    h1 { text-align:center; font-size:32px; margin:0 0 8px 0; color:var(--txt); }
+    .sub { text-align:center; color:#668; font-size:16px; margin-bottom:36px; }
+
+    /* Cards de plano */
+    .planos { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; margin-bottom:32px; }
+    .plano { background:#fff; border:2px solid var(--cinza-borda); border-radius:16px; padding:28px 24px; cursor:pointer; transition:all 0.2s; position:relative; }
+    .plano:hover { border-color:var(--azul); transform:translateY(-2px); box-shadow:0 6px 24px rgba(57,96,249,0.15); }
+    .plano.selecionado { border-color:var(--azul); background:linear-gradient(135deg, #f0f4ff, #fff); box-shadow:0 6px 24px rgba(57,96,249,0.18); }
+    .plano.popular::before {
+      content:'MAIS POPULAR'; position:absolute; top:-12px; right:18px;
+      background:var(--verde); color:#fff; font-size:11px; font-weight:900;
+      padding:4px 12px; border-radius:14px; letter-spacing:0.6px;
+    }
+    .plano h3 { margin:0 0 8px 0; color:var(--azul); font-size:20px; }
+    .plano .preco { font-size:36px; font-weight:900; color:var(--txt); margin:14px 0 4px 0; }
+    .plano .preco .moeda { font-size:18px; vertical-align:super; }
+    .plano .preco .periodo { font-size:14px; color:#668; font-weight:600; }
+    .plano .economia { background:#dcfce7; color:#166534; font-size:12px; font-weight:700; padding:5px 10px; border-radius:8px; display:inline-block; margin-bottom:10px; }
+    .plano .desc { font-size:13px; color:#668; margin-top:8px; }
+    .plano ul { padding:0 0 0 18px; margin:14px 0 0 0; font-size:14px; line-height:1.8; color:#444; }
+    .plano ul li { list-style:none; position:relative; padding-left:22px; }
+    .plano ul li::before { content:'✓'; position:absolute; left:0; color:var(--verde); font-weight:900; }
+
+    /* Formulário */
+    .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
+    .form-card.visivel { display:block; }
+    .form-card h2 { margin:0 0 6px 0; color:var(--azul); font-size:22px; }
+    .form-card .form-sub { color:#668; font-size:14px; margin-bottom:20px; }
+    .form-row { display:flex; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+    .form-row > div { flex:1; min-width:200px; }
+    .form-card label { display:block; font-weight:600; font-size:13px; color:#555; margin-bottom:5px; }
+    .form-card input, .form-card select { width:100%; padding:11px 13px; border:1px solid var(--cinza-borda); border-radius:8px; font-size:15px; font-family:inherit; }
+    .form-card input:focus { outline:1.5px solid var(--azul); }
+    .form-card .resumo { background:#f0f4ff; border-radius:10px; padding:14px 18px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; }
+    .form-card .resumo .lbl { font-size:13px; color:#668; }
+    .form-card .resumo .val { font-size:22px; font-weight:900; color:var(--azul); }
+    .form-card .btn { background:var(--azul); color:#fff; border:none; padding:14px; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; width:100%; margin-top:14px; }
+    .form-card .btn:hover { background:#2a4ad6; }
+    .form-card .btn:disabled { background:#9aa6c0; cursor:wait; }
+    .form-card .btn-trial { background:transparent; color:var(--azul); border:none; font-size:13px; cursor:pointer; margin-top:14px; text-decoration:underline; padding:0; width:100%; }
+    .form-card .erro { background:#fff1f2; color:var(--vermelho); padding:11px 14px; border-radius:8px; font-size:14px; margin-top:14px; display:none; border:1px solid #fecaca; }
+    .form-card .erro.show { display:block; }
+    .seguranca { display:flex; align-items:center; gap:10px; margin-top:20px; padding:12px 16px; background:#f0fdf4; border-radius:10px; font-size:13px; color:#166534; }
+    .footer { text-align:center; margin-top:30px; font-size:13px; color:#668; }
+    .footer a { color:#25D366; font-weight:700; text-decoration:none; }
+
+    @media (max-width: 600px) {
+      h1 { font-size:24px; }
+      .form-card { padding:22px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="topbar">
+    <div class="logo">GL <span>Sistema de Vendas</span></div>
+    <a href="/login.html">← Voltar ao login</a>
+  </div>
+
+  <h1>Assine e comece a usar agora mesmo</h1>
+  <p class="sub">Escolha o plano que cabe no seu negócio. Pague com PIX, cartão ou boleto.</p>
+
+  <div class="planos">
+    <div class="plano" id="plano-mensal" onclick="selecionarPlano('mensal')">
+      <h3>📅 Mensal</h3>
+      <div class="preco">
+        <span class="moeda">R$</span>99<span class="periodo">,00 / mês</span>
+      </div>
+      <div class="desc">Cobrado mensalmente</div>
+      <ul>
+        <li>Sistema de Vendas completo</li>
+        <li>Controle de Estoque</li>
+        <li>Financeiro (Contas a Pagar/Receber)</li>
+        <li>Relatórios e DRE</li>
+        <li>Múltiplos usuários</li>
+        <li>Suporte por WhatsApp</li>
+      </ul>
+    </div>
+
+    <div class="plano popular" id="plano-anual" onclick="selecionarPlano('anual')">
+      <h3>🌟 Anual</h3>
+      <div class="economia">💰 Economize 16% (R$ 189/ano)</div>
+      <div class="preco">
+        <span class="moeda">R$</span>83<span class="periodo">,25 / mês</span>
+      </div>
+      <div class="desc">R$ 999,00 cobrados uma vez por ano</div>
+      <ul>
+        <li>Tudo do Plano Mensal</li>
+        <li><strong>16% de desconto</strong></li>
+        <li>Parcele em até 12x sem juros</li>
+        <li>Atendimento prioritário</li>
+      </ul>
+    </div>
+  </div>
+
+  <form class="form-card" id="form-card" onsubmit="enviar(event)">
+    <h2>Crie sua conta</h2>
+    <p class="form-sub">Após o pagamento, sua conta é ativada automaticamente.</p>
+
+    <h3 style="font-size:14px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:18px 0 10px 0;">Dados da empresa</h3>
+    <div class="form-row">
+      <div>
+        <label>Nome da empresa*</label>
+        <input type="text" id="empresa" required maxlength="80" placeholder="Razão social ou nome fantasia">
+      </div>
+      <div>
+        <label>CNPJ (opcional)</label>
+        <input type="text" id="cnpj" maxlength="18" placeholder="00.000.000/0000-00">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Telefone (opcional)</label>
+        <input type="tel" id="telefone" maxlength="15" placeholder="(00) 00000-0000">
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:24px 0 10px 0;">Seu acesso (administrador)</h3>
+    <div class="form-row">
+      <div>
+        <label>Seu nome*</label>
+        <input type="text" id="nomeAdmin" required maxlength="60">
+      </div>
+      <div>
+        <label>Seu e-mail*</label>
+        <input type="email" id="emailAdmin" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Senha (mín. 6 caracteres)*</label>
+        <input type="password" id="senhaAdmin" required minlength="6">
+      </div>
+    </div>
+
+    <div class="resumo">
+      <div>
+        <div class="lbl">Plano selecionado:</div>
+        <div style="font-weight:700;font-size:16px;" id="resumo-plano">—</div>
+      </div>
+      <div class="val" id="resumo-valor">—</div>
+    </div>
+
+    <div class="erro" id="erro"></div>
+
+    <button type="submit" class="btn" id="btn-assinar">Continuar para o Pagamento →</button>
+
+    <div class="seguranca">
+      🔒 Pagamento processado com segurança pelo PagBank — Aceita PIX, cartão e boleto
+    </div>
+  </form>
+
+  <div class="footer" style="margin-top:34px;">
+    Em caso de dúvidas: <a href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20tenho%20d%C3%BAvidas%20sobre%20a%20assinatura%20do%20GL%20Sistema%20de%20Vendas" target="_blank">📱 WhatsApp (62) 99234-7572</a>
+  </div>
+</div>
+
+<script>
+  let _planoSelecionado = null;
+  const PLANOS = {
+    mensal: { nome: 'Plano Mensal', valor: 99.00, label: 'R$ 99,00 / mês' },
+    anual:  { nome: 'Plano Anual',  valor: 999.00, label: 'R$ 999,00 / ano' }
+  };
+
+  function selecionarPlano(p) {
+    _planoSelecionado = p;
+    document.querySelectorAll('.plano').forEach(el => el.classList.remove('selecionado'));
+    document.getElementById('plano-' + p).classList.add('selecionado');
+    document.getElementById('form-card').classList.add('visivel');
+    document.getElementById('resumo-plano').textContent = PLANOS[p].nome;
+    document.getElementById('resumo-valor').textContent = PLANOS[p].label;
+    // Rolar suavemente até o formulário
+    setTimeout(() => {
+      document.getElementById('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // Máscaras
+  function maskCnpj(v) {
+    v = v.replace(/\D/g,'').slice(0,14);
+    v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+    v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+    v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+    v = v.replace(/(\d{4})(\d)/, '$1-$2');
+    return v;
+  }
+  function maskPhone(v) {
+    v = v.replace(/\D/g,'').slice(0,11);
+    if(v.length>10) return "("+v.substr(0,2)+") "+v.substr(2,5)+"-"+v.substr(7,4);
+    if(v.length>6) return "("+v.substr(0,2)+") "+v.substr(2,4)+"-"+v.substr(6,4);
+    if(v.length>2) return "("+v.substr(0,2)+") "+v.substr(2);
+    if(v.length>0) return "("+v;
+    return "";
+  }
+  document.getElementById('cnpj').addEventListener('input', function(){ this.value = maskCnpj(this.value); });
+  document.getElementById('telefone').addEventListener('input', function(){ this.value = maskPhone(this.value); });
+
+  async function enviar(e) {
+    e.preventDefault();
+    const erro = document.getElementById('erro');
+    const btn = document.getElementById('btn-assinar');
+    erro.classList.remove('show');
+
+    if (!_planoSelecionado) {
+      erro.textContent = 'Selecione um plano antes de continuar.';
+      erro.classList.add('show');
+      return;
+    }
+
+    const payload = {
+      plano: _planoSelecionado,
+      empresa: document.getElementById('empresa').value.trim(),
+      cnpj: document.getElementById('cnpj').value.trim() || null,
+      telefone: document.getElementById('telefone').value.trim() || null,
+      nomeAdmin: document.getElementById('nomeAdmin').value.trim(),
+      emailAdmin: document.getElementById('emailAdmin').value.trim(),
+      senhaAdmin: document.getElementById('senhaAdmin').value
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Criando sua conta...';
+
+    try {
+      const r = await fetch('/api/assinaturas/iniciar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao processar.');
+
+      // Redireciona para o checkout do PagBank
+      btn.textContent = 'Redirecionando para o PagBank...';
+      window.location.href = data.linkPagamento;
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Continuar para o Pagamento →';
+    }
+  }
+</script>
+</body>
+</html>

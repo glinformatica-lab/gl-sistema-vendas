@@ -13,6 +13,7 @@ app.use(express.json({ limit: '5mb' }));
 
 // Rotas públicas (sem auth)
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/assinaturas', require('./routes/assinaturas'));
 
 // Rotas protegidas (token de empresa)
 app.use('/api/produtos',        autenticar, require('./routes/produtos'));

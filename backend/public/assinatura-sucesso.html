@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Confirmação — GL Sistema de Vendas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --azul:#3960f9; --verde:#18c29c; --vermelho:#e8556a; --amarelo:#f59e0b;
+      --bg:#f6f8fc; --txt:#2a3140; --cinza-borda:#d2d6df;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:linear-gradient(135deg,#f6f8fc 0%, #e8eef9 100%); color:var(--txt); font-family:'Segoe UI',Arial,sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .card { background:#fff; border-radius:18px; padding:40px 36px; max-width:520px; width:100%; box-shadow:0 8px 36px rgba(0,0,0,0.08); text-align:center; }
+    .icon { font-size:60px; margin-bottom:14px; }
+    h1 { font-size:24px; margin:0 0 10px 0; }
+    p { color:#668; font-size:15px; line-height:1.6; }
+    .info { background:#f0f4ff; border-radius:10px; padding:16px 20px; margin:18px 0; text-align:left; }
+    .info .lbl { font-size:12px; color:#668; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; }
+    .info .val { font-size:16px; font-weight:700; color:var(--txt); margin-bottom:6px; }
+    .btn { background:var(--azul); color:#fff; border:none; padding:13px 24px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; margin-top:14px; }
+    .btn:hover { background:#2a4ad6; }
+    .btn-ghost { background:transparent; color:var(--azul); border:1px solid var(--cinza-borda); }
+    .status-pendente { background:#fef3c7; color:#92400e; padding:14px 18px; border-radius:10px; font-size:14px; }
+    .status-paga { background:#dcfce7; color:#166534; padding:14px 18px; border-radius:10px; font-size:14px; }
+    .status-recusada { background:#fee2e2; color:#991b1b; padding:14px 18px; border-radius:10px; font-size:14px; }
+    .pulso { display:inline-block; width:10px; height:10px; background:#f59e0b; border-radius:50%; margin-right:8px; animation:pulso 1.5s infinite; }
+    @keyframes pulso { 0%, 100% { opacity:1 } 50% { opacity:0.3 } }
+    .suporte { margin-top:24px; font-size:13px; color:#668; }
+    .suporte a { color:#25D366; font-weight:700; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="icon">⏳</div>
+    <h1 id="titulo">Verificando pagamento...</h1>
+    <p id="descricao">Aguarde um momento.</p>
+  </div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const referencia = params.get('ref');
+  const card = document.getElementById('card');
+  let tentativas = 0;
+  const MAX_TENTATIVAS = 30; // ~2 minutos
+
+  if (!referencia) {
+    renderErro('Referência não fornecida.');
+  } else {
+    consultar();
+  }
+
+  async function consultar() {
+    tentativas++;
+    try {
+      const r = await fetch('/api/assinaturas/' + encodeURIComponent(referencia));
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao consultar');
+      renderStatus(data);
+
+      // Se ainda pendente, tenta de novo em 4s (mas só até MAX_TENTATIVAS)
+      if (data.status === 'pendente' && tentativas < MAX_TENTATIVAS) {
+        setTimeout(consultar, 4000);
+      }
+    } catch (err) {
+      renderErro(err.message);
+    }
+  }
+
+  function renderStatus(data) {
+    if (data.status === 'paga') {
+      card.innerHTML = `
+        <div class="icon">🎉</div>
+        <h1 style="color:var(--verde);">Pagamento confirmado!</h1>
+        <p>Sua conta foi ativada com sucesso. Já pode fazer login!</p>
+        <div class="info">
+          <div class="lbl">Empresa</div>
+          <div class="val">${escapeHtml(data.empresaNome || '')}</div>
+          <div class="lbl">Plano</div>
+          <div class="val">${data.plano === 'anual' ? 'Anual' : 'Mensal'} — R$ ${Number(data.valor).toFixed(2).replace('.', ',')}</div>
+          <div class="lbl">Login</div>
+          <div class="val">${escapeHtml(data.emailContato || '')}</div>
+        </div>
+        <a href="/login.html" class="btn">Acessar o Sistema →</a>
+        <div class="suporte">
+          Em caso de dúvidas: <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
+        </div>
+      `;
+    } else if (data.status === 'recusada') {
+      card.innerHTML = `
+        <div class="icon">❌</div>
+        <h1 style="color:var(--vermelho);">Pagamento recusado</h1>
+        <p>Não foi possível concluir o pagamento. Você pode tentar novamente ou entrar em contato com o suporte.</p>
+        ${data.linkPagamento ? `<a href="${data.linkPagamento}" class="btn">Tentar Pagar Novamente</a>` : ''}
+        <a href="/assinar.html" class="btn btn-ghost">Voltar aos Planos</a>
+        <div class="suporte">
+          Precisa de ajuda? <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
+        </div>
+      `;
+    } else if (data.status === 'expirada' || data.status === 'cancelada') {
+      card.innerHTML = `
+        <div class="icon">⌛</div>
+        <h1>Pagamento expirado</h1>
+        <p>O prazo para pagamento desta solicitação venceu. Você pode iniciar uma nova assinatura.</p>
+        <a href="/assinar.html" class="btn">Nova Assinatura</a>
+      `;
+    } else {
+      // Pendente
+      card.innerHTML = `
+        <div class="icon">⏳</div>
+        <h1>Aguardando confirmação do pagamento</h1>
+        <p>Estamos verificando o status na PagBank. Isso pode levar alguns minutos, especialmente para pagamentos via PIX ou boleto.</p>
+        <div class="status-pendente">
+          <span class="pulso"></span> Atualizando automaticamente a cada 4 segundos...
+        </div>
+        <div class="info" style="margin-top:18px;">
+          <div class="lbl">Empresa</div>
+          <div class="val">${escapeHtml(data.empresaNome || '')}</div>
+          <div class="lbl">Plano</div>
+          <div class="val">${data.plano === 'anual' ? 'Anual' : 'Mensal'} — R$ ${Number(data.valor).toFixed(2).replace('.', ',')}</div>
+        </div>
+        ${data.linkPagamento ? `<a href="${data.linkPagamento}" class="btn btn-ghost">Voltar à Tela de Pagamento</a>` : ''}
+        <div class="suporte">
+          Pode fechar esta janela. Quando o pagamento for confirmado, sua conta será ativada e você poderá fazer login.<br><br>
+          Dúvidas: <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
+        </div>
+      `;
+    }
+  }
+
+  function renderErro(msg) {
+    card.innerHTML = `
+      <div class="icon">⚠️</div>
+      <h1 style="color:var(--vermelho);">Algo deu errado</h1>
+      <p>${escapeHtml(msg)}</p>
+      <a href="/assinar.html" class="btn">Voltar aos Planos</a>
+      <div class="suporte" style="margin-top:18px;">
+        Suporte: <a href="https://wa.me/5562992347572" target="_blank">📱 WhatsApp (62) 99234-7572</a>
+      </div>
+    `;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+</script>
+</body>
+</html>

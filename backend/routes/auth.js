@@ -17,6 +17,12 @@ async function verificarLicenca(empresa, dbClient) {
   if (empresa.status === 'bloqueada') {
     return { ok: false, error: 'Esta empresa está bloqueada. Entre em contato com o suporte.' };
   }
+  if (empresa.status === 'aguardando-pagamento') {
+    return { ok: false, error: 'Sua assinatura ainda não foi confirmada. Após o pagamento, o acesso é liberado em poucos minutos. Em caso de dúvidas, entre em contato pelo WhatsApp (62) 99234-7572.' };
+  }
+  if (empresa.status === 'cancelada') {
+    return { ok: false, error: 'Esta assinatura foi cancelada. Entre em contato com o suporte para reativar.' };
+  }
   // Se tiver data_vencimento e estiver no passado, marca como vencida
   if (empresa.data_vencimento) {
     const hoje = new Date().toISOString().slice(0, 10);
