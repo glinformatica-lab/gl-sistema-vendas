@@ -1639,18 +1639,27 @@
     cnpj = cnpj.replace(/\D/g, '');
     if (cnpj.length !== 14) return false;
     if (/^(\d)\1+$/.test(cnpj)) return false;
-    let t = cnpj.length-2,
-        d = cnpj.substring(t),
-        d1 = parseInt(d.charAt(0)),
-        d2 = parseInt(d.charAt(1)),
-        calc = x => {
-          let n = 0;
-          for(let i = t; i > 0; i--) {
-            n += cnpj.charAt(t-i)*(x-i%8);
-          }
-          return n%11<2?0:11-n%11;
-        };
-    return calc(5)===d1 && calc(6)===d2;
+    // Cálculo do 1º dígito verificador
+    let tamanho = cnpj.length - 2;
+    let numeros = cnpj.substring(0, tamanho);
+    let digitos = cnpj.substring(tamanho);
+    let soma = 0, pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+      soma += numeros.charAt(tamanho - i) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado != parseInt(digitos.charAt(0))) return false;
+    // Cálculo do 2º dígito verificador
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0; pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+      soma += numeros.charAt(tamanho - i) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    return resultado == parseInt(digitos.charAt(1));
   }
   // Máscara telefone
   function maskPhone(v) {
