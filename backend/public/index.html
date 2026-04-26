@@ -1096,10 +1096,20 @@
         <span class="label">Subtotal</span>
         <span class="valor" id="nv-subtotal" style="color:var(--azul);">R$ 0,00</span>
       </div>
-      <div class="form-row" style="margin-top:12px;">
-        <div class="form-field" style="max-width:220px;">
-          <label>Desconto (R$)</label>
-          <input type="number" id="nv-desconto" min="0" step="0.01" value="0.00">
+      <div class="form-row" style="margin-top:12px;align-items:flex-end;gap:8px;">
+        <div class="form-field" style="max-width:140px;">
+          <label>Tipo de desconto</label>
+          <select id="nv-tipo-desconto" onchange="atualizarTotalVenda()">
+            <option value="valor">R$ (valor)</option>
+            <option value="percentual">% (percentual)</option>
+          </select>
+        </div>
+        <div class="form-field" style="max-width:160px;">
+          <label>Desconto</label>
+          <input type="number" id="nv-desconto" min="0" step="0.01" value="0" oninput="atualizarTotalVenda()">
+        </div>
+        <div style="font-size:12px;color:#668;padding-bottom:14px;flex:1;">
+          <span id="nv-desconto-info">Sem desconto</span>
         </div>
       </div>
       <div class="totais-box" style="background:#eef9f5;border-color:#c3edde;">
@@ -3357,6 +3367,9 @@
     document.getElementById('nv-erro').style.display = 'none';
     document.getElementById('nv-subtotal').textContent = 'R$ 0,00';
     document.getElementById('nv-total-final').textContent = 'R$ 0,00';
+    document.getElementById('nv-tipo-desconto').value = 'valor';
+    document.getElementById('nv-desconto-info').textContent = 'Sem desconto';
+    document.getElementById('nv-desconto-info').style.color = '#668';
     _vendaEditandoId = null;
     document.querySelector('#form-nova-venda h2').textContent = 'Nova Venda';
     document.querySelector('#form-nova-venda button[type="submit"]').textContent = 'Salvar Venda';
@@ -3404,12 +3417,40 @@
       const preco = parseFloat(tr.querySelector('.nv-item-preco').value) || 0;
       subtotal += qtd * preco;
     });
-    const desconto = parseFloat(document.getElementById('nv-desconto').value) || 0;
-    const total = Math.max(0, subtotal - desconto);
+    const tipoDesc = document.getElementById('nv-tipo-desconto')?.value || 'valor';
+    const inputDesc = parseFloat(document.getElementById('nv-desconto').value) || 0;
+    let descontoValor = 0;
+    let percentualReal = 0;
+    if (tipoDesc === 'percentual') {
+      percentualReal = Math.min(inputDesc, 100);
+      descontoValor = subtotal * (percentualReal / 100);
+    } else {
+      descontoValor = Math.min(inputDesc, subtotal);
+      percentualReal = subtotal > 0 ? (descontoValor / subtotal * 100) : 0;
+    }
+    const total = Math.max(0, subtotal - descontoValor);
     document.getElementById('nv-subtotal').textContent    = formatarBRL(subtotal);
     document.getElementById('nv-total-final').textContent = formatarBRL(total);
+    // Info do desconto: alerta visual se acima de 10%
+    const info = document.getElementById('nv-desconto-info');
+    if (info) {
+      if (descontoValor <= 0) {
+        info.textContent = 'Sem desconto';
+        info.style.color = '#668';
+      } else {
+        const txt = `${formatarBRL(descontoValor)} (${percentualReal.toFixed(1)}%)`;
+        if (percentualReal > 10) {
+          info.innerHTML = `${txt} ⚠️ <span style="color:var(--vermelho);font-weight:700;">acima de 10% — exigirá senha de admin</span>`;
+        } else {
+          info.textContent = txt;
+          info.style.color = '#166534';
+        }
+      }
+    }
     atualizarPreviaParcelas();
   }
+  // Alias antigo (compatibilidade)
+  function atualizarTotalVenda() { atualizarTotaisVenda(); }
   document.getElementById('nv-desconto').addEventListener('input', atualizarTotaisVenda);
   function toggleParcelasVenda() {
     const pag = document.getElementById('nv-pagamento').value;
@@ -3487,7 +3528,43 @@
       if(!preco || preco <= 0) return mostrarErro('Preço unitário é obrigatório e deve ser maior que zero.');
       itens.push({ produto, qtd, preco });
     }
-    const desconto = parseFloat(document.getElementById('nv-desconto').value) || 0;
+    // Calcula desconto em valor (a partir do tipo escolhido)
+    const tipoDesc = document.getElementById('nv-tipo-desconto')?.value || 'valor';
+    const inputDesc = parseFloat(document.getElementById('nv-desconto').value) || 0;
+    let subtotalCalc = 0;
+    for (const it of itens) subtotalCalc += it.qtd * it.preco;
+    let desconto = 0;
+    let percentualDesc = 0;
+    if (tipoDesc === 'percentual') {
+      percentualDesc = Math.min(inputDesc, 100);
+      desconto = subtotalCalc * (percentualDesc / 100);
+    } else {
+      desconto = Math.min(inputDesc, subtotalCalc);
+      percentualDesc = subtotalCalc > 0 ? (desconto / subtotalCalc * 100) : 0;
+    }
+    // Se desconto > 10% e usuário não é admin, exige senha de admin
+    if (percentualDesc > 10 && window._papelAtual !== 'admin') {
+      const senhaAdmin = prompt(`Desconto de ${percentualDesc.toFixed(1)}% excede 10%.\n\nDigite a senha de um administrador para autorizar:`);
+      if (!senhaAdmin) return mostrarErro('Desconto acima de 10% requer autorização de administrador.');
+      // Valida senha tentando o endpoint /api/auth/login com email do usuário admin (que precisa estar conhecido)
+      // Como não sabemos o email, pedimos também ao admin
+      const emailAdmin = prompt('Digite o e-mail do administrador:');
+      if (!emailAdmin) return mostrarErro('Autorização cancelada.');
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ email: emailAdmin, senha: senhaAdmin })
+        });
+        const data = await r.json();
+        if (!r.ok) return mostrarErro('Senha incorreta. Desconto não autorizado.');
+        if (data.usuario.papel !== 'admin') return mostrarErro('O usuário informado não é administrador.');
+        if (data.empresa.id !== JSON.parse(localStorage.getItem('empresa') || '{}').id) {
+          return mostrarErro('Administrador inválido.');
+        }
+      } catch (e) {
+        return mostrarErro('Erro ao validar senha do administrador.');
+      }
+    }
 
     try {
       // Edição: por simplicidade, deletamos e recriamos
@@ -3526,6 +3603,7 @@
     document.getElementById('nv-cliente').value = v.cliente || '';
     document.getElementById('nv-data').value    = v.data || '';
     document.getElementById('nv-desconto').value = (v.desconto || 0).toFixed(2);
+    document.getElementById('nv-tipo-desconto').value = 'valor'; // edição sempre em valor (já está calculado)
     document.getElementById('nv-pagamento').value = v.pagamento || 'A Vista';
     document.getElementById('nv-obs').value = v.obs || '';
     // Itens
