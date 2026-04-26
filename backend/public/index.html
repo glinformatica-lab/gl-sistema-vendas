@@ -493,8 +493,12 @@
     <!-- Clientes (INTEGRADO) -->
     <div id="page-clientes" style="display:none;">
       <div class="page-title">Clientes</div>
-      <div class="actions">
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoCliente()">&#43; Novo Cliente</button>
+        <input type="text" id="busca-clientes" placeholder="🔍 Buscar por nome, CPF/CNPJ, telefone ou cidade"
+               style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
+               oninput="renderClientes()">
+        <span id="contador-clientes" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
         <thead>
@@ -514,10 +518,14 @@
 
     <!-- Fornecedores -->
     <div id="page-fornecedores" style="display:none;">
-      <div class="page-title">
-        Fornecedores
-        <button class="btn" style="margin-left:16px;" onclick="openNovoFornecedor()">+ Novo Fornecedor</button>
-        <button class="btn" style="margin-left:8px;background:#eceef2;color:var(--azul);" onclick="openEntradaMercadoria()">Entrada de Mercadoria</button>
+      <div class="page-title">Fornecedores</div>
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <button class="btn" onclick="openNovoFornecedor()">+ Novo Fornecedor</button>
+        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="openEntradaMercadoria()">Entrada de Mercadoria</button>
+        <input type="text" id="busca-fornecedores" placeholder="🔍 Buscar por nome, CPF/CNPJ ou cidade"
+               style="flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
+               oninput="renderFornecedores()">
+        <span id="contador-fornecedores" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
         <thead>
@@ -549,7 +557,14 @@
 
     <!-- Produtos -->
     <div id="page-produtos" style="display:none;">
-      <div class="page-title">Produtos <button class="btn" style="margin-left:16px;" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button></div>
+      <div class="page-title">Produtos</div>
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
+        <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria ou fornecedor"
+               style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
+               oninput="renderProdutos()">
+        <span id="contador-produtos" style="color:#668;font-size:13px;"></span>
+      </div>
       <table>
         <thead>
           <tr>
@@ -1948,11 +1963,35 @@
   function renderProdutos() {
     const tbody = document.getElementById('tbody-produtos');
     if(!tbody) return;
+    const inputBusca = document.getElementById('busca-produtos');
+    const termo = inputBusca ? inputBusca.value.trim().toLowerCase() : '';
+    let lista = dbProdutos;
+    if (termo) {
+      lista = dbProdutos.filter(p => (
+        (p.codigo && String(p.codigo).toLowerCase().includes(termo)) ||
+        (p.nome && p.nome.toLowerCase().includes(termo)) ||
+        (p.categoria && p.categoria.toLowerCase().includes(termo)) ||
+        (p.fornecedor && p.fornecedor.toLowerCase().includes(termo))
+      ));
+    }
+    const contador = document.getElementById('contador-produtos');
+    if(contador) {
+      contador.textContent = termo
+        ? `${lista.length} de ${dbProdutos.length} produto(s)`
+        : `${dbProdutos.length} produto(s)`;
+    }
     if(dbProdutos.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto cadastrado.</td></tr>';
+      agendarSalvar();
       return;
     }
-    tbody.innerHTML = dbProdutos.map((p, idx) => `
+    if(lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto encontrado para "${termo}".</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = lista.map(p => {
+      const idxOriginal = dbProdutos.indexOf(p);
+      return `
       <tr>
         <td>${p.codigo || '-'}</td>
         <td>${p.nome}</td>
@@ -1962,10 +2001,11 @@
         <td>${formatarBRL(p.precoCusto || 0)}</td>
         <td>${formatarBRL(p.precoVenda || 0)}</td>
         <td>
-          <button class="btn-link" onclick="editarProduto(${idx})">Editar</button>
+          <button class="btn-link" onclick="editarProduto(${idxOriginal})">Editar</button>
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
     agendarSalvar();
   }
   let _produtoEditandoIdx = null;
@@ -2781,11 +2821,38 @@
   function renderClientes() {
     const tbody = document.getElementById('tbody-clientes');
     if(!tbody) return;
+    const inputBusca = document.getElementById('busca-clientes');
+    const termo = inputBusca ? inputBusca.value.trim().toLowerCase() : '';
+    const termoNum = termo.replace(/\D/g, '');
+    let lista = dbClientes;
+    if (termo) {
+      lista = dbClientes.filter(c => {
+        const docNum = (c.doc || '').replace(/\D/g, '');
+        return (
+          (c.nome && c.nome.toLowerCase().includes(termo)) ||
+          (c.doc && c.doc.toLowerCase().includes(termo)) ||
+          (termoNum && docNum && docNum.includes(termoNum)) ||
+          (c.telefone && c.telefone.toLowerCase().includes(termo)) ||
+          (c.cidade && c.cidade.toLowerCase().includes(termo))
+        );
+      });
+    }
+    const contador = document.getElementById('contador-clientes');
+    if(contador) {
+      contador.textContent = termo
+        ? `${lista.length} de ${dbClientes.length} cliente(s)`
+        : `${dbClientes.length} cliente(s)`;
+    }
     if(dbClientes.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum cliente cadastrado.</td></tr>';
+      agendarSalvar();
       return;
     }
-    tbody.innerHTML = dbClientes.map((c, idx) => {
+    if(lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum cliente encontrado para "${termo}".</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = lista.map((c, idx) => {
       const endereco = [c.endereco, c.cidade && c.uf ? `${c.cidade}-${c.uf}` : c.cidade].filter(Boolean).join(', ') || '-';
       return `
         <tr>
@@ -4295,11 +4362,37 @@ ${conteudo}
   function renderFornecedores() {
     const tbody = document.getElementById('tbody-fornecedores');
     if(!tbody) return;
+    const inputBusca = document.getElementById('busca-fornecedores');
+    const termo = inputBusca ? inputBusca.value.trim().toLowerCase() : '';
+    const termoNum = termo.replace(/\D/g, '');
+    let lista = dbFornecedores || [];
+    if (termo) {
+      lista = lista.filter(f => {
+        const docNum = (f.doc || '').replace(/\D/g, '');
+        return (
+          (f.nome && f.nome.toLowerCase().includes(termo)) ||
+          (f.doc && f.doc.toLowerCase().includes(termo)) ||
+          (termoNum && docNum && docNum.includes(termoNum)) ||
+          (f.cidade && f.cidade.toLowerCase().includes(termo)) ||
+          (f.telefone && f.telefone.toLowerCase().includes(termo))
+        );
+      });
+    }
+    const contador = document.getElementById('contador-fornecedores');
+    if(contador) {
+      contador.textContent = termo
+        ? `${lista.length} de ${(dbFornecedores||[]).length} fornecedor(es)`
+        : `${(dbFornecedores||[]).length} fornecedor(es)`;
+    }
     if(!dbFornecedores || dbFornecedores.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum fornecedor cadastrado.</td></tr>';
       return;
     }
-    tbody.innerHTML = dbFornecedores.map(f => `
+    if(lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum fornecedor encontrado para "${termo}".</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = lista.map(f => `
       <tr>
         <td>${f.nome}</td>
         <td>${f.doc || '-'}</td>
