@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Entrar — GL Sistema de Vendas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root { --azul:#3960f9; --verde:#18c29c; --vermelho:#e8556a; --bg:#f6f8fc; --txt:#2a3140; --cinza-borda:#d2d6df; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--txt); font-family:'Segoe UI',Arial,sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .login-card { background:#fff; padding:40px 36px; border-radius:18px; max-width:440px; width:100%;
+      box-shadow:0 8px 36px rgba(0,0,0,0.06); }
+    .logo { font-size:24px; font-weight:900; color:var(--azul); margin-bottom:6px; letter-spacing:0.3px; }
+    .logo span { color:var(--verde); }
+    h1 { font-size:22px; margin:8px 0 4px 0; }
+    .sub { color:#668; font-size:14px; margin-bottom:24px; }
+    label { display:block; font-weight:600; font-size:13px; color:#555; margin-top:14px; margin-bottom:5px; }
+    input { width:100%; padding:11px 12px; border:1px solid var(--cinza-borda); border-radius:8px;
+      font-size:15px; font-family:inherit; }
+    input:focus { outline:1.5px solid var(--azul); }
+    .btn { width:100%; background:var(--azul); color:#fff; border:none; padding:13px; border-radius:8px;
+      font-size:15px; font-weight:700; cursor:pointer; margin-top:22px; transition:background 0.18s; }
+    .btn:hover { background:#2740c4; }
+    .btn:disabled { background:#9aa6c0; cursor:wait; }
+    .toggle { text-align:center; margin-top:18px; color:#668; font-size:14px; }
+    .toggle a { color:var(--azul); font-weight:700; cursor:pointer; text-decoration:none; }
+    .toggle a:hover { text-decoration:underline; }
+    .erro { background:#fff1f2; color:var(--vermelho); padding:10px 14px; border-radius:8px; font-size:14px;
+      margin-top:14px; display:none; border:1px solid #fecaca; }
+    .erro.show { display:block; }
+    .row { display:flex; gap:10px; }
+    .row > div { flex:1; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo">GL <span>Sistema de Vendas</span></div>
+
+    <!-- LOGIN -->
+    <div id="form-login">
+      <h1>Entrar</h1>
+      <div class="sub">Acesse sua conta para gerenciar suas vendas.</div>
+      <form id="form-login-el">
+        <label>E-mail</label>
+        <input type="email" id="login-email" required autocomplete="email">
+        <label>Senha</label>
+        <input type="password" id="login-senha" required autocomplete="current-password">
+        <div class="erro" id="login-erro"></div>
+        <button type="submit" class="btn" id="btn-login">Entrar</button>
+      </form>
+      <div class="toggle">Ainda não tem conta? <a onclick="toggleForm('cadastro')">Cadastrar minha empresa</a></div>
+    </div>
+
+    <!-- CADASTRO -->
+    <div id="form-cadastro" style="display:none;">
+      <h1>Cadastrar empresa</h1>
+      <div class="sub">Crie sua conta — você será o administrador.</div>
+      <form id="form-cadastro-el">
+        <label>Nome da empresa</label>
+        <input type="text" id="cad-empresa" required>
+        <label>CNPJ (opcional)</label>
+        <input type="text" id="cad-cnpj">
+        <label>Seu nome</label>
+        <input type="text" id="cad-nome" required>
+        <label>E-mail</label>
+        <input type="email" id="cad-email" required autocomplete="email">
+        <div class="row">
+          <div>
+            <label>Senha (mín. 6)</label>
+            <input type="password" id="cad-senha" required minlength="6" autocomplete="new-password">
+          </div>
+          <div>
+            <label>Confirmar</label>
+            <input type="password" id="cad-senha2" required minlength="6" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="erro" id="cad-erro"></div>
+        <button type="submit" class="btn" id="btn-cadastrar">Criar conta</button>
+      </form>
+      <div class="toggle">Já tem conta? <a onclick="toggleForm('login')">Entrar</a></div>
+    </div>
+
+    <!-- Bloco de Suporte -->
+    <div style="margin-top:18px;text-align:center;font-size:13px;color:#668;">
+      Precisa de ajuda?
+      <a href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20GL%20Sistema%20de%20Vendas"
+         target="_blank" rel="noopener"
+         style="color:#25D366;font-weight:700;text-decoration:none;margin-left:4px;">
+        &#128241; WhatsApp (62) 99234-7572
+      </a>
+    </div>
+
+    <!-- Link discreto pro painel Master -->
+    <div style="margin-top:14px;text-align:center;font-size:11px;">
+      <a href="/master.html" style="color:#aab;text-decoration:none;">Painel Master</a>
+    </div>
+  </div>
+
+<script>
+  // Se já tem token, redireciona para o sistema
+  if (localStorage.getItem('token')) {
+    window.location.href = '/index.html';
+  }
+
+  function toggleForm(tipo) {
+    document.getElementById('form-login').style.display    = tipo === 'login' ? '' : 'none';
+    document.getElementById('form-cadastro').style.display = tipo === 'cadastro' ? '' : 'none';
+    ['login-erro','cad-erro'].forEach(id => document.getElementById(id).classList.remove('show'));
+  }
+
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.classList.add('show');
+  }
+
+  document.getElementById('form-login-el').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true; btn.textContent = 'Entrando...';
+    document.getElementById('login-erro').classList.remove('show');
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('login-email').value.trim(),
+          senha: document.getElementById('login-senha').value
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao entrar');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      window.location.href = '/index.html';
+    } catch (err) {
+      showErr('login-erro', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Entrar';
+    }
+  });
+
+  document.getElementById('form-cadastro-el').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const senha  = document.getElementById('cad-senha').value;
+    const senha2 = document.getElementById('cad-senha2').value;
+    if (senha !== senha2) { showErr('cad-erro', 'As senhas não conferem.'); return; }
+    const btn = document.getElementById('btn-cadastrar');
+    btn.disabled = true; btn.textContent = 'Criando conta...';
+    document.getElementById('cad-erro').classList.remove('show');
+    try {
+      const r = await fetch('/api/auth/registrar-empresa', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          empresa: document.getElementById('cad-empresa').value.trim(),
+          cnpj:    document.getElementById('cad-cnpj').value.trim(),
+          nome:    document.getElementById('cad-nome').value.trim(),
+          email:   document.getElementById('cad-email').value.trim(),
+          senha
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao cadastrar');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      window.location.href = '/index.html';
+    } catch (err) {
+      showErr('cad-erro', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Criar conta';
+    }
+  });
+</script>
+</body>
+</html>
