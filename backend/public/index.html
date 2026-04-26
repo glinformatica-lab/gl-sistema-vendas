@@ -604,6 +604,7 @@
       <div class="page-title">Produtos</div>
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
+        <button class="btn" style="background:#16a34a;" onclick="openImportarProdutos()">📥 Importar Planilha</button>
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria ou fornecedor"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="renderProdutos()">
@@ -867,6 +868,58 @@
         <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeUsuario()">Cancelar</button>
       </div>
     </form>
+  </div>
+
+  <!-- Modal/Importar Produtos via Planilha -->
+  <div id="modal-importar-produtos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:32px;border-radius:12px;max-width:780px;width:95%;max-height:90vh;overflow-y:auto;">
+      <h2 style="color:var(--azul);margin-bottom:6px;">📥 Importar Produtos</h2>
+      <p style="color:#668;font-size:14px;margin-bottom:18px;">Aceita arquivos Excel (.xlsx) ou CSV. Produtos com nome já existente terão preço/categoria atualizados (estoque é preservado).</p>
+
+      <div style="background:#f6f8fc;padding:14px 18px;border-radius:10px;margin-bottom:16px;">
+        <strong>Colunas esperadas (na ordem):</strong>
+        <div style="font-family:monospace;font-size:13px;color:#445;margin-top:6px;">
+          codigo · nome · categoria · fornecedor · estoque · preco_custo · preco_venda
+        </div>
+        <button class="btn-link" onclick="baixarPlanilhaModelo()" style="margin-top:8px;display:inline-block;">📄 Baixar planilha modelo</button>
+      </div>
+
+      <label style="display:block;margin-bottom:12px;">
+        <strong>Selecione o arquivo:</strong>
+        <input type="file" id="imp-arquivo" accept=".xlsx,.xls,.csv" onchange="processarArquivoImport(event)"
+               style="display:block;margin-top:8px;padding:10px;border:1px dashed var(--cinza-borda);border-radius:8px;width:100%;background:#fafbff;">
+      </label>
+
+      <div id="imp-preview" style="display:none;margin-top:14px;">
+        <strong id="imp-preview-titulo">Pré-visualização</strong>
+        <div style="overflow-x:auto;max-height:300px;border:1px solid var(--cinza-borda);border-radius:8px;margin-top:8px;">
+          <table style="width:100%;font-size:13px;">
+            <thead style="background:#eef2ff;position:sticky;top:0;">
+              <tr>
+                <th style="padding:8px;">Linha</th>
+                <th style="padding:8px;">Código</th>
+                <th style="padding:8px;">Nome</th>
+                <th style="padding:8px;">Categoria</th>
+                <th style="padding:8px;">Fornecedor</th>
+                <th style="padding:8px;">Estoque</th>
+                <th style="padding:8px;">Custo</th>
+                <th style="padding:8px;">Venda</th>
+                <th style="padding:8px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="imp-preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="imp-resultado" style="display:none;margin-top:16px;padding:14px;border-radius:8px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn" id="imp-btn-confirmar" onclick="confirmarImportacao()" disabled
+                style="opacity:0.5;cursor:not-allowed;">Importar produtos</button>
+        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeImportarProdutos()">Fechar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal/Novo ou Editar Fornecedor -->
@@ -1504,6 +1557,7 @@
 
 <!-- Chart.js para o gráfico (dashboard) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
   // ====== AUTH GUARD: redireciona pro login se não tiver token ======
   (function() {
@@ -4775,6 +4829,193 @@ ${conteudo}
       erro.style.display = 'block';
     }
   });
+
+  // ====== IMPORTAÇÃO DE PRODUTOS (XLSX/CSV) ======
+  let _importItens = [];
+  function openImportarProdutos() {
+    document.getElementById('modal-importar-produtos').style.display = 'flex';
+    document.getElementById('imp-arquivo').value = '';
+    document.getElementById('imp-preview').style.display = 'none';
+    document.getElementById('imp-resultado').style.display = 'none';
+    document.getElementById('imp-btn-confirmar').disabled = true;
+    document.getElementById('imp-btn-confirmar').style.opacity = '0.5';
+    document.getElementById('imp-btn-confirmar').style.cursor = 'not-allowed';
+    _importItens = [];
+  }
+  function closeImportarProdutos() {
+    document.getElementById('modal-importar-produtos').style.display = 'none';
+  }
+  function baixarPlanilhaModelo() {
+    if (typeof XLSX === 'undefined') { alert('Biblioteca não carregou. Recarregue a página.'); return; }
+    const dados = [
+      ['codigo', 'nome', 'categoria', 'fornecedor', 'estoque', 'preco_custo', 'preco_venda'],
+      ['', 'Produto Exemplo 1', 'Categoria A', 'Fornecedor X', 10, 25.50, 49.90],
+      ['', 'Produto Exemplo 2', 'Categoria B', 'Fornecedor Y', 5, 100.00, 199.99]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    ws['!cols'] = [{wch:10},{wch:30},{wch:18},{wch:22},{wch:10},{wch:12},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
+    XLSX.writeFile(wb, 'modelo-importacao-produtos.xlsx');
+  }
+  function processarArquivoImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (typeof XLSX === 'undefined') { alert('Biblioteca não carregou. Recarregue a página.'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+        if (linhas.length < 2) {
+          alert('Arquivo vazio ou sem dados. Verifique se há cabeçalho na primeira linha e dados a partir da segunda.');
+          return;
+        }
+        // Identifica colunas pelo cabeçalho (primeira linha)
+        const cabecalho = linhas[0].map(c => String(c || '').toLowerCase().trim().replace(/\s+/g,'_'));
+        const idx = {
+          codigo:      cabecalho.findIndex(c => c === 'codigo' || c === 'código'),
+          nome:        cabecalho.findIndex(c => c === 'nome'),
+          categoria:   cabecalho.findIndex(c => c === 'categoria'),
+          fornecedor:  cabecalho.findIndex(c => c === 'fornecedor'),
+          estoque:     cabecalho.findIndex(c => c === 'estoque' || c === 'qtd' || c === 'quantidade'),
+          precoCusto:  cabecalho.findIndex(c => c === 'preco_custo' || c === 'custo' || c === 'preço_custo'),
+          precoVenda:  cabecalho.findIndex(c => c === 'preco_venda' || c === 'venda' || c === 'preço_venda' || c === 'preco')
+        };
+        if (idx.nome === -1 || idx.fornecedor === -1 || idx.precoCusto === -1 || idx.precoVenda === -1) {
+          alert('Cabeçalho inválido. Colunas obrigatórias: nome, fornecedor, preco_custo, preco_venda.\n\nVeja a planilha modelo.');
+          return;
+        }
+        // Parse de números no padrão BR/EN ("1.234,56" ou "1234.56")
+        const parseNumero = (v) => {
+          if (typeof v === 'number') return v;
+          let s = String(v || '').trim();
+          if (!s) return 0;
+          s = s.replace(/[R$\s]/g, '');
+          // Se tem vírgula E ponto, ponto é separador de milhar (BR)
+          if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+          else if (s.includes(',')) s = s.replace(',', '.');
+          return Number(s) || 0;
+        };
+        const itens = [];
+        for (let i = 1; i < linhas.length; i++) {
+          const l = linhas[i];
+          if (!l || l.length === 0) continue;
+          const nome = String(l[idx.nome] || '').trim();
+          if (!nome) continue; // pula linhas vazias
+          itens.push({
+            linha: i + 1,
+            codigo: idx.codigo > -1 ? String(l[idx.codigo] || '').trim() : '',
+            nome,
+            categoria: idx.categoria > -1 ? String(l[idx.categoria] || '').trim() : '',
+            fornecedor: idx.fornecedor > -1 ? String(l[idx.fornecedor] || '').trim() : '',
+            estoque: idx.estoque > -1 ? parseNumero(l[idx.estoque]) : 0,
+            precoCusto: parseNumero(l[idx.precoCusto]),
+            precoVenda: parseNumero(l[idx.precoVenda])
+          });
+        }
+        _importItens = itens;
+        renderPreviewImport();
+      } catch (err) {
+        alert('Erro ao ler arquivo: ' + err.message);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  function renderPreviewImport() {
+    if (_importItens.length === 0) {
+      alert('Nenhum produto encontrado no arquivo.');
+      return;
+    }
+    document.getElementById('imp-preview').style.display = 'block';
+    document.getElementById('imp-preview-titulo').textContent = `Pré-visualização (${_importItens.length} linha(s))`;
+    const tbody = document.getElementById('imp-preview-body');
+    const nomesExistentes = new Set((dbProdutos || []).map(p => (p.nome || '').toLowerCase()));
+    let validos = 0, atualizar = 0, invalidos = 0;
+    tbody.innerHTML = _importItens.map(it => {
+      let status, cor;
+      if (!it.nome) { status = '❌ Sem nome'; cor = '#dc2626'; invalidos++; }
+      else if (!it.fornecedor) { status = '❌ Sem fornecedor'; cor = '#dc2626'; invalidos++; }
+      else if (!it.precoCusto || it.precoCusto <= 0) { status = '❌ Custo inválido'; cor = '#dc2626'; invalidos++; }
+      else if (!it.precoVenda || it.precoVenda <= 0) { status = '❌ Venda inválida'; cor = '#dc2626'; invalidos++; }
+      else if (nomesExistentes.has(it.nome.toLowerCase())) { status = '🔄 Atualizar'; cor = '#0891b2'; atualizar++; validos++; }
+      else { status = '✅ Novo'; cor = '#16a34a'; validos++; }
+      return `
+        <tr style="border-top:1px solid #eef;">
+          <td style="padding:6px 8px;color:#667;">${it.linha}</td>
+          <td style="padding:6px 8px;">${it.codigo || '-'}</td>
+          <td style="padding:6px 8px;">${it.nome || '<i style="color:#dc2626;">vazio</i>'}</td>
+          <td style="padding:6px 8px;">${it.categoria || '-'}</td>
+          <td style="padding:6px 8px;">${it.fornecedor || '-'}</td>
+          <td style="padding:6px 8px;text-align:right;">${it.estoque || 0}</td>
+          <td style="padding:6px 8px;text-align:right;">${formatarBRL(it.precoCusto)}</td>
+          <td style="padding:6px 8px;text-align:right;">${formatarBRL(it.precoVenda)}</td>
+          <td style="padding:6px 8px;color:${cor};font-weight:600;font-size:12px;">${status}</td>
+        </tr>
+      `;
+    }).join('');
+    const btn = document.getElementById('imp-btn-confirmar');
+    btn.textContent = `Importar ${validos} produto(s)${invalidos > 0 ? ` (ignorar ${invalidos} inválido(s))` : ''}`;
+    btn.disabled = (validos === 0);
+    btn.style.opacity = validos > 0 ? '1' : '0.5';
+    btn.style.cursor = validos > 0 ? 'pointer' : 'not-allowed';
+  }
+  async function confirmarImportacao() {
+    if (_importItens.length === 0) return;
+    const btn = document.getElementById('imp-btn-confirmar');
+    btn.disabled = true;
+    btn.textContent = 'Importando...';
+    try {
+      const resultado = await api('POST', '/api/produtos/importar', {
+        itens: _importItens.map(it => ({
+          codigo: it.codigo || '',
+          nome: it.nome,
+          categoria: it.categoria || null,
+          fornecedor: it.fornecedor,
+          estoque: it.estoque || 0,
+          precoCusto: it.precoCusto,
+          precoVenda: it.precoVenda
+        }))
+      });
+      const div = document.getElementById('imp-resultado');
+      div.style.display = 'block';
+      div.style.background = '#f0fdf4';
+      div.style.border = '1px solid #86efac';
+      div.style.color = '#166534';
+      let html = `<strong>✅ Importação concluída!</strong><br>`;
+      html += `Criados: <strong>${resultado.criados}</strong> · `;
+      html += `Atualizados: <strong>${resultado.atualizados}</strong> · `;
+      html += `Ignorados: <strong>${resultado.ignorados}</strong>`;
+      if (resultado.erros && resultado.erros.length > 0) {
+        html += `<br><br><strong>Linhas com erro:</strong><ul style="margin-top:6px;">`;
+        resultado.erros.slice(0, 10).forEach(e => {
+          html += `<li>Linha ${e.linha}: ${e.motivo}</li>`;
+        });
+        if (resultado.erros.length > 10) html += `<li>… e mais ${resultado.erros.length - 10} erro(s).</li>`;
+        html += `</ul>`;
+      }
+      div.innerHTML = html;
+      // Recarrega lista de produtos
+      dbProdutos = await api('GET', '/api/produtos');
+      renderProdutos();
+      renderListaProdutos();
+      btn.textContent = 'Importar produtos';
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    } catch (err) {
+      const div = document.getElementById('imp-resultado');
+      div.style.display = 'block';
+      div.style.background = '#fef2f2';
+      div.style.border = '1px solid #fca5a5';
+      div.style.color = '#991b1b';
+      div.textContent = 'Erro ao importar: ' + err.message;
+      btn.textContent = 'Tentar novamente';
+      btn.disabled = false;
+    }
+  }
 
   // ====== GERENCIAMENTO DE FORNECEDORES ======
   let _fornecedorEditandoId = null;

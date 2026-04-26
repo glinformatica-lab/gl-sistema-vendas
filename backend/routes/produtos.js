@@ -111,6 +111,94 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Importação em lote (planilha)
+// Body: { itens: [{ codigo?, nome, categoria?, fornecedor, estoque?, precoCusto, precoVenda }, ...] }
+// Resposta: { criados, atualizados, ignorados, erros: [{linha, motivo}] }
+router.post('/importar', async (req, res) => {
+  const { itens } = req.body || {};
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ error: 'Nenhum produto recebido para importação.' });
+  }
+  if (itens.length > 1000) {
+    return res.status(400).json({ error: 'Máximo de 1000 produtos por importação.' });
+  }
+  let criados = 0, atualizados = 0, ignorados = 0;
+  const erros = [];
+  // Próximo código auto (caso vazio)
+  const r0 = await db.query('SELECT codigo FROM produtos WHERE empresa_id = $1', [req.user.empresaId]);
+  let proximoCodigo = 1000;
+  for (const row of r0.rows) {
+    if (row.codigo && /^\d+$/.test(row.codigo)) {
+      const n = parseInt(row.codigo, 10);
+      if (n > proximoCodigo) proximoCodigo = n;
+    }
+  }
+  for (let i = 0; i < itens.length; i++) {
+    const it = itens[i];
+    const linha = i + 2; // assumindo cabeçalho na linha 1
+    try {
+      const nome = (it.nome || '').trim();
+      const fornecedor = (it.fornecedor || '').trim();
+      const precoCusto = Number(it.precoCusto);
+      const precoVenda = Number(it.precoVenda);
+      if (!nome) { erros.push({ linha, motivo: 'Nome em branco' }); ignorados++; continue; }
+      if (!fornecedor) { erros.push({ linha, motivo: 'Fornecedor em branco' }); ignorados++; continue; }
+      if (!precoCusto || precoCusto <= 0) { erros.push({ linha, motivo: 'Preço de custo inválido' }); ignorados++; continue; }
+      if (!precoVenda || precoVenda <= 0) { erros.push({ linha, motivo: 'Preço de venda inválido' }); ignorados++; continue; }
+      const estoque = Number(it.estoque) || 0;
+      const categoria = (it.categoria || '').trim() || null;
+      // Verifica se já existe produto com o mesmo nome (case-insensitive)
+      const exist = await db.query(
+        'SELECT id, codigo FROM produtos WHERE empresa_id=$1 AND LOWER(nome)=LOWER($2) LIMIT 1',
+        [req.user.empresaId, nome]
+      );
+      if (exist.rows.length > 0) {
+        // Atualiza preços e categoria — NÃO mexe em estoque (estoque vem por movimentações)
+        await db.query(
+          `UPDATE produtos SET categoria=COALESCE($1, categoria), fornecedor=$2,
+                 preco_custo=$3, preco_venda=$4
+           WHERE id=$5 AND empresa_id=$6`,
+          [categoria, fornecedor, precoCusto, precoVenda, exist.rows[0].id, req.user.empresaId]
+        );
+        atualizados++;
+      } else {
+        // Cria novo produto
+        let codigoFinal = (it.codigo || '').toString().trim();
+        if (!codigoFinal) {
+          proximoCodigo++;
+          codigoFinal = String(proximoCodigo);
+        }
+        // Verifica se código já existe pra essa empresa (gera outro se sim)
+        const dupCod = await db.query(
+          'SELECT id FROM produtos WHERE empresa_id=$1 AND codigo=$2 LIMIT 1',
+          [req.user.empresaId, codigoFinal]
+        );
+        if (dupCod.rows.length > 0) {
+          proximoCodigo++;
+          codigoFinal = String(proximoCodigo);
+        }
+        const ins = await db.query(
+          `INSERT INTO produtos (empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, codigo, nome`,
+          [req.user.empresaId, codigoFinal, nome, categoria, fornecedor, estoque, precoCusto, precoVenda]
+        );
+        if (estoque > 0) {
+          await db.query(
+            `INSERT INTO movimentacoes (empresa_id, produto_codigo, produto_nome, data, tipo, qtd, origem)
+             VALUES ($1,$2,$3,CURRENT_DATE,'entrada',$4,'Importação Planilha')`,
+            [req.user.empresaId, ins.rows[0].codigo, ins.rows[0].nome, estoque]
+          );
+        }
+        criados++;
+      }
+    } catch (e) {
+      erros.push({ linha, motivo: e.message || 'Erro desconhecido' });
+      ignorados++;
+    }
+  }
+  res.json({ criados, atualizados, ignorados, total: itens.length, erros });
+});
+
 // Movimentações de um produto (histórico)
 router.get('/:id/movimentacoes', async (req, res) => {
   try {
