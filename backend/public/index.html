@@ -2275,7 +2275,7 @@
     if (filtroBusca) {
       lista = lista.filter(e => {
         const docNum = `${e.numero || ''}${e.serie ? '/' + e.serie : ''} ${e.doc || ''}`.toLowerCase();
-        const itensTxt = (e.itens || []).map(i => `${i.codigo||''} ${i.nome||''}`).join(' ').toLowerCase();
+        const itensTxt = (e.itens || []).map(i => `${i.produto||''} ${i.codigo||''} ${i.nome||''}`).join(' ').toLowerCase();
         return docNum.includes(filtroBusca) || itensTxt.includes(filtroBusca) ||
                (e.fornecedor && e.fornecedor.toLowerCase().includes(filtroBusca));
       });
