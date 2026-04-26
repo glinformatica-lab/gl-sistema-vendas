@@ -1749,6 +1749,15 @@
         renderListaClientes();
         alert("Cliente cadastrado com sucesso!");
       }
+      // Se marcou como "também é fornecedor", recarrega a lista de fornecedores
+      // (o backend criou/sincronizou automaticamente)
+      if (payload.eTambemFornecedor) {
+        try {
+          dbFornecedores = await api('GET', '/api/fornecedores');
+          if (typeof renderFornecedores === 'function') renderFornecedores();
+          renderListaFornecedores();
+        } catch(_) {}
+      }
       closeNovoCliente();
     } catch (err) {
       erro.textContent = err.message; erro.style.display = "block";
