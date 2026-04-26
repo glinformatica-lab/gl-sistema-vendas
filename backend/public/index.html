@@ -551,8 +551,8 @@
           </select>
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
-          Buscar (produto, documento, NF)
-          <input type="text" id="filtro-ent-busca" oninput="renderEntradasFornecedores()" placeholder="🔍 ex: 1234, ABC, telefone"
+          Buscar (produto, código, NF, documento)
+          <input type="text" id="filtro-ent-busca" oninput="renderEntradasFornecedores()" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <button class="btn" type="button" onclick="limparFiltrosEntradas()"
@@ -2273,10 +2273,23 @@
       lista = lista.filter(e => e.fornecedor === filtroFornecedor);
     }
     if (filtroBusca) {
+      // Constrói índice de código→nome a partir de dbProdutos para permitir busca por código
+      const codigoParaNome = new Map();
+      const nomeParaCodigo = new Map();
+      (dbProdutos || []).forEach(p => {
+        if (p.codigo) codigoParaNome.set(String(p.codigo).toLowerCase(), p.nome);
+        if (p.nome) nomeParaCodigo.set(p.nome, String(p.codigo || ''));
+      });
       lista = lista.filter(e => {
         const docNum = `${e.numero || ''}${e.serie ? '/' + e.serie : ''} ${e.doc || ''}`.toLowerCase();
-        const itensTxt = (e.itens || []).map(i => `${i.produto||''} ${i.codigo||''} ${i.nome||''}`).join(' ').toLowerCase();
-        return docNum.includes(filtroBusca) || itensTxt.includes(filtroBusca) ||
+        // Para cada item da entrada, monta string com nome + código (consultado em dbProdutos)
+        const itensTxt = (e.itens || []).map(i => {
+          const nomeProduto = i.produto || i.nome || '';
+          const codigoProduto = nomeParaCodigo.get(nomeProduto) || i.codigo || '';
+          return `${nomeProduto} ${codigoProduto}`;
+        }).join(' ').toLowerCase();
+        return docNum.includes(filtroBusca) ||
+               itensTxt.includes(filtroBusca) ||
                (e.fornecedor && e.fornecedor.toLowerCase().includes(filtroBusca));
       });
     }
