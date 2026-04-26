@@ -61,10 +61,10 @@ router.post('/iniciar', async (req, res) => {
       return res.status(400).json({ error: 'Já existe um usuário com este e-mail. Use outro ou faça login.' });
     }
 
-    // Cria empresa em "aguardando-pagamento"
+    // Cria empresa em "aguardando-pagamento" (origem = auto-assinatura)
     const empResult = await client.query(
-      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, valor_mensalidade)
-       VALUES ($1, $2, $3, 'aguardando-pagamento', $4, $5) RETURNING *`,
+      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, valor_mensalidade, origem)
+       VALUES ($1, $2, $3, 'aguardando-pagamento', $4, $5, 'auto-assinatura') RETURNING *`,
       [empresa.trim(), cnpj || null, telefone || null, plano,
        plano === 'mensal' ? planoConfig.valor : (planoConfig.valor / 12)]
     );

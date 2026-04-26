@@ -176,7 +176,8 @@ router.get('/me', autenticar, async (req, res) => {
     const result = await db.query(
       `SELECT u.id, u.nome, u.email, u.papel,
               e.id AS empresa_id, e.nome AS empresa_nome,
-              e.status AS empresa_status, e.plano, e.data_vencimento
+              e.status AS empresa_status, e.plano, e.data_vencimento,
+              e.origem, e.valor_mensalidade
        FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
        WHERE u.id = $1 LIMIT 1`,
       [req.user.userId]
@@ -190,7 +191,15 @@ router.get('/me', autenticar, async (req, res) => {
       : null;
     res.json({
       usuario: { id: u.id, nome: u.nome, email: u.email, papel: u.papel },
-      empresa: { id: u.empresa_id, nome: u.empresa_nome, status: u.empresa_status, plano: u.plano, dataVencimento: venc }
+      empresa: {
+        id: u.empresa_id,
+        nome: u.empresa_nome,
+        status: u.empresa_status,
+        plano: u.plano,
+        dataVencimento: venc,
+        origem: u.origem || 'manual',
+        valorMensalidade: u.valor_mensalidade != null ? Number(u.valor_mensalidade) : null
+      }
     });
   } catch (err) {
     console.error('[auth/me]', err);

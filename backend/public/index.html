@@ -378,6 +378,10 @@
       #menu { position: relative; width: 100%; border-right: none; }
       #conteudo { padding: 20px 4vw; }
       .cards { flex-direction: column; gap: 16px; }
+      #page-minha-conta > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+    }
+    @media (max-width:1200px) {
+      #page-minha-conta > div[style*="grid-template-columns"] { grid-template-columns: 1fr 1fr !important; }
     }
   </style>
 </head>
@@ -853,61 +857,67 @@
     <!-- Minha Conta -->
     <div id="page-minha-conta" style="display:none;">
       <div class="page-title">Minha Conta</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;">
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;align-items:start;">
         <!-- Card Usuário -->
-        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
-          <h3 style="color:var(--azul);margin-bottom:14px;">👤 Meus dados</h3>
-          <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">👤 Meus dados</h3>
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;">
             <div><strong>Nome:</strong> <span id="mc-nome">—</span></div>
             <div><strong>E-mail:</strong> <span id="mc-email">—</span></div>
             <div><strong>Papel:</strong> <span id="mc-papel">—</span></div>
-            <button class="btn" onclick="openTrocarSenha()" style="margin-top:10px;">🔑 Trocar minha senha</button>
+            <button class="btn" onclick="openTrocarSenha()" style="margin-top:6px;font-size:13px;padding:8px 14px;">🔑 Trocar minha senha</button>
           </div>
         </div>
 
         <!-- Card Empresa -->
-        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
-          <h3 style="color:var(--azul);margin-bottom:14px;">🏢 Empresa</h3>
-          <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">🏢 Empresa</h3>
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;">
             <div><strong>Nome:</strong> <span id="mc-empresa-nome">—</span></div>
             <div><strong>Plano:</strong> <span id="mc-plano">—</span></div>
+            <div id="mc-valor-linha" style="display:none;"><strong>Valor:</strong> <span id="mc-valor">—</span></div>
             <div><strong>Status:</strong> <span id="mc-status">—</span></div>
             <div><strong>Vencimento:</strong> <span id="mc-vencimento">—</span></div>
           </div>
-          <p style="margin-top:14px;font-size:13px;color:#668;">
+          <p style="margin-top:14px;font-size:12px;color:#668;line-height:1.4;">
             Para alterar dados da empresa (CNPJ, endereço, logo etc.), peça ao administrador acessar <strong>Configurações</strong>.
           </p>
         </div>
 
         <!-- Card Suporte -->
-        <div style="background:#fff;border-radius:10px;padding:22px;box-shadow:0 2px 10px #0001;">
-          <h3 style="color:var(--azul);margin-bottom:14px;">💬 Suporte</h3>
-          <p style="color:#445;margin-bottom:12px;">
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">💬 Suporte</h3>
+          <p style="color:#445;margin-bottom:12px;font-size:14px;">
             Precisa de ajuda? Estamos no WhatsApp:
           </p>
           <a href="https://wa.me/5562992347572" target="_blank"
-             style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">
+             style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
              📱 (62) 99234-7572
           </a>
+          <p style="margin-top:12px;font-size:12px;color:#668;line-height:1.4;">
+            Atendimento de segunda a sexta, das 8h às 18h.
+          </p>
         </div>
       </div>
 
-      <!-- Histórico de Pagamentos -->
-      <h3 style="margin-top:28px;margin-bottom:10px;color:var(--azul);">💰 Histórico de Pagamentos</h3>
-      <div style="background:#fff;border-radius:10px;padding:6px;box-shadow:0 2px 10px #0001;">
-        <table>
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Valor</th>
-              <th>Forma</th>
-              <th>Observação</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-pagamentos-mc">
-            <tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Carregando...</td></tr>
-          </tbody>
-        </table>
+      <!-- Histórico de Pagamentos (somente assinaturas via /assinar) -->
+      <div id="mc-secao-pagamentos" style="display:none;">
+        <h3 style="margin-top:24px;margin-bottom:10px;color:var(--azul);">💰 Histórico de Pagamentos</h3>
+        <div style="background:#fff;border-radius:10px;padding:6px;box-shadow:0 2px 10px #0001;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Valor</th>
+                <th>Forma</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pagamentos-mc">
+              <tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -4920,8 +4930,18 @@ ${conteudo}
       document.getElementById('mc-papel').textContent = u.papel === 'admin' ? 'Administrador' : (u.papel === 'vendedor' ? 'Vendedor' : (u.papel || '—'));
       // Card empresa
       document.getElementById('mc-empresa-nome').textContent = e.nome || '—';
-      const planoLabel = { 'mensal':'Mensal (R$ 99,00/mês)', 'anual':'Anual (R$ 999,00/ano)', 'trial':'Trial (7 dias)' };
+      const planoLabel = { 'mensal':'Mensal', 'anual':'Anual', 'trial':'Trial (7 dias)' };
       document.getElementById('mc-plano').textContent = planoLabel[e.plano] || (e.plano || '—');
+      // Mostra valor APENAS se origem for auto-assinatura (cliente que assinou pelo /assinar)
+      const linhaValor = document.getElementById('mc-valor-linha');
+      const elValor = document.getElementById('mc-valor');
+      if (e.origem === 'auto-assinatura' && e.valorMensalidade != null && e.valorMensalidade > 0) {
+        const sufixo = e.plano === 'anual' ? '/mês (cobrado anualmente)' : '/mês';
+        elValor.textContent = formatarBRL(e.valorMensalidade) + sufixo;
+        linhaValor.style.display = '';
+      } else {
+        linhaValor.style.display = 'none';
+      }
       const statusLabel = { 'ativa':'✅ Ativa', 'trial':'🟡 Trial', 'aguardando-pagamento':'⏳ Aguardando pagamento', 'vencida':'❌ Vencida', 'bloqueada':'🚫 Bloqueada' };
       const elStatus = document.getElementById('mc-status');
       elStatus.textContent = statusLabel[e.status] || (e.status || '—');
@@ -4938,28 +4958,34 @@ ${conteudo}
       } else {
         document.getElementById('mc-vencimento').textContent = '—';
       }
-    } catch(err) {
-      console.warn('Erro ao carregar dados:', err.message);
-    }
-    // Pagamentos
-    try {
-      const pagamentos = await api('GET', '/api/empresa/pagamentos');
-      const tbody = document.getElementById('tbody-pagamentos-mc');
-      if (!pagamentos || pagamentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Nenhum pagamento registrado ainda.</td></tr>';
+      // Histórico de pagamentos: só mostra se for auto-assinatura
+      const secaoPag = document.getElementById('mc-secao-pagamentos');
+      if (e.origem === 'auto-assinatura') {
+        secaoPag.style.display = '';
+        try {
+          const pagamentos = await api('GET', '/api/empresa/pagamentos');
+          const tbody = document.getElementById('tbody-pagamentos-mc');
+          if (!pagamentos || pagamentos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Nenhum pagamento registrado ainda.</td></tr>';
+          } else {
+            tbody.innerHTML = pagamentos.map(p => `
+              <tr>
+                <td>${formatarDataBR(p.dataPagamento)}</td>
+                <td><strong style="color:var(--verde);">${formatarBRL(p.valor)}</strong></td>
+                <td>${p.forma || '—'}</td>
+                <td style="color:#668;">${p.observacao || '—'}</td>
+              </tr>
+            `).join('');
+          }
+        } catch(err) {
+          const tbody = document.getElementById('tbody-pagamentos-mc');
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Erro ao carregar pagamentos.</td></tr>';
+        }
       } else {
-        tbody.innerHTML = pagamentos.map(p => `
-          <tr>
-            <td>${formatarDataBR(p.dataPagamento)}</td>
-            <td><strong style="color:var(--verde);">${formatarBRL(p.valor)}</strong></td>
-            <td>${p.forma || '—'}</td>
-            <td style="color:#668;">${p.observacao || '—'}</td>
-          </tr>
-        `).join('');
+        secaoPag.style.display = 'none';
       }
     } catch(err) {
-      const tbody = document.getElementById('tbody-pagamentos-mc');
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#889;padding:20px;">Erro ao carregar pagamentos.</td></tr>';
+      console.warn('Erro ao carregar dados:', err.message);
     }
   }
   function openTrocarSenha() {
