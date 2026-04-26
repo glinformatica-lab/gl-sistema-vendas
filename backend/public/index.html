@@ -4377,6 +4377,12 @@ ${conteudo}
         const atualizado = await api('PUT', `/api/fornecedores/${_fornecedorEditandoId}`, payload);
         const idx = dbFornecedores.findIndex(x => x.id === _fornecedorEditandoId);
         if(idx !== -1) dbFornecedores[idx] = atualizado;
+        // Recarrega clientes pois o backend pode ter sincronizado um cliente com mesmo nome/doc
+        try {
+          dbClientes = await api('GET', '/api/clientes');
+          if (typeof renderClientes === 'function') renderClientes();
+          if (typeof renderListaClientes === 'function') renderListaClientes();
+        } catch(_) {}
       } else {
         const novo = await api('POST', '/api/fornecedores', payload);
         dbFornecedores.push(novo);
