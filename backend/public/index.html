@@ -957,6 +957,55 @@
     </form>
   </div>
 
+  <!-- Modal/Cadastrar Produtos novos do XML -->
+  <div id="modal-cadastrar-xml" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:28px;border-radius:12px;max-width:920px;width:96%;max-height:92vh;overflow-y:auto;">
+      <h2 style="color:var(--azul);margin-bottom:6px;">📦 Cadastrar Produtos da NF</h2>
+      <p style="color:#668;font-size:14px;margin-bottom:14px;">
+        Os produtos abaixo <strong>foram lidos do XML</strong> mas não estão no seu cadastro de Produtos. Defina a margem de lucro e a categoria para cadastrá-los automaticamente.
+      </p>
+
+      <div style="background:#f6f8fc;padding:12px 16px;border-radius:8px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#445;font-weight:600;">
+          Margem de lucro padrão (%)
+          <input type="number" id="cxml-margem" min="0" step="1" value="40"
+                 onchange="recalcularPrecosVendaXml()"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;width:120px;">
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#445;font-weight:600;">
+          Categoria padrão
+          <input type="text" id="cxml-categoria" placeholder="(opcional)"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;width:200px;">
+        </label>
+        <button class="btn" type="button" onclick="aplicarCategoriaTodos()"
+                style="background:#eceef2;color:var(--azul);font-size:12px;padding:6px 12px;align-self:flex-end;">Aplicar a todos</button>
+      </div>
+
+      <div style="overflow-x:auto;max-height:50vh;border:1px solid var(--cinza-borda);border-radius:8px;">
+        <table style="width:100%;font-size:13px;">
+          <thead style="background:#eef2ff;position:sticky;top:0;">
+            <tr>
+              <th style="padding:8px;width:30px;"><input type="checkbox" id="cxml-todos" checked onchange="toggleTodosXml(this)"></th>
+              <th style="padding:8px;">Código</th>
+              <th style="padding:8px;">Nome</th>
+              <th style="padding:8px;">Categoria</th>
+              <th style="padding:8px;">Custo (R$)</th>
+              <th style="padding:8px;">Venda (R$)</th>
+            </tr>
+          </thead>
+          <tbody id="cxml-body"></tbody>
+        </table>
+      </div>
+
+      <div id="cxml-resultado" style="display:none;margin-top:12px;padding:12px;border-radius:8px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" id="cxml-btn-confirmar" onclick="confirmarCadastroProdutosXml()">Cadastrar produtos selecionados</button>
+        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeCadastrarXml()">Pular cadastro</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal/Importar Produtos via Planilha -->
   <div id="modal-importar-produtos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:32px;border-radius:12px;max-width:780px;width:95%;max-height:90vh;overflow-y:auto;">
@@ -3054,7 +3103,14 @@
       try {
         const dados = parseXmlNfe(e.target.result);
         preencherComXml(dados);
-        alert(`XML importado!\n\nNF ${dados.numero || '?'} — ${dados.itens.length} iten(s).\nConfira os dados e salve a entrada.`);
+        // Detecta produtos novos (não existem em dbProdutos por código nem por nome)
+        const novos = detectarProdutosNovosXml(dados.itens);
+        if (novos.length > 0) {
+          // Pequeno delay para não conflitar com o alert anterior
+          setTimeout(() => abrirCadastroProdutosXml(novos, dados.fornecedor), 200);
+        } else {
+          alert(`✅ XML importado!\n\nNF ${dados.numero || '?'} — ${dados.itens.length} iten(s).\nTodos os produtos já estão cadastrados.\n\nConfira os dados e salve a entrada.`);
+        }
       } catch(err) {
         console.error(err);
         alert('Não foi possível ler este XML. Verifique se é um XML válido de NF-e.');
@@ -3062,6 +3118,28 @@
     };
     reader.readAsText(file);
     event.target.value = '';
+  }
+
+  function detectarProdutosNovosXml(itensXml) {
+    const novos = [];
+    for (const it of itensXml) {
+      const jaExiste = (dbProdutos || []).some(p => {
+        const nomeIgual = (p.nome || '').toLowerCase().trim() === (it.produto || '').toLowerCase().trim();
+        const codigoIgual = it.codigo && p.codigo && String(p.codigo).trim() === String(it.codigo).trim();
+        return nomeIgual || codigoIgual;
+      });
+      if (!jaExiste && it.produto) {
+        novos.push({
+          codigo: it.codigo || '',
+          nome: it.produto,
+          ncm: it.ncm || '',
+          unidade: it.un || 'UN',
+          custo: it.valor || 0,
+          qtd: it.qtd || 0
+        });
+      }
+    }
+    return novos;
   }
   function parseXmlNfe(xmlText) {
     const parser = new DOMParser();
@@ -5015,6 +5093,125 @@ ${conteudo}
       erro.style.display = 'block';
     }
   });
+
+  // ====== CADASTRO DE PRODUTOS A PARTIR DO XML DA NF ======
+  let _xmlProdutosNovos = [];
+  let _xmlFornecedor = '';
+
+  function abrirCadastroProdutosXml(novos, fornecedor) {
+    _xmlProdutosNovos = novos.map(n => ({
+      ...n,
+      selecionado: true,
+      categoria: '',
+      precoVenda: 0  // será calculado pela margem
+    }));
+    _xmlFornecedor = fornecedor || '';
+    document.getElementById('cxml-margem').value = 40;
+    document.getElementById('cxml-categoria').value = '';
+    document.getElementById('cxml-resultado').style.display = 'none';
+    document.getElementById('cxml-todos').checked = true;
+    recalcularPrecosVendaXml();
+    renderTabelaCadastroXml();
+    document.getElementById('modal-cadastrar-xml').style.display = 'flex';
+  }
+
+  function recalcularPrecosVendaXml() {
+    const margem = parseFloat(document.getElementById('cxml-margem').value) || 0;
+    _xmlProdutosNovos.forEach(p => {
+      p.precoVenda = +(p.custo * (1 + margem / 100)).toFixed(2);
+    });
+    renderTabelaCadastroXml();
+  }
+
+  function aplicarCategoriaTodos() {
+    const categoria = document.getElementById('cxml-categoria').value.trim();
+    _xmlProdutosNovos.forEach(p => p.categoria = categoria);
+    renderTabelaCadastroXml();
+  }
+
+  function toggleTodosXml(checkbox) {
+    _xmlProdutosNovos.forEach(p => p.selecionado = checkbox.checked);
+    renderTabelaCadastroXml();
+  }
+
+  function renderTabelaCadastroXml() {
+    const tbody = document.getElementById('cxml-body');
+    tbody.innerHTML = _xmlProdutosNovos.map((p, i) => `
+      <tr style="border-top:1px solid #eef;">
+        <td style="padding:6px 8px;text-align:center;">
+          <input type="checkbox" ${p.selecionado ? 'checked' : ''} onchange="toggleProdutoXml(${i}, this.checked)">
+        </td>
+        <td style="padding:6px 8px;">
+          <input type="text" value="${(p.codigo || '').replace(/"/g,'&quot;')}" oninput="atualizarCampoXml(${i}, 'codigo', this.value)"
+                 style="width:90px;padding:4px 6px;border:1px solid var(--cinza-borda);border-radius:4px;font-size:12px;">
+        </td>
+        <td style="padding:6px 8px;font-weight:600;">${p.nome}</td>
+        <td style="padding:6px 8px;">
+          <input type="text" value="${(p.categoria || '').replace(/"/g,'&quot;')}" oninput="atualizarCampoXml(${i}, 'categoria', this.value)"
+                 style="width:130px;padding:4px 6px;border:1px solid var(--cinza-borda);border-radius:4px;font-size:12px;">
+        </td>
+        <td style="padding:6px 8px;text-align:right;">${formatarBRL(p.custo)}</td>
+        <td style="padding:6px 8px;">
+          <input type="number" value="${p.precoVenda.toFixed(2)}" min="0" step="0.01"
+                 oninput="atualizarCampoXml(${i}, 'precoVenda', parseFloat(this.value)||0)"
+                 style="width:100px;padding:4px 6px;border:1px solid var(--cinza-borda);border-radius:4px;font-size:12px;text-align:right;">
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function toggleProdutoXml(i, val) { _xmlProdutosNovos[i].selecionado = val; }
+  function atualizarCampoXml(i, campo, valor) { _xmlProdutosNovos[i][campo] = valor; }
+
+  function closeCadastrarXml() {
+    document.getElementById('modal-cadastrar-xml').style.display = 'none';
+  }
+
+  async function confirmarCadastroProdutosXml() {
+    const selecionados = _xmlProdutosNovos.filter(p => p.selecionado);
+    if (selecionados.length === 0) {
+      alert('Nenhum produto selecionado para cadastrar.');
+      return;
+    }
+    const btn = document.getElementById('cxml-btn-confirmar');
+    btn.disabled = true;
+    btn.textContent = 'Cadastrando...';
+    const itens = selecionados.map(p => ({
+      codigo: p.codigo || '',
+      nome: p.nome,
+      categoria: p.categoria || null,
+      fornecedor: _xmlFornecedor || 'Sem fornecedor',
+      estoque: 0, // o estoque entrará via Entrada de Mercadoria
+      precoCusto: Number(p.custo) || 0,
+      precoVenda: Number(p.precoVenda) || Number(p.custo) || 0
+    }));
+    try {
+      const resultado = await api('POST', '/api/produtos/importar', { itens });
+      const div = document.getElementById('cxml-resultado');
+      div.style.display = 'block';
+      div.style.background = '#f0fdf4';
+      div.style.border = '1px solid #86efac';
+      div.style.color = '#166534';
+      div.innerHTML = `<strong>✅ ${resultado.criados} produto(s) cadastrado(s)!</strong>${resultado.atualizados > 0 ? ` · ${resultado.atualizados} atualizado(s).` : ''}${resultado.ignorados > 0 ? ` <span style="color:#dc2626;">${resultado.ignorados} ignorado(s).</span>` : ''}`;
+      // Recarrega lista de produtos
+      dbProdutos = await api('GET', '/api/produtos');
+      if (typeof renderProdutos === 'function') renderProdutos();
+      if (typeof renderListaProdutos === 'function') renderListaProdutos();
+      btn.textContent = 'Cadastrar produtos selecionados';
+      btn.disabled = false;
+      // Fecha modal automaticamente após 1.5s
+      setTimeout(() => closeCadastrarXml(), 1500);
+    } catch(err) {
+      const div = document.getElementById('cxml-resultado');
+      div.style.display = 'block';
+      div.style.background = '#fef2f2';
+      div.style.border = '1px solid #fca5a5';
+      div.style.color = '#991b1b';
+      div.textContent = 'Erro ao cadastrar: ' + err.message;
+      btn.textContent = 'Tentar novamente';
+      btn.disabled = false;
+    }
+  }
 
   // ====== IMPORTAÇÃO DE PRODUTOS (XLSX/CSV) ======
   let _importItens = [];
