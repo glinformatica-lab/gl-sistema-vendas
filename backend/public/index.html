@@ -394,6 +394,7 @@
     <button class="menu-btn" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
     <button class="menu-btn" onclick="showPage('produtos')">&#128230; Produtos</button>
     <button class="menu-btn" onclick="showPage('vendas')">&#128722; Vendas</button>
+    <button class="menu-btn" onclick="showPage('caixa')">&#128181; Caixa</button>
     <button class="menu-btn admin-only" onclick="showPage('financeiro')">&#128184; Financeiro</button>
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
     <button class="menu-btn admin-only" onclick="showPage('usuarios')">&#128101; Usuários</button>
@@ -677,6 +678,75 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
+    </div>
+
+    <!-- Caixa -->
+    <div id="page-caixa" style="display:none;">
+      <div class="page-title">Caixa do Dia</div>
+      <div id="caixa-container" style="max-width:1100px;">
+        <div style="text-align:center;padding:40px;color:#888;">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Modal: Novo Movimento de Caixa -->
+    <div id="modal-mov-caixa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+      <form id="form-mov-caixa" autocomplete="off" style="background:#fff;padding:28px;border-radius:12px;max-width:480px;width:92%;">
+        <h2 id="mov-titulo" style="color:var(--azul);margin-bottom:18px;">Novo Movimento</h2>
+        <input type="hidden" id="mov-tipo">
+        <div style="display:flex;flex-direction:column;gap:13px;">
+          <label>Valor (R$)*<input type="number" id="mov-valor" min="0.01" step="0.01" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+          <label>Descrição*<input type="text" id="mov-descricao" required maxlength="120" placeholder="Ex: Almoço, Combustível, Troco do banco" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+          <label id="mov-categoria-label" style="display:none;">Categoria
+            <select id="mov-categoria" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;">
+              <option value="">— Sem categoria —</option>
+              <option value="alimentacao">Alimentação</option>
+              <option value="combustivel">Combustível</option>
+              <option value="manutencao">Manutenção</option>
+              <option value="material">Material de escritório</option>
+              <option value="limpeza">Limpeza</option>
+              <option value="outros">Outros</option>
+            </select>
+          </label>
+          <div id="mov-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
+          <button type="submit" class="btn">Registrar</button>
+          <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeMovCaixa()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Modal: Fechar Caixa -->
+    <div id="modal-fechar-caixa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+      <form id="form-fechar-caixa" autocomplete="off" style="background:#fff;padding:28px;border-radius:12px;max-width:520px;width:92%;">
+        <h2 style="color:var(--azul);margin-bottom:6px;">🔒 Fechar Caixa</h2>
+        <p style="color:#668;font-size:14px;margin-bottom:14px;">Confira o dinheiro físico que está no caixa e informe o valor abaixo para finalizar o dia.</p>
+        <div style="background:#f6f8fc;padding:14px 18px;border-radius:8px;margin-bottom:14px;font-size:14px;">
+          <div style="display:flex;justify-content:space-between;"><span>Saldo esperado:</span> <strong id="fc-saldo-esperado">R$ 0,00</strong></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:13px;">
+          <label>Saldo contado no caixa físico (R$)*<input type="number" id="fc-saldo-final" min="0" step="0.01" required oninput="atualizarDiferencaFechamento()" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+          <div id="fc-diferenca-box" style="padding:12px;border-radius:8px;background:#f6f8fc;font-weight:600;text-align:center;">
+            Diferença: <span id="fc-diferenca">—</span>
+          </div>
+          <label>Observações (opcional)<textarea id="fc-obs" rows="2" maxlength="500" placeholder="Ex: caixa fechado com 5 reais a mais — provável troco devolvido errado." style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-family:inherit;"></textarea></label>
+          <div id="fc-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
+          <button type="submit" class="btn">Confirmar Fechamento</button>
+          <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeFecharCaixa()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Modal: Abrir Caixa -->
+    <div id="modal-abrir-caixa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+      <form id="form-abrir-caixa" autocomplete="off" style="background:#fff;padding:28px;border-radius:12px;max-width:440px;width:92%;">
+        <h2 style="color:var(--azul);margin-bottom:6px;">📂 Abrir Caixa do Dia</h2>
+        <p style="color:#668;font-size:14px;margin-bottom:14px;">Informe o valor inicial em dinheiro disponível para troco no caixa.</p>
+        <div style="display:flex;flex-direction:column;gap:13px;">
+          <label>Saldo inicial / Troco (R$)*<input type="number" id="ac-saldo" min="0" step="0.01" value="0" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
+          <div id="ac-erro" style="color:var(--vermelho);font-size:14px;display:none;background:#fff1f2;padding:8px 12px;border-radius:6px;"></div>
+          <button type="submit" class="btn">Abrir Caixa</button>
+          <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="closeAbrirCaixa()">Cancelar</button>
+        </div>
+      </form>
     </div>
 
     <!-- Financeiro -->
@@ -1798,6 +1868,7 @@
     if(pg === 'usuarios') carregarUsuarios();
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'minha-conta') carregarMinhaConta();
+    if(pg === 'caixa') carregarCaixa();
   }
 
   // ====== Dashboard - gráfico de evolução de vendas ======
@@ -4995,6 +5066,343 @@ ${conteudo}
       erro.style.display = 'block';
     }
   });
+
+  // ====== CAIXA DO DIA ======
+  let _caixaDados = null;
+  async function carregarCaixa() {
+    const cont = document.getElementById('caixa-container');
+    cont.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Carregando...</div>';
+    try {
+      const dados = await api('GET', '/api/caixa/atual');
+      _caixaDados = dados;
+      renderCaixa();
+    } catch(err) {
+      cont.innerHTML = `<div style="background:#fef2f2;border:1px solid #fca5a5;padding:14px;border-radius:8px;color:#991b1b;">Erro: ${err.message}</div>`;
+    }
+  }
+
+  function renderCaixa() {
+    const cont = document.getElementById('caixa-container');
+    if (!_caixaDados) return;
+    const dataHoje = formatarDataBR(_caixaDados.hoje);
+
+    // Caso 1: Sem caixa aberto hoje
+    if (!_caixaDados.caixa) {
+      cont.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 2px 10px #0001;">
+          <div style="font-size:48px;margin-bottom:12px;">📂</div>
+          <h2 style="color:var(--azul);margin-bottom:6px;">Caixa fechado</h2>
+          <p style="color:#668;margin-bottom:24px;">Nenhum caixa foi aberto hoje (${dataHoje}).</p>
+          <button class="btn" onclick="openAbrirCaixa()" style="font-size:15px;padding:12px 28px;">📂 Abrir Caixa do Dia</button>
+          <div style="margin-top:30px;">
+            <a href="javascript:void(0)" onclick="abrirHistoricoCaixa()" style="color:var(--azul);">📋 Ver histórico de fechamentos</a>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const c = _caixaDados.caixa;
+    const t = _caixaDados.totais;
+    const saldoEsperado = _caixaDados.saldoEsperado;
+    const isAberto = c.status === 'aberto';
+
+    // Lista vendas por forma de pagamento
+    const formasPagto = Object.keys(t.vendasPorForma);
+    const formaLabel = { 'A Vista':'Dinheiro/À vista', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' };
+    let vendasHtml = '';
+    if (t.qtdVendas === 0) {
+      vendasHtml = '<div style="color:#888;font-size:13px;padding:8px 0;">Nenhuma venda à vista hoje.</div>';
+    } else {
+      vendasHtml = formasPagto.map(f => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eef;">
+          <span>${formaLabel[f] || f}</span>
+          <strong>${formatarBRL(t.vendasPorForma[f])}</strong>
+        </div>`).join('') + `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:700;color:var(--verde);">
+          <span>Subtotal Vendas</span><span>${formatarBRL(t.totalVendasVista)}</span>
+        </div>`;
+    }
+
+    // Lista de movimentos
+    const tipoLabel = { 'reforco':'💰 Reforço', 'sangria':'🏦 Sangria', 'despesa':'💸 Despesa' };
+    const tipoCor = { 'reforco':'#16a34a', 'sangria':'#ca8a04', 'despesa':'#dc2626' };
+    const tipoSinal = { 'reforco':'+', 'sangria':'−', 'despesa':'−' };
+    const movimentosHtml = (_caixaDados.movimentos || []).length === 0
+      ? '<tr><td colspan="5" style="text-align:center;color:#888;padding:14px;">Nenhum movimento registrado.</td></tr>'
+      : _caixaDados.movimentos.map(m => `
+          <tr>
+            <td style="padding:8px;color:${tipoCor[m.tipo]};font-weight:600;">${tipoLabel[m.tipo] || m.tipo}</td>
+            <td style="padding:8px;">${m.descricao}</td>
+            <td style="padding:8px;font-size:12px;color:#668;">${m.categoria || '—'}</td>
+            <td style="padding:8px;text-align:right;color:${tipoCor[m.tipo]};font-weight:600;">${tipoSinal[m.tipo]} ${formatarBRL(m.valor)}</td>
+            <td style="padding:8px;text-align:center;">${isAberto ? `<button class="btn-link danger" onclick="excluirMovCaixa(${m.id})">Excluir</button>` : ''}</td>
+          </tr>`).join('');
+
+    const statusBadge = isAberto
+      ? '<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:14px;font-size:12px;font-weight:700;">🟢 ABERTO</span>'
+      : '<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:14px;font-size:12px;font-weight:700;">🔴 FECHADO</span>';
+
+    let blocoFechamento = '';
+    if (!isAberto && c.saldoFinalInformado != null) {
+      const dif = _caixaDados.diferenca;
+      const corDif = Math.abs(dif) < 0.01 ? '#16a34a' : (dif > 0 ? '#0891b2' : '#dc2626');
+      const labelDif = Math.abs(dif) < 0.01 ? '✅ Caixa bateu certinho' : (dif > 0 ? `⬆ Sobrou ${formatarBRL(Math.abs(dif))}` : `⬇ Faltou ${formatarBRL(Math.abs(dif))}`);
+      blocoFechamento = `
+        <div style="background:#fff;border-radius:12px;padding:18px 22px;box-shadow:0 2px 10px #0001;margin-top:16px;border-left:4px solid ${corDif};">
+          <h3 style="margin:0 0 10px 0;font-size:15px;">📋 Resultado do Fechamento</h3>
+          <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;">
+            <span>Saldo esperado:</span><strong>${formatarBRL(saldoEsperado)}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;">
+            <span>Saldo contado:</span><strong>${formatarBRL(c.saldoFinalInformado)}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0 0;font-size:15px;color:${corDif};font-weight:700;border-top:1px solid #eef;margin-top:6px;">
+            <span>${labelDif}</span>
+          </div>
+          ${c.obs ? `<div style="margin-top:10px;padding:10px;background:#f6f8fc;border-radius:6px;font-size:13px;color:#445;"><strong>Observações:</strong> ${c.obs}</div>` : ''}
+        </div>`;
+    }
+
+    cont.innerHTML = `
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:12px;padding:18px 22px;box-shadow:0 2px 10px #0001;margin-bottom:16px;">
+        <div>
+          <div style="font-size:13px;color:#668;">📅 ${dataHoje}</div>
+          <h2 style="margin:4px 0 0 0;font-size:18px;color:var(--azul);">Caixa do Dia ${statusBadge}</h2>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${isAberto ? `
+            <button class="btn" style="background:#16a34a;font-size:13px;padding:8px 14px;" onclick="openMovCaixa('reforco')">💰 Reforço</button>
+            <button class="btn" style="background:#ca8a04;font-size:13px;padding:8px 14px;" onclick="openMovCaixa('sangria')">🏦 Sangria</button>
+            <button class="btn" style="background:#dc2626;font-size:13px;padding:8px 14px;" onclick="openMovCaixa('despesa')">💸 Despesa</button>
+            <button class="btn" style="background:#1e293b;font-size:13px;padding:8px 14px;" onclick="openFecharCaixa()">🔒 Fechar Caixa</button>
+          ` : `
+            ${window._papelAtual === 'admin' ? `<button class="btn" style="background:#eceef2;color:var(--azul);font-size:13px;padding:8px 14px;" onclick="reabrirCaixa()">🔓 Reabrir</button>` : ''}
+            <button class="btn" style="background:var(--azul);font-size:13px;padding:8px 14px;" onclick="imprimirCaixa()">🖨️ Imprimir</button>
+          `}
+        </div>
+      </div>
+
+      <!-- Resumo Financeiro -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:16px;">
+        <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 10px #0001;border-top:3px solid #3b82f6;">
+          <div style="color:#668;font-size:13px;margin-bottom:4px;">SALDO INICIAL</div>
+          <div style="font-size:24px;font-weight:700;color:#1e3a8a;">${formatarBRL(c.saldoInicial)}</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">Troco da abertura</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 10px #0001;border-top:3px solid #16a34a;">
+          <div style="color:#668;font-size:13px;margin-bottom:4px;">VENDAS À VISTA</div>
+          <div style="font-size:24px;font-weight:700;color:#16a34a;">+ ${formatarBRL(t.totalVendasVista)}</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">${t.qtdVendas} venda(s) hoje</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 10px #0001;border-top:3px solid #ca8a04;">
+          <div style="color:#668;font-size:13px;margin-bottom:4px;">REFORÇOS / SANGRIAS / DESPESAS</div>
+          <div style="font-size:18px;font-weight:600;line-height:1.3;">
+            <span style="color:#16a34a;">+ ${formatarBRL(t.totalReforcos)}</span> ·
+            <span style="color:#ca8a04;">− ${formatarBRL(t.totalSangrias)}</span> ·
+            <span style="color:#dc2626;">− ${formatarBRL(t.totalDespesas)}</span>
+          </div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 10px #0001;border-top:3px solid #6366f1;">
+          <div style="color:#668;font-size:13px;margin-bottom:4px;">SALDO ESPERADO</div>
+          <div style="font-size:24px;font-weight:700;color:#4338ca;">${formatarBRL(saldoEsperado)}</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">Total que deve estar no caixa</div>
+        </div>
+      </div>
+
+      <!-- Vendas detalhadas -->
+      <div style="background:#fff;border-radius:10px;padding:18px 22px;box-shadow:0 2px 10px #0001;margin-bottom:14px;">
+        <h3 style="margin:0 0 12px 0;font-size:15px;color:var(--azul);">🛒 Vendas do Dia (à vista)</h3>
+        ${vendasHtml}
+      </div>
+
+      <!-- Movimentos -->
+      <div style="background:#fff;border-radius:10px;padding:18px 22px;box-shadow:0 2px 10px #0001;">
+        <h3 style="margin:0 0 12px 0;font-size:15px;color:var(--azul);">💼 Movimentos do Caixa</h3>
+        <table>
+          <thead>
+            <tr><th>Tipo</th><th>Descrição</th><th>Categoria</th><th style="text-align:right;">Valor</th><th></th></tr>
+          </thead>
+          <tbody>${movimentosHtml}</tbody>
+        </table>
+      </div>
+
+      ${blocoFechamento}
+    `;
+  }
+
+  function openAbrirCaixa() {
+    document.getElementById('ac-saldo').value = 0;
+    document.getElementById('ac-erro').style.display = 'none';
+    document.getElementById('modal-abrir-caixa').style.display = 'flex';
+  }
+  function closeAbrirCaixa() { document.getElementById('modal-abrir-caixa').style.display = 'none'; }
+
+  document.getElementById('form-abrir-caixa').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const erro = document.getElementById('ac-erro'); erro.style.display = 'none';
+    const valor = parseFloat(document.getElementById('ac-saldo').value) || 0;
+    try {
+      await api('POST', '/api/caixa/abrir', { saldoInicial: valor });
+      closeAbrirCaixa();
+      carregarCaixa();
+    } catch(err) { erro.textContent = err.message; erro.style.display = 'block'; }
+  });
+
+  function openMovCaixa(tipo) {
+    document.getElementById('mov-tipo').value = tipo;
+    const titulos = { 'reforco':'💰 Novo Reforço de Caixa', 'sangria':'🏦 Nova Sangria', 'despesa':'💸 Nova Despesa' };
+    document.getElementById('mov-titulo').textContent = titulos[tipo];
+    // Categoria só pra despesa
+    document.getElementById('mov-categoria-label').style.display = tipo === 'despesa' ? '' : 'none';
+    document.getElementById('mov-valor').value = '';
+    document.getElementById('mov-descricao').value = '';
+    document.getElementById('mov-categoria').value = '';
+    document.getElementById('mov-erro').style.display = 'none';
+    document.getElementById('modal-mov-caixa').style.display = 'flex';
+    setTimeout(() => document.getElementById('mov-valor').focus(), 100);
+  }
+  function closeMovCaixa() { document.getElementById('modal-mov-caixa').style.display = 'none'; }
+
+  document.getElementById('form-mov-caixa').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const erro = document.getElementById('mov-erro'); erro.style.display = 'none';
+    const tipo = document.getElementById('mov-tipo').value;
+    const valor = parseFloat(document.getElementById('mov-valor').value) || 0;
+    const descricao = document.getElementById('mov-descricao').value.trim();
+    const categoria = document.getElementById('mov-categoria').value || null;
+    try {
+      await api('POST', '/api/caixa/movimentos', { tipo, valor, descricao, categoria });
+      closeMovCaixa();
+      carregarCaixa();
+    } catch(err) { erro.textContent = err.message; erro.style.display = 'block'; }
+  });
+
+  async function excluirMovCaixa(id) {
+    if (!confirm('Excluir este movimento do caixa?')) return;
+    try {
+      await api('DELETE', `/api/caixa/movimentos/${id}`);
+      carregarCaixa();
+    } catch(err) { alert('Erro: ' + err.message); }
+  }
+
+  function openFecharCaixa() {
+    if (!_caixaDados || !_caixaDados.caixa) return;
+    document.getElementById('fc-saldo-esperado').textContent = formatarBRL(_caixaDados.saldoEsperado);
+    document.getElementById('fc-saldo-final').value = _caixaDados.saldoEsperado.toFixed(2);
+    document.getElementById('fc-obs').value = '';
+    document.getElementById('fc-erro').style.display = 'none';
+    atualizarDiferencaFechamento();
+    document.getElementById('modal-fechar-caixa').style.display = 'flex';
+  }
+  function closeFecharCaixa() { document.getElementById('modal-fechar-caixa').style.display = 'none'; }
+  function atualizarDiferencaFechamento() {
+    const final = parseFloat(document.getElementById('fc-saldo-final').value) || 0;
+    const esperado = _caixaDados.saldoEsperado;
+    const dif = final - esperado;
+    const span = document.getElementById('fc-diferenca');
+    const box = document.getElementById('fc-diferenca-box');
+    if (Math.abs(dif) < 0.01) { span.textContent = '✅ Bateu certinho!'; box.style.background = '#dcfce7'; box.style.color = '#166534'; }
+    else if (dif > 0) { span.textContent = `⬆ Sobra de ${formatarBRL(Math.abs(dif))}`; box.style.background = '#dbeafe'; box.style.color = '#1e40af'; }
+    else { span.textContent = `⬇ Falta de ${formatarBRL(Math.abs(dif))}`; box.style.background = '#fee2e2'; box.style.color = '#991b1b'; }
+  }
+
+  document.getElementById('form-fechar-caixa').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const erro = document.getElementById('fc-erro'); erro.style.display = 'none';
+    const saldoFinalInformado = parseFloat(document.getElementById('fc-saldo-final').value) || 0;
+    const obs = document.getElementById('fc-obs').value.trim();
+    if (!confirm('Confirmar o fechamento do caixa? Após fechar, novos movimentos não poderão ser adicionados (apenas admins podem reabrir).')) return;
+    try {
+      await api('POST', '/api/caixa/fechar', { saldoFinalInformado, obs });
+      closeFecharCaixa();
+      carregarCaixa();
+    } catch(err) { erro.textContent = err.message; erro.style.display = 'block'; }
+  });
+
+  async function reabrirCaixa() {
+    if (!confirm('Reabrir o caixa de hoje?\n\nIsso é permitido apenas para administradores e a operação fica registrada.')) return;
+    try {
+      await api('POST', '/api/caixa/reabrir');
+      carregarCaixa();
+    } catch(err) { alert('Erro: ' + err.message); }
+  }
+
+  function imprimirCaixa() {
+    if (!_caixaDados || !_caixaDados.caixa) return;
+    const c = _caixaDados.caixa;
+    const t = _caixaDados.totais;
+    const saldoEsperado = _caixaDados.saldoEsperado;
+    const dif = _caixaDados.diferenca;
+    const formaLabel = { 'A Vista':'Dinheiro/À vista', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' };
+    const tipoLabel = { 'reforco':'Reforço', 'sangria':'Sangria', 'despesa':'Despesa' };
+    const cabec = window._cabecalhoEmpresa || (`<h2 style="text-align:center;margin:0;">${(window._empresaInfo?.nome) || 'Empresa'}</h2>`);
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <html><head><title>Fechamento de Caixa - ${formatarDataBR(c.data)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 24px auto; padding: 0 20px; color:#222; }
+        h1, h2, h3 { margin: 8px 0; }
+        table { width:100%; border-collapse: collapse; margin: 8px 0 16px; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid #ddd; text-align:left; font-size: 13px; }
+        th { background:#f4f4f8; }
+        .total { font-weight: bold; }
+        .right { text-align: right; }
+        .center { text-align: center; }
+        .box { background:#f8f9fc; padding:12px; border-radius:8px; margin:10px 0; }
+        .footer { font-size:11px; color:#888; text-align:center; margin-top:30px; border-top:1px solid #ddd; padding-top:10px; }
+      </style></head><body>
+      ${cabec}
+      <h1 style="text-align:center;border-bottom:2px solid #333;padding-bottom:8px;">Fechamento de Caixa</h1>
+      <div class="box">
+        <div><strong>Data:</strong> ${formatarDataBR(c.data)}</div>
+        <div><strong>Status:</strong> ${c.status === 'fechado' ? '🔴 FECHADO' : '🟢 ABERTO'}</div>
+        <div><strong>Saldo Inicial (Troco):</strong> ${formatarBRL(c.saldoInicial)}</div>
+      </div>
+
+      <h3>🛒 Vendas à Vista do Dia (${t.qtdVendas} venda(s))</h3>
+      <table>
+        <thead><tr><th>Forma de Pagamento</th><th class="right">Valor</th></tr></thead>
+        <tbody>
+          ${Object.keys(t.vendasPorForma).map(f => `<tr><td>${formaLabel[f]||f}</td><td class="right">${formatarBRL(t.vendasPorForma[f])}</td></tr>`).join('') || '<tr><td colspan="2" class="center">Nenhuma venda à vista.</td></tr>'}
+          <tr class="total"><td>TOTAL</td><td class="right">${formatarBRL(t.totalVendasVista)}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>💼 Movimentos do Caixa</h3>
+      <table>
+        <thead><tr><th>Tipo</th><th>Descrição</th><th>Categoria</th><th class="right">Valor</th></tr></thead>
+        <tbody>
+          ${(_caixaDados.movimentos || []).map(m => `<tr><td>${tipoLabel[m.tipo]||m.tipo}</td><td>${m.descricao}</td><td>${m.categoria||'-'}</td><td class="right">${formatarBRL(m.valor)}</td></tr>`).join('') || '<tr><td colspan="4" class="center">Nenhum movimento.</td></tr>'}
+        </tbody>
+      </table>
+
+      <h3>📊 Resumo</h3>
+      <table>
+        <tr><td>Saldo Inicial</td><td class="right">${formatarBRL(c.saldoInicial)}</td></tr>
+        <tr><td>(+) Vendas à Vista</td><td class="right">${formatarBRL(t.totalVendasVista)}</td></tr>
+        <tr><td>(+) Reforços</td><td class="right">${formatarBRL(t.totalReforcos)}</td></tr>
+        <tr><td>(−) Sangrias</td><td class="right">${formatarBRL(t.totalSangrias)}</td></tr>
+        <tr><td>(−) Despesas</td><td class="right">${formatarBRL(t.totalDespesas)}</td></tr>
+        <tr class="total"><td>SALDO ESPERADO</td><td class="right">${formatarBRL(saldoEsperado)}</td></tr>
+        ${c.saldoFinalInformado != null ? `
+          <tr class="total"><td>SALDO CONTADO</td><td class="right">${formatarBRL(c.saldoFinalInformado)}</td></tr>
+          <tr class="total" style="color:${Math.abs(dif||0)<0.01 ? '#16a34a' : (dif>0 ? '#0891b2':'#dc2626')};">
+            <td>DIFERENÇA</td><td class="right">${dif > 0 ? '+' : ''}${formatarBRL(dif||0)}</td>
+          </tr>
+        ` : ''}
+      </table>
+      ${c.obs ? `<div class="box"><strong>Observações:</strong> ${c.obs}</div>` : ''}
+      <div class="footer">Fechamento gerado em ${new Date().toLocaleString('pt-BR')}</div>
+      </body></html>
+    `);
+    w.document.close();
+    setTimeout(() => w.print(), 250);
+  }
+
+  function abrirHistoricoCaixa() {
+    alert('Histórico de fechamentos pode ser visto em Relatórios → (em breve).\n\nPor enquanto, você pode acompanhar pelo backend.');
+  }
 
   // ====== MINHA CONTA ======
   async function carregarMinhaConta() {

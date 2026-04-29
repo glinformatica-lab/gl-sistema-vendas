@@ -25,6 +25,7 @@ app.use('/api/contas-pagar',    autenticar, require('./routes/contas-pagar'));
 app.use('/api/contas-receber',  autenticar, require('./routes/contas-receber'));
 app.use('/api/usuarios',        autenticar, require('./routes/usuarios'));
 app.use('/api/empresa',         autenticar, require('./routes/empresa'));
+app.use('/api/caixa',           autenticar, require('./routes/caixa'));
 
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
