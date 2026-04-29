@@ -11,8 +11,8 @@ const router = express.Router();
 
 // Configuração dos planos disponíveis
 const PLANOS = {
-  mensal: { nome: 'Plano Mensal', valor: 99.00, meses: 1 },
-  anual:  { nome: 'Plano Anual',  valor: 999.00, meses: 12 }
+  mensal: { nome: 'Plano Mensal', valor: 99.90, meses: 1 },
+  anual:  { nome: 'Plano Anual',  valor: 1080.00, meses: 12 }
 };
 
 // Helper: cria string única para reference_id

@@ -86,7 +86,7 @@
     <div class="plano" id="plano-mensal" onclick="selecionarPlano('mensal')">
       <h3>📅 Mensal</h3>
       <div class="preco">
-        <span class="moeda">R$</span>99<span class="periodo">,00 / mês</span>
+        <span class="moeda">R$</span>99<span class="periodo">,90 / mês</span>
       </div>
       <div class="desc">Cobrado mensalmente</div>
       <ul>
@@ -101,14 +101,14 @@
 
     <div class="plano popular" id="plano-anual" onclick="selecionarPlano('anual')">
       <h3>🌟 Anual</h3>
-      <div class="economia">💰 Economize 16% (R$ 189/ano)</div>
+      <div class="economia">💰 Economize 10% (R$ 118,80/ano)</div>
       <div class="preco">
-        <span class="moeda">R$</span>83<span class="periodo">,25 / mês</span>
+        <span class="moeda">R$</span>90<span class="periodo">,00 / mês</span>
       </div>
-      <div class="desc">R$ 999,00 cobrados uma vez por ano</div>
+      <div class="desc">R$ 1.080,00 cobrados uma vez por ano</div>
       <ul>
         <li>Tudo do Plano Mensal</li>
-        <li><strong>16% de desconto</strong></li>
+        <li><strong>10% de desconto</strong></li>
         <li>Parcele em até 12x sem juros</li>
         <li>Atendimento prioritário</li>
       </ul>
@@ -180,8 +180,8 @@
 <script>
   let _planoSelecionado = null;
   const PLANOS = {
-    mensal: { nome: 'Plano Mensal', valor: 99.00, label: 'R$ 99,00 / mês' },
-    anual:  { nome: 'Plano Anual',  valor: 999.00, label: 'R$ 999,00 / ano' }
+    mensal: { nome: 'Plano Mensal', valor: 99.90, label: 'R$ 99,90 / mês' },
+    anual:  { nome: 'Plano Anual',  valor: 1080.00, label: 'R$ 1.080,00 / ano' }
   };
 
   function selecionarPlano(p) {
