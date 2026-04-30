@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { autenticar, autenticarMaster } = require('./middleware/auth');
+const { autenticar, autenticarMaster, verificarAcesso } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,16 +16,16 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/assinaturas', require('./routes/assinaturas'));
 
 // Rotas protegidas (token de empresa)
-app.use('/api/produtos',        autenticar, require('./routes/produtos'));
-app.use('/api/clientes',        autenticar, require('./routes/clientes'));
-app.use('/api/fornecedores',    autenticar, require('./routes/fornecedores'));
-app.use('/api/vendas',          autenticar, require('./routes/vendas'));
-app.use('/api/entradas',        autenticar, require('./routes/entradas'));
-app.use('/api/contas-pagar',    autenticar, require('./routes/contas-pagar'));
-app.use('/api/contas-receber',  autenticar, require('./routes/contas-receber'));
-app.use('/api/usuarios',        autenticar, require('./routes/usuarios'));
-app.use('/api/empresa',         autenticar, require('./routes/empresa'));
-app.use('/api/caixa',           autenticar, require('./routes/caixa'));
+app.use('/api/produtos',        autenticar, verificarAcesso, require('./routes/produtos'));
+app.use('/api/clientes',        autenticar, verificarAcesso, require('./routes/clientes'));
+app.use('/api/fornecedores',    autenticar, verificarAcesso, require('./routes/fornecedores'));
+app.use('/api/vendas',          autenticar, verificarAcesso, require('./routes/vendas'));
+app.use('/api/entradas',        autenticar, verificarAcesso, require('./routes/entradas'));
+app.use('/api/contas-pagar',    autenticar, verificarAcesso, require('./routes/contas-pagar'));
+app.use('/api/contas-receber',  autenticar, verificarAcesso, require('./routes/contas-receber'));
+app.use('/api/usuarios',        autenticar, verificarAcesso, require('./routes/usuarios'));
+app.use('/api/empresa',         autenticar, verificarAcesso, require('./routes/empresa'));
+app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/caixa'));
 
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
@@ -49,4 +49,11 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
+  // Inicia jobs em background (verificação de trials e licenças)
+  try {
+    require('./services/jobs').iniciarJobs();
+    console.log('[jobs] Inicializados.');
+  } catch (e) {
+    console.error('[jobs] Erro ao inicializar:', e.message);
+  }
 });

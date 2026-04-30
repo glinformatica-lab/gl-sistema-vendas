@@ -1803,6 +1803,16 @@
     if (r.status === 401) { logout(); throw new Error('Sessão expirada.'); }
     let data;
     try { data = await r.json(); } catch (_) { data = null; }
+    // 403 com código de modo leitura: atualiza empresa no localStorage e mostra alerta
+    if (r.status === 403 && data && data.codigo) {
+      try {
+        const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+        if (data.codigo === 'TRIAL_EXPIRADO') empresa.status = 'trial-expirado';
+        else if (data.codigo === 'MENSALIDADE_VENCIDA') empresa.status = 'vencida';
+        else if (data.codigo === 'CONTA_BLOQUEADA') empresa.status = 'bloqueada';
+        localStorage.setItem('empresa', JSON.stringify(empresa));
+      } catch(e) {}
+    }
     if (!r.ok) throw new Error((data && data.error) || `Erro ${r.status}`);
     return data;
   }
@@ -1901,25 +1911,43 @@
       if(papelAtual !== 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
       }
-      // Banner de licença (trial / vencimento próximo)
+      // Banner de licença (trial / vencimento próximo / expirado)
       try {
         const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
         const banner = document.getElementById('banner-licenca');
-        if (banner && empresa.dataVencimento) {
-          const hoje = new Date(); hoje.setHours(0,0,0,0);
-          const venc = new Date(String(empresa.dataVencimento).slice(0,10) + 'T00:00:00');
-          const dias = Math.round((venc - hoje) / (1000 * 60 * 60 * 24));
-          if (empresa.status === 'trial' && dias <= 7) {
+        if (banner) {
+          // Status crítico: trial-expirado ou vencida → modo somente leitura
+          if (empresa.status === 'trial-expirado') {
             banner.style.display = 'block';
-            banner.innerHTML = dias > 0
-              ? `🎁 Período de teste ativo — restam <strong>${dias} dia(s)</strong>. Entre em contato com o suporte para contratar: <a href="https://wa.me/5562992347572" target="_blank" style="color:#92400e;font-weight:700;">WhatsApp (62) 99234-7572</a>`
-              : `⚠️ Seu trial termina hoje — após isso o sistema será bloqueado. Entre em contato: <a href="https://wa.me/5562992347572" target="_blank" style="color:#92400e;font-weight:700;">WhatsApp (62) 99234-7572</a>`;
-          } else if (empresa.status === 'ativa' && dias >= 0 && dias <= 5) {
-            banner.style.display = 'block';
-            banner.style.background = '#fee2e2';
+            banner.style.background = '#fef2f2';
             banner.style.color = '#991b1b';
             banner.style.borderBottomColor = '#dc2626';
-            banner.innerHTML = `⏰ Sua licença vence em <strong>${dias} dia(s)</strong> (${String(empresa.dataVencimento).slice(0,10).split('-').reverse().join('/')}). Renove para evitar bloqueio: <a href="https://wa.me/5562992347572" target="_blank" style="color:#991b1b;font-weight:700;">WhatsApp (62) 99234-7572</a>`;
+            banner.innerHTML = `🔒 <strong>Seu período de teste expirou.</strong> Você está em modo somente leitura — não é possível cadastrar ou alterar dados. <a href="/assinar" style="color:#991b1b;font-weight:700;text-decoration:underline;">Assine agora</a> para liberar tudo!`;
+          } else if (empresa.status === 'vencida') {
+            banner.style.display = 'block';
+            banner.style.background = '#fef2f2';
+            banner.style.color = '#991b1b';
+            banner.style.borderBottomColor = '#dc2626';
+            banner.innerHTML = `🔒 <strong>Sua mensalidade está vencida.</strong> Você está em modo somente leitura. <a href="https://wa.me/5562992347572" target="_blank" style="color:#991b1b;font-weight:700;text-decoration:underline;">Falar com suporte</a> para renovar.`;
+          } else if (empresa.dataVencimento) {
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+            const venc = new Date(String(empresa.dataVencimento).slice(0,10) + 'T00:00:00');
+            const dias = Math.round((venc - hoje) / (1000 * 60 * 60 * 24));
+            if (empresa.status === 'trial' && dias <= 7) {
+              banner.style.display = 'block';
+              banner.style.background = '#fef3c7';
+              banner.style.color = '#92400e';
+              banner.style.borderBottomColor = '#f59e0b';
+              banner.innerHTML = dias > 0
+                ? `🎁 Período de teste ativo — restam <strong>${dias} dia(s)</strong>. <a href="/assinar" style="color:#92400e;font-weight:700;text-decoration:underline;">Assinar agora</a> para não perder o acesso!`
+                : `⚠️ <strong>Seu trial termina hoje</strong> — após isso o sistema entrará em modo somente leitura. <a href="/assinar" style="color:#92400e;font-weight:700;text-decoration:underline;">Assine agora</a>`;
+            } else if (empresa.status === 'ativa' && dias >= 0 && dias <= 5) {
+              banner.style.display = 'block';
+              banner.style.background = '#fee2e2';
+              banner.style.color = '#991b1b';
+              banner.style.borderBottomColor = '#dc2626';
+              banner.innerHTML = `⏰ Sua licença vence em <strong>${dias} dia(s)</strong> (${String(empresa.dataVencimento).slice(0,10).split('-').reverse().join('/')}). Renove para evitar bloqueio: <a href="https://wa.me/5562992347572" target="_blank" style="color:#991b1b;font-weight:700;">WhatsApp (62) 99234-7572</a>`;
+            }
           }
         }
       } catch(e) {}

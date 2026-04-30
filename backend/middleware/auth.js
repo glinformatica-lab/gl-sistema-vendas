@@ -62,6 +62,65 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
+// Middleware: bloqueia operações de escrita (POST, PUT, DELETE, PATCH)
+// para empresas com trial expirado ou licença vencida.
+// Permite apenas GET (leitura).
+const db = require('../db');
+async function verificarAcesso(req, res, next) {
+  // Só verifica em métodos de escrita
+  const metodosEscrita = ['POST', 'PUT', 'DELETE', 'PATCH'];
+  if (!metodosEscrita.includes(req.method)) {
+    return next();
+  }
+  // Endpoints sempre liberados (auth, leitura própria, sair, etc.)
+  const url = req.originalUrl || req.url || '';
+  const liberados = [
+    '/api/auth/me',
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/me/senha',
+    '/api/empresa/pagamentos'
+  ];
+  if (liberados.some(l => url.startsWith(l))) {
+    return next();
+  }
+  try {
+    const r = await db.query(
+      'SELECT status, plano, data_vencimento FROM empresas WHERE id = $1 LIMIT 1',
+      [req.user.empresaId]
+    );
+    if (r.rows.length === 0) {
+      return res.status(403).json({ error: 'Empresa não encontrada.' });
+    }
+    const emp = r.rows[0];
+    // Status que bloqueiam escrita
+    if (emp.status === 'bloqueada') {
+      return res.status(403).json({
+        error: 'Sua conta está bloqueada. Entre em contato com o suporte.',
+        codigo: 'CONTA_BLOQUEADA'
+      });
+    }
+    if (emp.status === 'trial-expirado') {
+      return res.status(403).json({
+        error: 'Seu período de teste expirou. Assine um plano para continuar.',
+        codigo: 'TRIAL_EXPIRADO',
+        modoLeitura: true
+      });
+    }
+    if (emp.status === 'vencida') {
+      return res.status(403).json({
+        error: 'Sua mensalidade está vencida. Renove para continuar usando o sistema.',
+        codigo: 'MENSALIDADE_VENCIDA',
+        modoLeitura: true
+      });
+    }
+    next();
+  } catch (err) {
+    console.error('[verificarAcesso]', err);
+    next(); // Em caso de erro no DB, deixa passar pra não travar o sistema
+  }
+}
+
 function gerarToken(usuario) {
   return jwt.sign(
     {
@@ -89,4 +148,4 @@ function gerarTokenMaster(master) {
   );
 }
 
-module.exports = { autenticar, autenticarMaster, exigirAdmin, gerarToken, gerarTokenMaster };
+module.exports = { autenticar, autenticarMaster, exigirAdmin, gerarToken, gerarTokenMaster, verificarAcesso };

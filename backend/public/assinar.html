@@ -41,6 +41,11 @@
     .plano ul { padding:0 0 0 18px; margin:14px 0 0 0; font-size:14px; line-height:1.8; color:#444; }
     .plano ul li { list-style:none; position:relative; padding-left:22px; }
     .plano ul li::before { content:'✓'; position:absolute; left:0; color:var(--verde); font-weight:900; }
+    .plano.trial-card { background:linear-gradient(135deg, #fef3c7, #fff); border-color:#f59e0b; }
+    .plano.trial-card:hover { border-color:#d97706; box-shadow:0 6px 24px rgba(245,158,11,0.20); }
+    .plano.trial-card.selecionado { border-color:#d97706; background:linear-gradient(135deg, #fef3c7, #fff); }
+    .plano.trial-card h3 { color:#b45309; }
+    .plano.trial-card::after { content:'GRÁTIS'; position:absolute; top:-10px; right:14px; background:#f59e0b; color:#fff; padding:3px 12px; border-radius:14px; font-size:11px; font-weight:700; }
 
     /* Formulário */
     .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
@@ -79,10 +84,26 @@
     <a href="/login">← Voltar ao login</a>
   </div>
 
-  <h1>Assine e comece a usar agora mesmo</h1>
-  <p class="sub">Escolha o plano que cabe no seu negócio. Pague com PIX, cartão ou boleto.</p>
+  <h1>Comece a usar agora mesmo</h1>
+  <p class="sub">Experimente <strong>7 dias grátis</strong> ou escolha o plano que cabe no seu negócio.</p>
 
   <div class="planos">
+    <div class="plano trial-card" id="plano-trial" onclick="selecionarPlano('trial')">
+      <h3>🎁 Teste Grátis</h3>
+      <div class="preco">
+        <span class="moeda" style="font-size:18px;">R$ 0</span>
+        <span class="periodo" style="font-size:18px;"> / 7 dias</span>
+      </div>
+      <div class="desc">Sem cartão de crédito</div>
+      <ul>
+        <li>Acesso a TODAS as funcionalidades</li>
+        <li>Sistema completo por 7 dias</li>
+        <li>Não precisa cadastrar cartão</li>
+        <li>Cancele quando quiser</li>
+        <li>Após 7 dias, escolha um plano</li>
+      </ul>
+    </div>
+
     <div class="plano" id="plano-mensal" onclick="selecionarPlano('mensal')">
       <h3>📅 Mensal</h3>
       <div class="preco">
@@ -180,6 +201,7 @@
 <script>
   let _planoSelecionado = null;
   const PLANOS = {
+    trial:  { nome: 'Teste Grátis 7 dias', valor: 0, label: 'GRÁTIS por 7 dias' },
     mensal: { nome: 'Plano Mensal', valor: 99.90, label: 'R$ 99,90 / mês' },
     anual:  { nome: 'Plano Anual',  valor: 1080.00, label: 'R$ 1.080,00 / ano' }
   };
@@ -191,7 +213,15 @@
     document.getElementById('form-card').classList.add('visivel');
     document.getElementById('resumo-plano').textContent = PLANOS[p].nome;
     document.getElementById('resumo-valor').textContent = PLANOS[p].label;
-    // Rolar suavemente até o formulário
+    // Botão muda conforme plano
+    const btn = document.getElementById('btn-assinar');
+    if (p === 'trial') {
+      btn.textContent = '🎁 Começar teste grátis (7 dias)';
+      btn.style.background = '#f59e0b';
+    } else {
+      btn.textContent = 'Continuar para o Pagamento →';
+      btn.style.background = '';
+    }
     setTimeout(() => {
       document.getElementById('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -240,10 +270,11 @@
     };
 
     btn.disabled = true;
-    btn.textContent = 'Criando sua conta...';
+    btn.textContent = _planoSelecionado === 'trial' ? 'Criando sua conta de teste...' : 'Criando sua conta...';
 
     try {
-      const r = await fetch('/api/assinaturas/iniciar', {
+      const url = _planoSelecionado === 'trial' ? '/api/assinaturas/trial' : '/api/assinaturas/iniciar';
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -251,14 +282,23 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Erro ao processar.');
 
-      // Redireciona para o checkout do PagBank
-      btn.textContent = 'Redirecionando para o PagBank...';
-      window.location.href = data.linkPagamento;
+      if (_planoSelecionado === 'trial') {
+        // Faz login automático com o token retornado
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('usuario', JSON.stringify(data.usuario));
+        localStorage.setItem('empresa', JSON.stringify(data.empresa));
+        btn.textContent = '🎉 Conta criada! Entrando no sistema...';
+        setTimeout(() => { window.location.href = '/index.html'; }, 800);
+      } else {
+        // Redireciona para o checkout do PagBank
+        btn.textContent = 'Redirecionando para o PagBank...';
+        window.location.href = data.linkPagamento;
+      }
     } catch (err) {
       erro.textContent = err.message;
       erro.classList.add('show');
       btn.disabled = false;
-      btn.textContent = 'Continuar para o Pagamento →';
+      btn.textContent = _planoSelecionado === 'trial' ? '🎁 Começar teste grátis (7 dias)' : 'Continuar para o Pagamento →';
     }
   }
 </script>

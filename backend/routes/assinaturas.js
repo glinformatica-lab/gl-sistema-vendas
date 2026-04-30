@@ -5,6 +5,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const { gerarToken } = require('../middleware/auth');
 const pagbank = require('../services/pagbank');
 
 const router = express.Router();
@@ -188,6 +189,102 @@ router.get('/:ref', async (req, res) => {
   } catch (err) {
     console.error('[assinaturas/get]', err);
     res.status(500).json({ error: 'Erro ao consultar assinatura.' });
+  }
+});
+
+// === POST /api/assinaturas/trial === Cria empresa com 7 dias grátis (sem pagamento)
+router.post('/trial', async (req, res) => {
+  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
+  if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
+  if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
+  if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
+  if (!senhaAdmin || senhaAdmin.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Verifica e-mail duplicado
+    const dup = await client.query(
+      'SELECT id FROM usuarios WHERE LOWER(email)=LOWER($1) LIMIT 1',
+      [emailAdmin.trim()]
+    );
+    if (dup.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Já existe um usuário com este e-mail. Use outro ou faça login.' });
+    }
+    // Verifica se já tem trial ativo com mesmo CNPJ (anti-abuso)
+    if (cnpj && cnpj.trim()) {
+      const cnpjLimpo = cnpj.replace(/\D/g, '');
+      if (cnpjLimpo) {
+        const dupCnpj = await client.query(
+          `SELECT id, status FROM empresas WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = $1 LIMIT 1`,
+          [cnpjLimpo]
+        );
+        if (dupCnpj.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Já existe uma empresa cadastrada com este CNPJ. Faça login ou contate o suporte.' });
+        }
+      }
+    }
+    // Cria empresa em status 'trial' com vencimento em 7 dias
+    const dataVenc = new Date();
+    dataVenc.setDate(dataVenc.getDate() + 7);
+    const vencIso = dataVenc.toISOString().slice(0, 10);
+    const empResult = await client.query(
+      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, data_vencimento, valor_mensalidade, origem)
+       VALUES ($1, $2, $3, 'trial', 'trial', $4, 0, 'auto-assinatura') RETURNING *`,
+      [empresa.trim(), cnpj || null, telefone || null, vencIso]
+    );
+    const novaEmpresa = empResult.rows[0];
+    // Cria admin
+    const senhaHash = await bcrypt.hash(senhaAdmin, 10);
+    const userResult = await client.query(
+      `INSERT INTO usuarios (empresa_id, email, nome, senha_hash, papel)
+       VALUES ($1, $2, $3, $4, 'admin') RETURNING id, email, nome, papel, empresa_id`,
+      [novaEmpresa.id, emailAdmin.toLowerCase().trim(), nomeAdmin.trim(), senhaHash]
+    );
+    const novoUsuario = userResult.rows[0];
+    await client.query('COMMIT');
+    // Notifica admin do sistema (você) por e-mail
+    try {
+      const { enviarEmail } = require('../services/email');
+      const dataFmt = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'jose.neto@glinformatica.com.br';
+      enviarEmail({
+        para: ADMIN_EMAIL,
+        assunto: `🎁 Novo trial: ${empresa.trim()}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1e3a8a;">🎁 Novo trial cadastrado!</h2>
+            <p>Uma empresa começou um teste de 7 dias.</p>
+            <table style="width:100%; border-collapse: collapse;">
+              <tr><td style="padding:6px 0;">Empresa:</td><td><strong>${empresa.trim()}</strong></td></tr>
+              <tr><td style="padding:6px 0;">CNPJ:</td><td>${cnpj || '—'}</td></tr>
+              <tr><td style="padding:6px 0;">Admin:</td><td>${nomeAdmin.trim()}</td></tr>
+              <tr><td style="padding:6px 0;">E-mail:</td><td>${emailAdmin}</td></tr>
+              <tr><td style="padding:6px 0;">Telefone:</td><td>${telefone || '—'}</td></tr>
+              <tr><td style="padding:6px 0;">Trial expira em:</td><td>${vencIso.split('-').reverse().join('/')}</td></tr>
+              <tr><td style="padding:6px 0;">Cadastrado em:</td><td>${dataFmt}</td></tr>
+            </table>
+          </div>`
+      }).catch(e => console.error('[trial] erro ao enviar e-mail:', e.message));
+    } catch (e) {
+      console.error('[trial] erro ao notificar:', e.message);
+    }
+    // Gera token JWT já — login automático
+    const token = gerarToken(novoUsuario);
+    res.json({
+      ok: true,
+      token,
+      usuario: { id: novoUsuario.id, nome: novoUsuario.nome, email: novoUsuario.email, papel: novoUsuario.papel },
+      empresa: { id: novaEmpresa.id, nome: novaEmpresa.nome, status: 'trial', dataVencimento: vencIso },
+      mensagem: 'Trial de 7 dias ativado!'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[assinaturas/trial]', err);
+    res.status(500).json({ error: 'Erro ao criar conta de teste. Tente novamente.' });
+  } finally {
+    client.release();
   }
 });
 
