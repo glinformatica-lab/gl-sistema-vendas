@@ -280,6 +280,29 @@ async function processarPagamento(referencia, dadosPedido) {
       );
 
       console.log(`[webhook] ✓ Assinatura ${referencia} paga, empresa ${assin.empresa_id} ativada até ${vencIso}`);
+
+      // Notifica admin por e-mail (não bloqueia o webhook se falhar)
+      try {
+        const { notificarVendaParaAdmin } = require('../services/email');
+        // Busca dados da empresa pra enriquecer o e-mail
+        const rEmp = await client.query(
+          `SELECT nome, cnpj, telefone FROM empresas WHERE id = $1`,
+          [assin.empresa_id]
+        );
+        const emp = rEmp.rows[0] || {};
+        // Não bloqueia o response — dispara em background
+        notificarVendaParaAdmin({
+          empresaNome: emp.nome,
+          empresaCnpj: emp.cnpj,
+          valorTotal: assin.valor,
+          plano: assin.plano,
+          emailCliente: assin.email_contato,
+          telefoneCliente: emp.telefone,
+          referenceId: referencia
+        }).catch(e => console.error('[webhook] erro ao enviar e-mail:', e.message));
+      } catch (e) {
+        console.error('[webhook] erro ao montar e-mail:', e.message);
+      }
     } else if (chargeRecusada) {
       await client.query(
         `UPDATE assinaturas SET status='recusada', ultimo_retorno=$1, atualizado_em=NOW() WHERE id=$2`,
