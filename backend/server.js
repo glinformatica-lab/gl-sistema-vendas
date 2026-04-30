@@ -37,6 +37,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 app.get('/assinar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinar.html')));
 app.get('/assinatura-sucesso', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinatura-sucesso.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/reset-senha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-senha.html')));
 app.get('/master', (req, res) => res.sendFile(path.join(__dirname, 'public', 'master.html')));
 
 // Frontend estático

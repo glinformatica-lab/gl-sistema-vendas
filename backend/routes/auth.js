@@ -225,4 +225,142 @@ router.put('/me/senha', autenticar, async (req, res) => {
   }
 });
 
+// === POST /esqueci-senha === Solicita reset de senha
+// Body: { email }
+// Resposta: sempre { ok: true } (não revela se e-mail existe — segurança)
+router.post('/esqueci-senha', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'E-mail é obrigatório.' });
+  }
+  const emailNorm = email.trim().toLowerCase();
+  try {
+    // Busca usuário pelo e-mail
+    const r = await db.query(
+      `SELECT u.id, u.nome, u.email, e.nome AS empresa_nome
+       FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
+       WHERE LOWER(u.email) = $1 LIMIT 1`,
+      [emailNorm]
+    );
+    // Se não achou, fingimos que deu certo (segurança - não vaza se e-mail existe)
+    if (r.rows.length === 0) {
+      console.log(`[esqueci-senha] E-mail não encontrado: ${emailNorm}`);
+      return res.json({ ok: true });
+    }
+    const usuario = r.rows[0];
+    // Gera token aleatório de 64 chars (criptograficamente seguro)
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiraEm = new Date(Date.now() + 60 * 60 * 1000); // +1 hora
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
+    // Invalida tokens antigos do mesmo usuário (limpeza)
+    await db.query(
+      `UPDATE reset_senha_tokens SET usado = TRUE WHERE usuario_id = $1 AND usado = FALSE`,
+      [usuario.id]
+    );
+    // Cria novo token
+    await db.query(
+      `INSERT INTO reset_senha_tokens (usuario_id, token, expira_em, ip)
+       VALUES ($1, $2, $3, $4)`,
+      [usuario.id, token, expiraEm, ip]
+    );
+    // Envia e-mail (não bloqueia o response - dispara em background)
+    const APP_URL = process.env.APP_URL || 'https://sistema.glinformatica.com.br';
+    const link = `${APP_URL}/reset-senha?token=${token}`;
+    const { enviarEmail } = require('../services/email');
+    enviarEmail({
+      para: usuario.email,
+      assunto: 'Redefinir senha — GL Sistema de Vendas',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #1e3a8a, #3730a3); color: white; padding: 22px; border-radius: 12px 12px 0 0;">
+            <h1 style="margin: 0; font-size: 20px;">🔑 Redefinição de senha</h1>
+          </div>
+          <div style="background: #fff; border: 1px solid #ddd; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;">
+            <p>Olá, <strong>${usuario.nome}</strong>!</p>
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta no <strong>GL Sistema de Vendas</strong> (${usuario.empresa_nome}).</p>
+            <p>Clique no botão abaixo para definir uma nova senha:</p>
+            <div style="text-align: center; margin: 26px 0;">
+              <a href="${link}" style="background: #1e3a8a; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Redefinir minha senha</a>
+            </div>
+            <p style="color: #666; font-size: 13px;">Ou copie e cole este link no navegador:</p>
+            <p style="word-break: break-all; background: #f6f8fc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #445;">${link}</p>
+            <div style="background: #fef3c7; border-left: 4px solid #ca8a04; padding: 12px; border-radius: 6px; margin-top: 18px; font-size: 13px;">
+              ⚠️ <strong>Este link expira em 1 hora</strong> e só pode ser usado uma vez.
+            </div>
+            <p style="color: #666; font-size: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #eee;">
+              Se você não solicitou esta redefinição, ignore este e-mail. Sua senha atual continua segura.
+            </p>
+          </div>
+          <p style="text-align: center; color: #888; font-size: 11px; margin-top: 14px;">
+            E-mail automático do GL Sistema de Vendas. Não responda este e-mail.
+          </p>
+        </div>
+      `
+    }).catch(e => console.error('[esqueci-senha] erro ao enviar e-mail:', e.message));
+    console.log(`[esqueci-senha] Token gerado para ${emailNorm}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[esqueci-senha]', err);
+    // Mesmo em erro, retornamos OK pra não vazar nada
+    res.json({ ok: true });
+  }
+});
+
+// === POST /resetar-senha === Aplica nova senha usando token
+// Body: { token, novaSenha }
+router.post('/resetar-senha', async (req, res) => {
+  const { token, novaSenha } = req.body || {};
+  if (!token || !novaSenha) {
+    return res.status(400).json({ error: 'Token e nova senha são obrigatórios.' });
+  }
+  if (String(novaSenha).length < 6) {
+    return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
+  }
+  try {
+    // Busca token válido (não usado, não expirado)
+    const r = await db.query(
+      `SELECT id, usuario_id FROM reset_senha_tokens
+       WHERE token = $1 AND usado = FALSE AND expira_em > NOW() LIMIT 1`,
+      [token]
+    );
+    if (r.rows.length === 0) {
+      return res.status(400).json({ error: 'Link inválido ou expirado. Solicite uma nova redefinição.' });
+    }
+    const tokenInfo = r.rows[0];
+    // Atualiza senha
+    const novoHash = await bcrypt.hash(novaSenha, 10);
+    await db.query('UPDATE usuarios SET senha_hash = $1 WHERE id = $2', [novoHash, tokenInfo.usuario_id]);
+    // Marca token como usado
+    await db.query('UPDATE reset_senha_tokens SET usado = TRUE WHERE id = $1', [tokenInfo.id]);
+    console.log(`[resetar-senha] Senha alterada para usuário ${tokenInfo.usuario_id}`);
+    res.json({ ok: true, mensagem: 'Senha alterada com sucesso!' });
+  } catch (err) {
+    console.error('[resetar-senha]', err);
+    res.status(500).json({ error: 'Erro ao processar a redefinição.' });
+  }
+});
+
+// === GET /validar-token-reset?token=XXX === Verifica se token é válido (antes de mostrar form)
+router.get('/validar-token-reset', async (req, res) => {
+  const { token } = req.query || {};
+  if (!token) return res.json({ valido: false });
+  try {
+    const r = await db.query(
+      `SELECT u.email FROM reset_senha_tokens t JOIN usuarios u ON u.id = t.usuario_id
+       WHERE t.token = $1 AND t.usado = FALSE AND t.expira_em > NOW() LIMIT 1`,
+      [token]
+    );
+    if (r.rows.length === 0) return res.json({ valido: false });
+    // Mascara e-mail (mostra só primeiro caractere + domínio)
+    const email = r.rows[0].email;
+    const [user, dom] = email.split('@');
+    const emailMascarado = user[0] + '***@' + dom;
+    res.json({ valido: true, email: emailMascarado });
+  } catch (err) {
+    console.error('[validar-token-reset]', err);
+    res.json({ valido: false });
+  }
+});
+
 module.exports = router;

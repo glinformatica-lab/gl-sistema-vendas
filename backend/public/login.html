@@ -46,10 +46,29 @@
         <input type="email" id="login-email" required autocomplete="email">
         <label>Senha</label>
         <input type="password" id="login-senha" required autocomplete="current-password">
+        <div style="text-align: right; margin-top: -10px; margin-bottom: 12px;">
+          <a href="javascript:void(0)" onclick="abrirEsqueciSenha()" style="color:#6366f1;font-size:13px;text-decoration:none;">Esqueci minha senha</a>
+        </div>
         <div class="erro" id="login-erro"></div>
         <button type="submit" class="btn" id="btn-login">Entrar</button>
       </form>
       <div class="toggle">Ainda não tem conta? <a href="/assinar" style="cursor:pointer;">Ver planos e assinar</a></div>
+    </div>
+
+    <!-- ESQUECI SENHA -->
+    <div id="form-esqueci" style="display:none;">
+      <h1>🔑 Esqueci minha senha</h1>
+      <div class="sub">Digite o e-mail cadastrado e enviaremos um link para redefinir sua senha.</div>
+      <form id="form-esqueci-el">
+        <label>E-mail</label>
+        <input type="email" id="esq-email" required autocomplete="email">
+        <div class="erro" id="esq-erro"></div>
+        <div id="esq-sucesso" style="display:none;background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:12px;border-radius:8px;margin-bottom:12px;font-size:14px;">
+          ✅ Se o e-mail estiver cadastrado, enviaremos um link em instantes. Verifique também a caixa de spam.
+        </div>
+        <button type="submit" class="btn" id="btn-esqueci">Enviar link de redefinição</button>
+      </form>
+      <div class="toggle"><a href="javascript:void(0)" onclick="voltarParaLogin()" style="cursor:pointer;">← Voltar para o login</a></div>
     </div>
 
     <!-- CADASTRO -->
@@ -169,6 +188,52 @@
       showErr('cad-erro', err.message);
     } finally {
       btn.disabled = false; btn.textContent = 'Criar conta';
+    }
+  });
+
+  // === ESQUECI MINHA SENHA ===
+  function abrirEsqueciSenha() {
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-esqueci').style.display = '';
+    document.getElementById('esq-email').value = '';
+    document.getElementById('esq-erro').style.display = 'none';
+    document.getElementById('esq-sucesso').style.display = 'none';
+    setTimeout(() => document.getElementById('esq-email').focus(), 100);
+  }
+  function voltarParaLogin() {
+    document.getElementById('form-esqueci').style.display = 'none';
+    document.getElementById('form-login').style.display = '';
+  }
+  document.getElementById('form-esqueci-el').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('esq-email').value.trim();
+    const btn = document.getElementById('btn-esqueci');
+    const erro = document.getElementById('esq-erro');
+    const sucesso = document.getElementById('esq-sucesso');
+    erro.style.display = 'none';
+    sucesso.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    try {
+      const resp = await fetch('/api/auth/esqueci-senha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        erro.textContent = data.error || 'Erro ao enviar.';
+        erro.style.display = 'block';
+        return;
+      }
+      sucesso.style.display = 'block';
+      document.getElementById('esq-email').value = '';
+    } catch (err) {
+      erro.textContent = 'Erro de conexão. Tente novamente.';
+      erro.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enviar link de redefinição';
     }
   });
 </script>
