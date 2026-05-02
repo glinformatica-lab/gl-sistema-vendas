@@ -948,6 +948,7 @@
             <div><strong>Status:</strong> <span id="mc-status">—</span></div>
             <div><strong>Vencimento:</strong> <span id="mc-vencimento">—</span></div>
           </div>
+          <button id="mc-btn-renovar" class="btn admin-only" onclick="abrirRenovacao()" style="margin-top:14px;font-size:13px;padding:8px 14px;background:#16a34a;display:none;">💳 Renovar / Mudar Plano</button>
           <p style="margin-top:14px;font-size:12px;color:#668;line-height:1.4;">
             Para alterar dados da empresa (CNPJ, endereço, logo etc.), peça ao administrador acessar <strong>Configurações</strong>.
           </p>
@@ -987,6 +988,70 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Renovação de Assinatura -->
+  <div id="modal-renovacao" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:32px;border-radius:14px;max-width:780px;width:96%;max-height:92vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px;">
+        <div>
+          <h2 style="color:var(--azul);margin:0 0 6px 0;">💳 Renovar Assinatura</h2>
+          <p style="color:#668;font-size:14px;margin:0;">Escolha o plano e finalize o pagamento. Você pode mudar de plano na renovação se quiser!</p>
+        </div>
+        <button onclick="fecharRenovacao()" style="background:transparent;border:none;font-size:28px;color:#999;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+
+      <div id="renovacao-info-atual" style="background:#eef2ff;padding:12px 16px;border-radius:8px;margin-bottom:18px;font-size:13px;color:#3730a3;display:none;">
+        <strong>Plano atual:</strong> <span id="renovacao-plano-atual">—</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
+        <!-- Card Mensal -->
+        <div id="card-mensal" onclick="selecionarPlanoRenovacao('mensal')"
+             style="border:3px solid #e2e8f0;border-radius:12px;padding:20px;cursor:pointer;transition:all 0.2s;background:#fff;">
+          <h3 style="color:var(--azul);margin:0 0 8px 0;font-size:16px;">📅 Plano Mensal</h3>
+          <div style="font-size:32px;font-weight:900;color:#1e3a8a;">R$ 99,90</div>
+          <div style="color:#668;font-size:13px;margin-bottom:12px;">/mês</div>
+          <ul style="font-size:13px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>Sistema completo</li>
+            <li>+1 mês no vencimento</li>
+            <li>Suporte por WhatsApp</li>
+          </ul>
+        </div>
+
+        <!-- Card Anual -->
+        <div id="card-anual" onclick="selecionarPlanoRenovacao('anual')"
+             style="border:3px solid #e2e8f0;border-radius:12px;padding:20px;cursor:pointer;transition:all 0.2s;background:#fff;position:relative;">
+          <span style="position:absolute;top:-12px;right:14px;background:#16a34a;color:#fff;padding:4px 12px;border-radius:14px;font-size:11px;font-weight:700;">10% OFF</span>
+          <h3 style="color:var(--azul);margin:0 0 8px 0;font-size:16px;">🌟 Plano Anual</h3>
+          <div style="font-size:32px;font-weight:900;color:#1e3a8a;">R$ 90,00</div>
+          <div style="color:#668;font-size:13px;margin-bottom:8px;">/mês (pago anualmente)</div>
+          <div style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;margin-bottom:8px;">💰 Economize R$ 118,80/ano</div>
+          <ul style="font-size:13px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>Total: R$ 1.080,00</li>
+            <li>+12 meses no vencimento</li>
+            <li>Atendimento prioritário</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="renovacao-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:12px;border-radius:8px;margin-bottom:14px;font-size:14px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button id="btn-renovar-confirmar" onclick="confirmarRenovacao()" disabled
+                style="flex:1;padding:14px;background:#94a3b8;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:not-allowed;transition:background 0.2s;">
+          Selecione um plano acima
+        </button>
+        <button onclick="fecharRenovacao()"
+                style="padding:14px 24px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;">
+          Cancelar
+        </button>
+      </div>
+
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#668;text-align:center;">
+        🔒 Pagamento processado com segurança pelo PagBank — Aceita PIX, cartão e boleto.
       </div>
     </div>
   </div>
@@ -1916,19 +1981,23 @@
         const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
         const banner = document.getElementById('banner-licenca');
         if (banner) {
+          // Função pra criar botão "Renovar agora"
+          const btnRenovar = (texto, corFundo) =>
+            `<button onclick="abrirRenovacao()" style="color:#fff;background:${corFundo};font-weight:700;border:none;padding:8px 16px;border-radius:6px;margin-left:10px;cursor:pointer;font-size:14px;">💳 ${texto}</button>`;
+
           // Status crítico: trial-expirado ou vencida → modo somente leitura
           if (empresa.status === 'trial-expirado') {
             banner.style.display = 'block';
             banner.style.background = '#fef2f2';
             banner.style.color = '#991b1b';
             banner.style.borderBottomColor = '#dc2626';
-            banner.innerHTML = `🔒 <strong>Seu período de teste expirou.</strong> Você está em modo somente leitura — não é possível cadastrar ou alterar dados. <a href="/assinar" style="color:#991b1b;font-weight:700;text-decoration:underline;">Assine agora</a> para liberar tudo!`;
+            banner.innerHTML = `🔒 <strong>Seu período de teste expirou.</strong> Você está em modo somente leitura — não é possível cadastrar ou alterar dados.${btnRenovar('Assinar agora', '#dc2626')}`;
           } else if (empresa.status === 'vencida') {
             banner.style.display = 'block';
             banner.style.background = '#fef2f2';
             banner.style.color = '#991b1b';
             banner.style.borderBottomColor = '#dc2626';
-            banner.innerHTML = `🔒 <strong>Sua mensalidade está vencida.</strong> Você está em modo somente leitura. <a href="https://wa.me/5562992347572" target="_blank" style="color:#991b1b;font-weight:700;text-decoration:underline;">Falar com suporte</a> para renovar.`;
+            banner.innerHTML = `🔒 <strong>Sua mensalidade está vencida.</strong> Você está em modo somente leitura.${btnRenovar('Renovar agora', '#dc2626')}`;
           } else if (empresa.dataVencimento) {
             const hoje = new Date(); hoje.setHours(0,0,0,0);
             const venc = new Date(String(empresa.dataVencimento).slice(0,10) + 'T00:00:00');
@@ -1939,14 +2008,17 @@
               banner.style.color = '#92400e';
               banner.style.borderBottomColor = '#f59e0b';
               banner.innerHTML = dias > 0
-                ? `🎁 Período de teste ativo — restam <strong>${dias} dia(s)</strong>. <a href="/assinar" style="color:#92400e;font-weight:700;text-decoration:underline;">Assinar agora</a> para não perder o acesso!`
-                : `⚠️ <strong>Seu trial termina hoje</strong> — após isso o sistema entrará em modo somente leitura. <a href="/assinar" style="color:#92400e;font-weight:700;text-decoration:underline;">Assine agora</a>`;
+                ? `🎁 Período de teste ativo — restam <strong>${dias} dia(s)</strong>. Garanta seu acesso!${btnRenovar('Assinar agora', '#16a34a')}`
+                : `⚠️ <strong>Seu trial termina hoje</strong> — após isso o sistema entrará em modo somente leitura.${btnRenovar('Assinar agora', '#dc2626')}`;
             } else if (empresa.status === 'ativa' && dias >= 0 && dias <= 5) {
               banner.style.display = 'block';
               banner.style.background = '#fee2e2';
               banner.style.color = '#991b1b';
               banner.style.borderBottomColor = '#dc2626';
-              banner.innerHTML = `⏰ Sua licença vence em <strong>${dias} dia(s)</strong> (${String(empresa.dataVencimento).slice(0,10).split('-').reverse().join('/')}). Renove para evitar bloqueio: <a href="https://wa.me/5562992347572" target="_blank" style="color:#991b1b;font-weight:700;">WhatsApp (62) 99234-7572</a>`;
+              const diasTxt = dias > 0
+                ? `Sua mensalidade vence em <strong>${dias} dia(s)</strong> (${String(empresa.dataVencimento).slice(0,10).split('-').reverse().join('/')}).`
+                : `<strong>Sua mensalidade vence HOJE</strong>.`;
+              banner.innerHTML = `⏰ ${diasTxt} Renove para não perder o acesso!${btnRenovar('Renovar agora', '#dc2626')}`;
             }
           }
         }
@@ -5445,6 +5517,96 @@ ${conteudo}
     alert('Histórico de fechamentos pode ser visto em Relatórios → (em breve).\n\nPor enquanto, você pode acompanhar pelo backend.');
   }
 
+  // ====== RENOVAÇÃO DE ASSINATURA ======
+  let _planoRenovacao = null;
+  function abrirRenovacao() {
+    _planoRenovacao = null;
+    document.getElementById('renovacao-erro').style.display = 'none';
+    // Reset cards
+    document.getElementById('card-mensal').style.borderColor = '#e2e8f0';
+    document.getElementById('card-mensal').style.background = '#fff';
+    document.getElementById('card-anual').style.borderColor = '#e2e8f0';
+    document.getElementById('card-anual').style.background = '#fff';
+    // Reset botão
+    const btn = document.getElementById('btn-renovar-confirmar');
+    btn.disabled = true;
+    btn.style.background = '#94a3b8';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = 'Selecione um plano acima';
+    // Mostra plano atual
+    try {
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const planoLabel = { 'mensal':'Mensal (R$ 99,90/mês)', 'anual':'Anual (R$ 1.080,00/ano)', 'trial':'Trial (7 dias)' };
+      const txtPlano = planoLabel[empresa.plano] || empresa.plano || '—';
+      const elInfo = document.getElementById('renovacao-info-atual');
+      const elPlano = document.getElementById('renovacao-plano-atual');
+      if (empresa.plano && empresa.plano !== 'trial') {
+        elPlano.textContent = txtPlano;
+        elInfo.style.display = 'block';
+      } else {
+        elInfo.style.display = 'none';
+      }
+    } catch(e) {}
+    document.getElementById('modal-renovacao').style.display = 'flex';
+  }
+  function fecharRenovacao() {
+    document.getElementById('modal-renovacao').style.display = 'none';
+  }
+  function selecionarPlanoRenovacao(plano) {
+    _planoRenovacao = plano;
+    // Reset visual de ambos
+    document.getElementById('card-mensal').style.borderColor = '#e2e8f0';
+    document.getElementById('card-mensal').style.background = '#fff';
+    document.getElementById('card-anual').style.borderColor = '#e2e8f0';
+    document.getElementById('card-anual').style.background = '#fff';
+    // Marca o selecionado
+    const card = document.getElementById('card-' + plano);
+    card.style.borderColor = '#1e3a8a';
+    card.style.background = 'linear-gradient(135deg, #f0f4ff, #fff)';
+    // Atualiza botão
+    const btn = document.getElementById('btn-renovar-confirmar');
+    btn.disabled = false;
+    btn.style.background = '#1e3a8a';
+    btn.style.cursor = 'pointer';
+    const valorTxt = plano === 'mensal' ? 'R$ 99,90' : 'R$ 1.080,00';
+    btn.textContent = `Pagar ${valorTxt} →`;
+  }
+  async function confirmarRenovacao() {
+    if (!_planoRenovacao) return;
+    const btn = document.getElementById('btn-renovar-confirmar');
+    const erro = document.getElementById('renovacao-erro');
+    erro.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Criando pagamento...';
+    btn.style.background = '#94a3b8';
+    btn.style.cursor = 'wait';
+    try {
+      // /api/assinaturas/renovar não passa pelo middleware verificarAcesso
+      // (porque usa JWT direto e funciona mesmo em modo readonly)
+      const resp = await fetch(API_URL + '/api/assinaturas/renovar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ plano: _planoRenovacao })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Erro ao criar pagamento.');
+      // Redireciona pro PagBank
+      btn.textContent = 'Redirecionando para o PagBank...';
+      window.location.href = data.linkPagamento;
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+      btn.disabled = false;
+      btn.style.background = '#1e3a8a';
+      btn.style.cursor = 'pointer';
+      const valorTxt = _planoRenovacao === 'mensal' ? 'R$ 99,90' : 'R$ 1.080,00';
+      btn.textContent = `Pagar ${valorTxt} →`;
+    }
+  }
+
   // ====== MINHA CONTA ======
   async function carregarMinhaConta() {
     try {
@@ -5484,6 +5646,15 @@ ${conteudo}
         document.getElementById('mc-vencimento').textContent = txt;
       } else {
         document.getElementById('mc-vencimento').textContent = '—';
+      }
+      // Botão "Renovar/Mudar Plano" — só pra admin de empresas auto-assinatura
+      const btnRenovar = document.getElementById('mc-btn-renovar');
+      if (btnRenovar) {
+        if (u.papel === 'admin' && e.origem === 'auto-assinatura') {
+          btnRenovar.style.display = 'inline-block';
+        } else {
+          btnRenovar.style.display = 'none';
+        }
       }
       // Histórico de pagamentos: só mostra se for auto-assinatura
       const secaoPag = document.getElementById('mc-secao-pagamentos');

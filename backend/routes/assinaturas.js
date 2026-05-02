@@ -288,6 +288,95 @@ router.post('/trial', async (req, res) => {
   }
 });
 
+// === POST /api/assinaturas/renovar === Cria checkout de renovação para empresa logada
+// Body: { plano: 'mensal' | 'anual' }
+// REQUER autenticação JWT do usuário admin
+router.post('/renovar', async (req, res) => {
+  // Verifica token JWT
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Token de acesso necessário.' });
+  let payload;
+  try {
+    const jwt = require('jsonwebtoken');
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Token inválido ou expirado.' });
+  }
+  if (payload.papel !== 'admin') {
+    return res.status(403).json({ error: 'Apenas administradores podem renovar a assinatura.' });
+  }
+
+  const { plano } = req.body || {};
+  if (!plano || !PLANOS[plano]) {
+    return res.status(400).json({ error: 'Plano inválido. Use "mensal" ou "anual".' });
+  }
+  if (!pagbank.tokenConfigurado()) {
+    return res.status(503).json({ error: 'Pagamento online temporariamente indisponível. Entre em contato pelo WhatsApp.' });
+  }
+
+  const planoConfig = PLANOS[plano];
+  const referencia = gerarReferencia();
+
+  try {
+    // Busca dados da empresa e do usuário
+    const r = await db.query(
+      `SELECT u.email, u.nome AS nome_admin,
+              e.nome AS empresa_nome, e.cnpj, e.telefone, e.plano AS plano_atual,
+              e.data_vencimento, e.status
+       FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
+       WHERE u.id = $1 LIMIT 1`,
+      [payload.userId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const dados = r.rows[0];
+
+    // Cria registro de assinatura (renovação)
+    const assinResult = await db.query(
+      `INSERT INTO assinaturas (empresa_id, referencia, plano, valor, status, email_contato)
+       VALUES ($1, $2, $3, $4, 'pendente', $5) RETURNING *`,
+      [payload.empresaId, referencia, plano, planoConfig.valor, dados.email]
+    );
+    const novaAssinatura = assinResult.rows[0];
+
+    // Chama PagBank para criar checkout
+    let checkout;
+    try {
+      checkout = await pagbank.criarCheckout({
+        referencia,
+        valor: planoConfig.valor,
+        descricao: `Renovação — ${planoConfig.nome} — GL Sistema de Vendas`,
+        email: dados.email,
+        nome: dados.nome_admin,
+        formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
+        maxParcelas: plano === 'anual' ? 12 : 1
+      });
+    } catch (err) {
+      // Marca assinatura como erro (não trava o sistema)
+      await db.query(`UPDATE assinaturas SET status = 'erro' WHERE id = $1`, [novaAssinatura.id]);
+      console.error('[assinaturas/renovar] Erro PagBank:', err.message, err.responseBody || '');
+      return res.status(502).json({ error: 'Erro ao criar pagamento. Tente novamente em instantes.' });
+    }
+
+    // Atualiza assinatura com dados do checkout
+    await db.query(
+      `UPDATE assinaturas SET checkout_id = $1, link_pagamento = $2 WHERE id = $3`,
+      [checkout.id, checkout.linkPagamento, novaAssinatura.id]
+    );
+
+    res.json({
+      ok: true,
+      referencia,
+      linkPagamento: checkout.linkPagamento,
+      plano,
+      valor: planoConfig.valor
+    });
+  } catch (err) {
+    console.error('[assinaturas/renovar]', err);
+    res.status(500).json({ error: 'Erro ao processar renovação. Tente novamente.' });
+  }
+});
+
 // === POST /api/assinaturas/webhook ===
 // Recebe notificações do PagBank quando algo muda.
 // O PagBank envia um POST com dados do pedido/checkout.
@@ -348,7 +437,22 @@ async function processarPagamento(referencia, dadosPedido) {
     if (chargePaga) {
       // Paga: ativa empresa
       const meses = assin.plano === 'anual' ? 12 : 1;
-      const novoVencimento = new Date();
+      // Pega vencimento atual da empresa (pode ser passado ou futuro)
+      const rVenc = await client.query(
+        `SELECT data_vencimento FROM empresas WHERE id = $1 LIMIT 1`,
+        [assin.empresa_id]
+      );
+      const vencAtual = rVenc.rows[0]?.data_vencimento;
+      const hoje = new Date();
+      let baseRenovacao = hoje;
+      // Se vencimento ATUAL é futuro, soma a partir dele (não perde dias do cliente)
+      if (vencAtual) {
+        const vencDate = new Date(vencAtual instanceof Date ? vencAtual : vencAtual + 'T00:00:00');
+        if (vencDate > hoje) {
+          baseRenovacao = vencDate;
+        }
+      }
+      const novoVencimento = new Date(baseRenovacao);
       novoVencimento.setMonth(novoVencimento.getMonth() + meses);
       const vencIso = novoVencimento.toISOString().slice(0, 10);
 
@@ -422,5 +526,67 @@ async function processarPagamento(referencia, dadosPedido) {
     client.release();
   }
 }
+
+// === POST /api/assinaturas/renovar === (PRECISA estar autenticado)
+// Body: { plano: 'mensal' | 'anual' }
+// Cliente logado escolhe um plano para renovar — gera novo checkout PagBank
+const { autenticar } = require('../middleware/auth');
+router.post('/renovar', autenticar, async (req, res) => {
+  const { plano } = req.body || {};
+  if (!plano || !PLANOS[plano]) {
+    return res.status(400).json({ error: 'Plano inválido. Use "mensal" ou "anual".' });
+  }
+  const planoConfig = PLANOS[plano];
+  try {
+    // Busca dados da empresa e usuário
+    const r = await db.query(
+      `SELECT e.id AS empresa_id, e.nome AS empresa_nome, e.cnpj, e.telefone,
+              u.email, u.nome AS usuario_nome
+       FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
+       WHERE u.id = $1 LIMIT 1`,
+      [req.user.userId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const dados = r.rows[0];
+    // Cria assinatura
+    const referencia = gerarReferencia();
+    await db.query(
+      `INSERT INTO assinaturas (empresa_id, referencia, plano, valor, status, email_contato)
+       VALUES ($1, $2, $3, $4, 'pendente', $5)`,
+      [dados.empresa_id, referencia, plano, planoConfig.valor, dados.email]
+    );
+    // Cria checkout no PagBank
+    const checkout = await pagbank.criarCheckout({
+      referencia,
+      plano: planoConfig,
+      cliente: {
+        nome: dados.usuario_nome,
+        email: dados.email,
+        telefone: dados.telefone,
+        cnpj: dados.cnpj
+      }
+    });
+    if (!checkout || !checkout.linkPagamento) {
+      return res.status(502).json({ error: 'Erro ao gerar link de pagamento. Tente novamente.' });
+    }
+    // Atualiza referência do PagBank
+    if (checkout.checkoutId) {
+      await db.query(
+        `UPDATE assinaturas SET pagbank_checkout_id = $1 WHERE referencia = $2`,
+        [checkout.checkoutId, referencia]
+      );
+    }
+    res.json({
+      ok: true,
+      referencia,
+      linkPagamento: checkout.linkPagamento,
+      plano: planoConfig.nome,
+      valor: planoConfig.valor
+    });
+  } catch (err) {
+    console.error('[assinaturas/renovar]', err);
+    res.status(500).json({ error: 'Erro ao iniciar renovação. Tente novamente.' });
+  }
+});
 
 module.exports = router;
