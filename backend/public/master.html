@@ -507,7 +507,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + getMasterToken()
+          'Authorization': 'Bearer ' + getToken()
         },
         body: JSON.stringify({ motivo: motivo.trim() })
       });
