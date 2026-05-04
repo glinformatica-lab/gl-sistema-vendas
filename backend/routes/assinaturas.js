@@ -30,7 +30,7 @@ function emailValido(e) {
 // Body: { plano, empresa, cnpj?, telefone?, nomeAdmin, emailAdmin, senhaAdmin }
 // Cria empresa em "aguardando-pagamento" + admin + assinatura + checkout PagBank.
 router.post('/iniciar', async (req, res) => {
-  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
+  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, recaptchaToken } = req.body || {};
 
   // Validações de entrada
   if (!plano || !PLANOS[plano]) {
@@ -40,6 +40,14 @@ router.post('/iniciar', async (req, res) => {
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
   if (!senhaAdmin || senhaAdmin.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+
+  // Validação reCaptcha
+  const { validarRecaptcha } = require('../services/recaptcha');
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
+  const recap = await validarRecaptcha(recaptchaToken, ip);
+  if (!recap.ok) {
+    return res.status(400).json({ error: recap.motivo || 'Verificação de segurança falhou.' });
+  }
 
   if (!pagbank.tokenConfigurado()) {
     return res.status(503).json({ error: 'Pagamento online temporariamente indisponível. Entre em contato pelo WhatsApp.' });
@@ -135,6 +143,13 @@ router.post('/iniciar', async (req, res) => {
 
 // === GET /api/assinaturas/:ref ===
 // Consulta o status atual de uma assinatura. Usado pela página de retorno.
+// === GET /api/assinaturas/config === Retorna config pública (chave do reCaptcha)
+router.get('/config', (req, res) => {
+  res.json({
+    recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY || null
+  });
+});
+
 router.get('/:ref', async (req, res) => {
   try {
     const r = await db.query(
@@ -194,11 +209,20 @@ router.get('/:ref', async (req, res) => {
 
 // === POST /api/assinaturas/trial === Cria empresa com 7 dias grátis (sem pagamento)
 router.post('/trial', async (req, res) => {
-  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
+  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, recaptchaToken } = req.body || {};
   if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
   if (!senhaAdmin || senhaAdmin.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+
+  // Validação reCaptcha
+  const { validarRecaptcha } = require('../services/recaptcha');
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
+  const recap = await validarRecaptcha(recaptchaToken, ip);
+  if (!recap.ok) {
+    return res.status(400).json({ error: recap.motivo || 'Verificação de segurança falhou.' });
+  }
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');

@@ -206,6 +206,23 @@
     anual:  { nome: 'Plano Anual',  valor: 1080.00, label: 'R$ 1.080,00 / ano' }
   };
 
+  // Carrega chave do reCaptcha do backend e injeta script do Google
+  (async function carregarRecaptcha() {
+    try {
+      const r = await fetch('/api/assinaturas/config');
+      const cfg = await r.json();
+      if (cfg.recaptchaSiteKey) {
+        window._recaptchaSiteKey = cfg.recaptchaSiteKey;
+        const s = document.createElement('script');
+        s.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(cfg.recaptchaSiteKey);
+        s.async = true; s.defer = true;
+        document.head.appendChild(s);
+      }
+    } catch (e) {
+      console.warn('Não foi possível carregar reCaptcha:', e);
+    }
+  })();
+
   function selecionarPlano(p) {
     _planoSelecionado = p;
     document.querySelectorAll('.plano').forEach(el => el.classList.remove('selecionado'));
@@ -272,6 +289,18 @@
     btn.disabled = true;
     btn.textContent = _planoSelecionado === 'trial' ? 'Criando sua conta de teste...' : 'Criando sua conta...';
 
+    // Gera token reCaptcha v3 antes de enviar
+    if (window._recaptchaSiteKey && window.grecaptcha) {
+      try {
+        await new Promise(resolve => window.grecaptcha.ready(resolve));
+        const action = _planoSelecionado === 'trial' ? 'trial' : 'assinar';
+        const token = await window.grecaptcha.execute(window._recaptchaSiteKey, { action });
+        payload.recaptchaToken = token;
+      } catch (recapErr) {
+        console.warn('Falha ao obter token reCaptcha:', recapErr);
+      }
+    }
+
     try {
       const url = _planoSelecionado === 'trial' ? '/api/assinaturas/trial' : '/api/assinaturas/iniciar';
       const r = await fetch(url, {
@@ -302,5 +331,11 @@
     }
   }
 </script>
+
+<div style="text-align:center;font-size:11px;color:#94a3b8;padding:12px 16px;line-height:1.5;">
+  Este site é protegido pelo reCAPTCHA e a
+  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" style="color:#94a3b8;">Política de Privacidade</a> e os
+  <a href="https://policies.google.com/terms" target="_blank" rel="noopener" style="color:#94a3b8;">Termos de Serviço</a> do Google se aplicam.
+</div>
 </body>
 </html>
