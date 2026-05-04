@@ -1,10 +1,10 @@
--- Migration v8
+-- Migration v8 (corrigida — nome real da tabela é master_usuarios)
 -- Auditoria de acessos de suporte do Master nas empresas
 
 CREATE TABLE IF NOT EXISTS master_acessos (
   id SERIAL PRIMARY KEY,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
-  master_id INTEGER REFERENCES master(id) ON DELETE SET NULL,
+  master_id INTEGER REFERENCES master_usuarios(id) ON DELETE SET NULL,
   master_email TEXT,
   motivo TEXT,
   ip TEXT,
