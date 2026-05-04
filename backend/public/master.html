@@ -503,7 +503,7 @@
       return;
     }
     try {
-      const resp = await fetch(API_URL + '/api/master/empresas/' + id + '/acessar', {
+      const resp = await fetch('/api/master/empresas/' + id + '/acessar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
