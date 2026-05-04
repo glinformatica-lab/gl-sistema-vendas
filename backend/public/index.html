@@ -454,6 +454,10 @@
     <button class="menu-btn" style="font-size:13px;color:var(--vermelho);padding:12px 24px;" onclick="logout()" title="Encerrar sessão">&#128274; Sair</button>
   </nav>
   <div id="conteudo">
+    <!-- Banner de modo suporte (Master acessando empresa) -->
+    <div id="banner-suporte" style="display:none;padding:12px 22px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;text-align:center;">
+      🛠️ <strong>MODO SUPORTE MASTER</strong> — Você está acessando como <span id="suporte-empresa">—</span>. <a href="javascript:void(0)" onclick="sairModoSuporte()" style="color:#fde047;font-weight:700;text-decoration:underline;margin-left:10px;">↩ Voltar ao Painel Master</a>
+    </div>
     <!-- Banner de aviso de licença (mostrado dinamicamente) -->
     <div id="banner-licenca" style="display:none;padding:12px 22px;background:#fef3c7;color:#92400e;border-bottom:2px solid #f59e0b;font-size:14px;font-weight:600;text-align:center;"></div>
     <!-- Dashboard -->
@@ -1978,6 +1982,30 @@
   }
 
   // ====== Navegação entre páginas ======
+  // ====== Modo Suporte Master ======
+  function detectarModoSuporte() {
+    if (localStorage.getItem('_master_support') === '1') {
+      try {
+        const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+        const banner = document.getElementById('banner-suporte');
+        if (banner) {
+          document.getElementById('suporte-empresa').textContent = empresa.nome || '?';
+          banner.style.display = 'block';
+        }
+      } catch(e) {}
+    }
+  }
+  function sairModoSuporte() {
+    if (!confirm('Sair do modo suporte e voltar pro Painel Master? (você vai sair desta empresa)')) return;
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    localStorage.removeItem('empresa');
+    localStorage.removeItem('_master_support');
+    window.location.href = '/master';
+  }
+  // Detecta ao carregar
+  document.addEventListener('DOMContentLoaded', detectarModoSuporte);
+
   // ====== Menu Mobile (hamburguer) ======
   function toggleMenu() {
     const menu = document.getElementById('menu');

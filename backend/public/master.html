@@ -396,6 +396,7 @@
             <td>${e.qtdUsuarios}</td>
             <td>${fmtBRL(e.valorMensalidade)}</td>
             <td>
+              <button class="btn-action" onclick="acessarEmpresa(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#7c3aed;border-color:#7c3aed;">🔓 Acessar</button>
               <button class="btn-action" onclick="abrirEditar(${e.id})">Editar</button>
               <button class="btn-action" onclick="abrirPagamento(${e.id})" style="color:var(--verde);border-color:var(--verde);">+Pgto</button>
               ${e.status === 'bloqueada'
@@ -492,6 +493,37 @@
       erro.textContent = err.message; erro.style.display = 'block';
     }
   });
+
+  // Acessar sistema da empresa (modo suporte - gera token JWT temporário)
+  async function acessarEmpresa(id, nome) {
+    const motivo = prompt(`Você vai acessar o sistema de "${nome}" como administrador.\n\nMotivo do acesso (será registrado em auditoria):`, 'Suporte ao cliente');
+    if (motivo === null) return; // cancelou
+    if (!motivo.trim()) {
+      alert('Informe um motivo para o acesso (será registrado em auditoria).');
+      return;
+    }
+    try {
+      const resp = await fetch(API_URL + '/api/master/empresas/' + id + '/acessar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + getMasterToken()
+        },
+        body: JSON.stringify({ motivo: motivo.trim() })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Erro ao acessar.');
+      // Salva o token de admin temporário em localStorage e abre o sistema
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      localStorage.setItem('_master_support', '1'); // flag pra mostrar banner no sistema
+      // Abre em nova aba (assim o Master continua aberto)
+      window.open('/index.html', '_blank');
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
 
   async function bloquearEmpresa(id) {
     const e = _empresasCache.find(x => x.id === id);

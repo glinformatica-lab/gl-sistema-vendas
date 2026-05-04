@@ -266,4 +266,91 @@ router.delete('/empresas/:id', async (req, res) => {
   }
 });
 
+// === POST /api/master/empresas/:id/acessar === Acesso de suporte
+// Gera um token JWT temporário (papel admin) pra entrar no sistema da empresa.
+// Registra log de auditoria em master_acessos.
+router.post('/empresas/:id/acessar', async (req, res) => {
+  const empresaId = parseInt(req.params.id);
+  if (!empresaId) return res.status(400).json({ error: 'ID inválido.' });
+  const { motivo } = req.body || {};
+  try {
+    // Busca a empresa
+    const rEmp = await db.query(
+      'SELECT id, nome FROM empresas WHERE id = $1 LIMIT 1',
+      [empresaId]
+    );
+    if (rEmp.rows.length === 0) {
+      return res.status(404).json({ error: 'Empresa não encontrada.' });
+    }
+    const empresa = rEmp.rows[0];
+
+    // Pega o primeiro admin da empresa (pra usar como contexto)
+    const rAdm = await db.query(
+      `SELECT id, email, nome FROM usuarios
+       WHERE empresa_id = $1 AND papel = 'admin'
+       ORDER BY id LIMIT 1`,
+      [empresaId]
+    );
+    if (rAdm.rows.length === 0) {
+      return res.status(404).json({ error: 'A empresa não possui usuário admin para acesso.' });
+    }
+    const admin = rAdm.rows[0];
+
+    // Gera token JWT como se fosse o admin, mas com flag _master_support = true
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      {
+        userId: admin.id,
+        empresaId: empresaId,
+        papel: 'admin',
+        _master_support: true,
+        _master_id: req.master?.id || null
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' } // Sessão de suporte expira em 2h
+    );
+
+    // Registra log de auditoria
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
+    const userAgent = req.headers['user-agent'] || null;
+    await db.query(
+      `INSERT INTO master_acessos (empresa_id, master_id, master_email, motivo, ip, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [empresaId, req.master?.id || null, req.master?.email || null, motivo || null, ip, userAgent]
+    );
+
+    console.log(`[master/acessar] Master ${req.master?.email || '?'} acessou empresa ${empresaId} (${empresa.nome})`);
+
+    res.json({
+      ok: true,
+      token,
+      usuario: { id: admin.id, nome: admin.nome, email: admin.email, papel: 'admin' },
+      empresa: { id: empresa.id, nome: empresa.nome },
+      modoSuporte: true
+    });
+  } catch (err) {
+    console.error('[master/acessar]', err);
+    res.status(500).json({ error: 'Erro ao gerar acesso de suporte.' });
+  }
+});
+
+// === GET /api/master/empresas/:id/historico-acessos === Histórico de quem acessou a empresa
+router.get('/empresas/:id/historico-acessos', async (req, res) => {
+  const empresaId = parseInt(req.params.id);
+  if (!empresaId) return res.status(400).json({ error: 'ID inválido.' });
+  try {
+    const r = await db.query(
+      `SELECT id, master_email, motivo, ip, acessado_em
+       FROM master_acessos
+       WHERE empresa_id = $1
+       ORDER BY acessado_em DESC LIMIT 50`,
+      [empresaId]
+    );
+    res.json(r.rows.map(camelizar));
+  } catch (err) {
+    console.error('[master/historico-acessos]', err);
+    res.status(500).json({ error: 'Erro ao buscar histórico.' });
+  }
+});
+
 module.exports = router;
