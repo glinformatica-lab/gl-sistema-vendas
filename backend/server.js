@@ -17,6 +17,8 @@ app.use('/api/assinaturas', require('./routes/assinaturas'));
 
 // Rotas protegidas (token de empresa)
 app.use('/api/produtos',        autenticar, verificarAcesso, require('./routes/produtos'));
+app.use('/api/servicos',        autenticar, verificarAcesso, require('./routes/servicos'));
+app.use('/api/orcamentos',      autenticar, verificarAcesso, require('./routes/orcamentos'));
 app.use('/api/clientes',        autenticar, verificarAcesso, require('./routes/clientes'));
 app.use('/api/fornecedores',    autenticar, verificarAcesso, require('./routes/fornecedores'));
 app.use('/api/vendas',          autenticar, verificarAcesso, require('./routes/vendas'));
@@ -37,6 +39,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 app.get('/assinar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinar.html')));
 app.get('/assinatura-sucesso', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinatura-sucesso.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/renovar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'renovar.html')));
 app.get('/reset-senha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-senha.html')));
 app.get('/master', (req, res) => res.sendFile(path.join(__dirname, 'public', 'master.html')));
 
