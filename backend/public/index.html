@@ -5779,7 +5779,7 @@ ${conteudo}
       <tr>
         <td><strong>${escapeHtml(s.nome)}</strong></td>
         <td>${escapeHtml(s.descricao || '—')}</td>
-        <td>${formatBR(s.valor)}</td>
+        <td>${formatarBRL(s.valor)}</td>
         <td class="acoes">
           <button onclick='editarServico(${s.id})'>✏️</button>
           <button onclick='excluirServico(${s.id})'>🗑️</button>
@@ -5871,9 +5871,9 @@ ${conteudo}
         const dias = Math.round((venc - hoje) / (86400 * 1000));
         if (dias < 0) { validadeTxt = `<span style="color:#dc2626;">Expirado há ${-dias}d</span>`; }
         else if (dias === 0) { validadeTxt = `<span style="color:#dc2626;">Vence hoje</span>`; }
-        else { validadeTxt = `<span style="color:#666;">${formatDate(o.data_validade)} (${dias}d)</span>`; }
+        else { validadeTxt = `<span style="color:#666;">${formatarDataBR(o.data_validade)} (${dias}d)</span>`; }
       } else {
-        validadeTxt = `<span style="color:#666;">${formatDate(o.data_validade)}</span>`;
+        validadeTxt = `<span style="color:#666;">${formatarDataBR(o.data_validade)}</span>`;
       }
       const statusCores = {
         'aberto': '#3960f9', 'aprovado': '#16a34a', 'convertido': '#7c3aed',
@@ -5890,9 +5890,9 @@ ${conteudo}
         <tr>
           <td><strong>#${o.numero}</strong></td>
           <td>${escapeHtml(o.cliente_nome || o.cliente_nome_real || '—')}</td>
-          <td>${formatDate(o.data_orcamento)}</td>
+          <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
-          <td><strong>${formatBR(o.total)}</strong></td>
+          <td><strong>${formatarBRL(o.total)}</strong></td>
           <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">${statusLabels[o.status] || o.status}</span></td>
           <td class="acoes">
             <button onclick="visualizarOrc(${o.id})" title="Visualizar/Imprimir">👁️</button>
@@ -6032,7 +6032,7 @@ ${conteudo}
         <td style="padding:6px;">
           <input type="number" step="0.01" min="0" value="${it.valor_unitario}" onchange="atualizarItemOrc(${i},'valor_unitario',parseFloat(this.value)||0)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
         </td>
-        <td style="padding:6px;text-align:right;font-weight:600;">${formatBR((it.quantidade||1) * (it.valor_unitario||0) - (it.desconto_item||0))}</td>
+        <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL((it.quantidade||1) * (it.valor_unitario||0) - (it.desconto_item||0))}</td>
         <td style="padding:6px;text-align:center;">
           <button onclick="removerItemOrc(${i})" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">🗑️</button>
         </td>
@@ -6049,8 +6049,8 @@ ${conteudo}
     const total = Math.max(0, subtotal - desconto);
     const elSub = document.getElementById('orc-subtotal');
     const elTot = document.getElementById('orc-total');
-    if (elSub) elSub.textContent = formatBR(subtotal);
-    if (elTot) elTot.textContent = formatBR(total);
+    if (elSub) elSub.textContent = formatarBRL(subtotal);
+    if (elTot) elTot.textContent = formatarBRL(total);
   }
   async function salvarOrcamento() {
     const id = document.getElementById('orc-id').value;
@@ -6122,8 +6122,8 @@ ${conteudo}
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${tipoLabels[it.tipo] || ''}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(it.descricao)}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${it.quantidade}</td>
-          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatBR(it.valor_unitario)}</td>
-          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatBR(it.total)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(it.total)}</td>
         </tr>
       `).join('');
       document.getElementById('orc-view-conteudo').innerHTML = `
@@ -6139,8 +6139,8 @@ ${conteudo}
             ${orc.cliente_cpf_cnpj ? `<strong>CPF/CNPJ:</strong> ${escapeHtml(orc.cliente_cpf_cnpj)}<br>` : ''}
           </div>
           <div style="text-align:right;">
-            <strong>Data:</strong> ${formatDate(orc.data_orcamento)}<br>
-            <strong>Validade:</strong> ${formatDate(orc.data_validade)}<br>
+            <strong>Data:</strong> ${formatarDataBR(orc.data_orcamento)}<br>
+            <strong>Validade:</strong> ${formatarDataBR(orc.data_validade)}<br>
             <strong>Vendedor:</strong> ${escapeHtml(orc.vendedor_nome || '—')}
           </div>
         </div>
@@ -6158,15 +6158,15 @@ ${conteudo}
         </table>
         <div style="display:flex;justify-content:flex-end;margin-bottom:18px;">
           <table style="font-size:14px;">
-            <tr><td style="padding:4px 12px;text-align:right;">Subtotal:</td><td style="padding:4px 0;text-align:right;min-width:120px;">${formatBR(orc.subtotal)}</td></tr>
-            ${parseFloat(orc.desconto) > 0 ? `<tr><td style="padding:4px 12px;text-align:right;color:#16a34a;">Desconto:</td><td style="padding:4px 0;text-align:right;color:#16a34a;">- ${formatBR(orc.desconto)}</td></tr>` : ''}
-            <tr style="font-size:18px;font-weight:700;color:#1e3a8a;border-top:2px solid #1e3a8a;"><td style="padding:8px 12px;text-align:right;">TOTAL:</td><td style="padding:8px 0;text-align:right;">${formatBR(orc.total)}</td></tr>
+            <tr><td style="padding:4px 12px;text-align:right;">Subtotal:</td><td style="padding:4px 0;text-align:right;min-width:120px;">${formatarBRL(orc.subtotal)}</td></tr>
+            ${parseFloat(orc.desconto) > 0 ? `<tr><td style="padding:4px 12px;text-align:right;color:#16a34a;">Desconto:</td><td style="padding:4px 0;text-align:right;color:#16a34a;">- ${formatarBRL(orc.desconto)}</td></tr>` : ''}
+            <tr style="font-size:18px;font-weight:700;color:#1e3a8a;border-top:2px solid #1e3a8a;"><td style="padding:8px 12px;text-align:right;">TOTAL:</td><td style="padding:8px 0;text-align:right;">${formatarBRL(orc.total)}</td></tr>
           </table>
         </div>
         ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
         ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
         <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
-          Orçamento válido até ${formatDate(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
+          Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
         </div>
       `;
       document.getElementById('modal-orc-view').style.display = 'flex';
