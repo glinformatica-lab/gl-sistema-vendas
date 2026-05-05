@@ -4431,6 +4431,18 @@
         pagamento, parcelamento,
         obs: document.getElementById('nv-obs').value.trim()
       });
+
+      // Se essa venda veio de uma conversão de orçamento, marca o orçamento como convertido
+      const orcamentoOrigemId = window._convertendoOrcamento;
+      if (orcamentoOrigemId) {
+        try {
+          await api('POST', `/api/orcamentos/${orcamentoOrigemId}/marcar-convertido`, { venda_id: venda.id });
+        } catch (e) {
+          console.warn('[orcamento] erro ao marcar convertido:', e.message);
+        }
+        window._convertendoOrcamento = null;
+      }
+
       // Recarrega tudo (a venda mexe em vários lugares)
       await recarregarTudoDaApi();
       renderProdutos();
@@ -4438,8 +4450,13 @@
       renderContasReceber();
       renderCardsVendas();
       renderResumoFinanceiro();
+      // Se estávamos na tela de orçamentos, recarrega
+      if (typeof carregarOrcamentos === 'function' && document.getElementById('page-orcamentos')?.style.display !== 'none') {
+        carregarOrcamentos();
+      }
       const ehEdicao = _vendaEditandoId !== null;
-      alert(`Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}`);
+      const msgOrc = orcamentoOrigemId ? ' Orçamento marcado como convertido.' : '';
+      alert(`Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!${msgOrc}\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}`);
       closeNovaVenda();
     } catch (err) {
       mostrarErro(err.message);
@@ -6230,16 +6247,60 @@ ${conteudo}
     catch (err) { alert(err.message); }
   }
   async function converterOrc(id) {
-    const formas = ['Dinheiro', 'PIX', 'Cartão Débito', 'Cartão Crédito', 'Boleto', 'Cheque', 'Outro'];
-    const escolhido = prompt('Forma de pagamento:\n\n' + formas.map((f,i) => (i+1) + ') ' + f).join('\n') + '\n\nDigite o número:');
-    const idx = parseInt(escolhido) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= formas.length) return;
-    if (!confirm('Confirma a conversão deste orçamento em VENDA com pagamento "' + formas[idx] + '"?\n\nIsso vai dar baixa no estoque dos produtos.')) return;
     try {
-      const r = await api('POST', '/api/orcamentos/' + id + '/converter', { forma_pagamento: formas[idx] });
-      alert(r.mensagem || 'Convertido com sucesso!');
-      carregarOrcamentos();
-    } catch (err) { alert('Erro: ' + err.message); }
+      // Busca dados completos do orçamento
+      const orc = await api('GET', '/api/orcamentos/' + id);
+
+      // Confirmação prévia
+      if (!confirm(`Converter orçamento Nº ${orc.numero} em VENDA?\n\nO modal de venda vai abrir já preenchido com os dados. Você confere e finaliza.\n\n⚠️ Produtos terão estoque baixado quando salvar a venda.`)) return;
+
+      // Marca que estamos convertendo (pra usar ao salvar a venda)
+      window._convertendoOrcamento = id;
+
+      // Abre o modal de Nova Venda
+      openNovaVenda();
+
+      // Aguarda render e preenche
+      setTimeout(() => {
+        // Cliente
+        document.getElementById('nv-cliente').value = orc.cliente_nome || '';
+        // Data: usa a do orçamento, mas pode editar
+        const hoje = new Date().toISOString().slice(0, 10);
+        document.getElementById('nv-data').value = hoje;
+        // Observações: incorpora notas do orçamento
+        let obs = `Originado do Orçamento Nº ${orc.numero}`;
+        if (orc.observacoes) obs += `\n\nObservações: ${orc.observacoes}`;
+        if (orc.condicoes_pagamento) obs += `\n\nCondições: ${orc.condicoes_pagamento}`;
+        document.getElementById('nv-obs').value = obs;
+        // Desconto
+        if (parseFloat(orc.desconto) > 0) {
+          document.getElementById('nv-tipo-desconto').value = 'valor';
+          document.getElementById('nv-desconto').value = parseFloat(orc.desconto).toFixed(2);
+        }
+        // Limpa itens e adiciona os do orçamento
+        const tbody = document.getElementById('tbody-itens-venda');
+        tbody.innerHTML = '';
+        for (const it of (orc.itens || [])) {
+          adicionarItemVenda({
+            produto: it.descricao,
+            qtd: parseFloat(it.quantidade) || 1,
+            preco: parseFloat(it.valor_unitario) || 0
+          });
+        }
+        // Recalcula
+        document.querySelectorAll('#tbody-itens-venda tr').forEach(tr => {
+          if (typeof recalcularLinhaVenda === 'function') recalcularLinhaVenda(tr);
+        });
+        if (typeof atualizarTotaisVenda === 'function') atualizarTotaisVenda();
+        if (typeof atualizarTotalVenda === 'function') atualizarTotalVenda();
+
+        // Muda título do modal pra ficar claro
+        const h2 = document.querySelector('#form-nova-venda h2');
+        if (h2) h2.textContent = `Converter Orçamento Nº ${orc.numero} → Venda`;
+      }, 100);
+    } catch (err) {
+      alert('Erro ao buscar orçamento: ' + err.message);
+    }
   }
 
   // Visualizar/Imprimir

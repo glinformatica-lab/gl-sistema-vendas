@@ -256,7 +256,27 @@ router.post('/:id/status', async (req, res) => {
   }
 });
 
-// Converter em venda
+// Marcar orçamento como convertido (quando a venda já foi criada via fluxo do modal)
+router.post('/:id/marcar-convertido', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { venda_id } = req.body || {};
+  try {
+    const r = await db.query(
+      `UPDATE orcamentos SET status='convertido', venda_id=$1, atualizado_em=NOW()
+       WHERE id=$2 AND empresa_id=$3 AND status != 'convertido' RETURNING id`,
+      [venda_id || null, id, req.user.empresaId]
+    );
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: 'Orçamento não encontrado ou já convertido.' });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[orcamentos] marcar-convertido', err);
+    res.status(500).json({ error: 'Erro ao marcar orçamento como convertido.' });
+  }
+});
+
+// Converter em venda (modo automático - cria a venda direto - mantido pra compatibilidade)
 router.post('/:id/converter', async (req, res) => {
   const id = parseInt(req.params.id);
   const { forma_pagamento } = req.body || {};
