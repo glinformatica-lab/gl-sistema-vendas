@@ -37,8 +37,9 @@ router.get('/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   try {
     const rOrc = await db.query(
-      `SELECT o.*, c.nome AS cliente_nome_real, c.telefone AS cliente_telefone, c.email AS cliente_email,
-              c.cpf_cnpj AS cliente_cpf_cnpj, c.endereco AS cliente_endereco
+      `SELECT o.*, c.nome AS cliente_nome_real, c.telefone AS cliente_telefone,
+              c.doc AS cliente_doc, c.endereco AS cliente_endereco,
+              c.cidade AS cliente_cidade, c.uf AS cliente_uf
        FROM orcamentos o
        LEFT JOIN clientes c ON c.id = o.cliente_id
        WHERE o.id = $1 AND o.empresa_id = $2 LIMIT 1`,

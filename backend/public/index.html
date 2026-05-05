@@ -5897,16 +5897,20 @@ ${conteudo}
     }
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     tbody.innerHTML = lista.map(o => {
-      const venc = o.data_validade ? new Date(o.data_validade + 'T00:00:00') : null;
+      // Pega só YYYY-MM-DD do campo data_validade (pode vir como Date ISO ou string)
+      const dataIso = o.data_validade ? String(o.data_validade).slice(0, 10) : null;
+      const venc = dataIso ? new Date(dataIso + 'T00:00:00') : null;
       let validadeTxt = '';
       let validadeStyle = '';
-      if (o.status === 'aberto' && venc) {
+      if (o.status === 'aberto' && venc && !isNaN(venc.getTime())) {
         const dias = Math.round((venc - hoje) / (86400 * 1000));
         if (dias < 0) { validadeTxt = `<span style="color:#dc2626;">Expirado há ${-dias}d</span>`; }
         else if (dias === 0) { validadeTxt = `<span style="color:#dc2626;">Vence hoje</span>`; }
-        else { validadeTxt = `<span style="color:#666;">${formatarDataBR(o.data_validade)} (${dias}d)</span>`; }
+        else { validadeTxt = `<span style="color:#666;">${formatarDataBR(dataIso)} (${dias}d)</span>`; }
+      } else if (dataIso) {
+        validadeTxt = `<span style="color:#666;">${formatarDataBR(dataIso)}</span>`;
       } else {
-        validadeTxt = `<span style="color:#666;">${formatarDataBR(o.data_validade)}</span>`;
+        validadeTxt = '<span style="color:#888;">—</span>';
       }
       const statusCores = {
         'aberto': '#3960f9', 'aprovado': '#16a34a', 'convertido': '#7c3aed',
@@ -6265,7 +6269,7 @@ ${conteudo}
           <div>
             <strong>Cliente:</strong> ${escapeHtml(orc.cliente_nome || '—')}<br>
             ${orc.cliente_telefone ? `<strong>Telefone:</strong> ${escapeHtml(orc.cliente_telefone)}<br>` : ''}
-            ${orc.cliente_cpf_cnpj ? `<strong>CPF/CNPJ:</strong> ${escapeHtml(orc.cliente_cpf_cnpj)}<br>` : ''}
+            ${orc.cliente_doc ? `<strong>CPF/CNPJ:</strong> ${escapeHtml(orc.cliente_doc)}<br>` : ''}
           </div>
           <div style="text-align:right;">
             <strong>Data:</strong> ${formatarDataBR(orc.data_orcamento)}<br>
