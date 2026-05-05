@@ -1131,8 +1131,8 @@
       <!-- Itens -->
       <h3 style="color:var(--azul);font-size:15px;margin:22px 0 12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">Itens do orçamento</h3>
 
-      <!-- Buscas com autocomplete + botão item avulso -->
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:14px;">
+      <!-- Buscas com autocomplete (apenas produtos e serviços cadastrados) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
         <!-- Buscar produto -->
         <div style="position:relative;">
           <input type="text" id="busca-produto" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar produto pelo nome..."
@@ -1147,8 +1147,6 @@
                  style="width:100%;padding:10px 12px;border:2px solid #16a34a;border-radius:6px;font-size:14px;background:#f0fdf4;">
           <div id="orc-lista-servicos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #16a34a;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         </div>
-        <!-- Botão item avulso -->
-        <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:10px 16px;background:#f59e0b;color:#fff;white-space:nowrap;">+ Item Avulso</button>
       </div>
 
       <div style="overflow-x:auto;">
@@ -6031,7 +6029,7 @@ ${conteudo}
           <div style="color:#dc2626;font-size:13px;font-weight:600;margin-bottom:6px;">⚠️ Nenhum produto cadastrado</div>
           <div style="color:#666;font-size:12px;margin-bottom:10px;">Cadastre produtos antes de adicioná-los ao orçamento.</div>
           <button onclick="fecharOrcamento(); showPage('produtos');" style="background:#3960f9;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ir para Produtos →</button>
-          <div style="color:#888;font-size:11px;margin-top:8px;">Ou use "+ Item Avulso" se for único.</div>
+          <div style="color:#888;font-size:11px;margin-top:8px;">Cadastre na tela "Produtos" e volte aqui.</div>
         </div>
       `;
       lista.style.display = 'block';
@@ -6083,6 +6081,18 @@ ${conteudo}
   function filtrarServicos(termo) {
     const lista = document.getElementById('orc-lista-servicos');
     const t = (termo || '').trim().toLowerCase();
+    // Caso especial: sem serviços cadastrados
+    if (!_servicosCache || _servicosCache.length === 0) {
+      lista.innerHTML = `
+        <div style="padding:16px;text-align:center;">
+          <div style="color:#dc2626;font-size:13px;font-weight:600;margin-bottom:6px;">⚠️ Nenhum serviço cadastrado</div>
+          <div style="color:#666;font-size:12px;margin-bottom:10px;">Cadastre serviços antes de adicioná-los ao orçamento.</div>
+          <button onclick="fecharOrcamento(); showPage('servicos');" style="background:#16a34a;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ir para Serviços →</button>
+        </div>
+      `;
+      lista.style.display = 'block';
+      return;
+    }
     let resultados = _servicosCache;
     if (t) {
       resultados = _servicosCache.filter(s =>
@@ -6091,7 +6101,7 @@ ${conteudo}
       );
     }
     if (resultados.length === 0) {
-      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum serviço encontrado.<br><span style="font-size:11px;">Cadastre em "Serviços" no menu.</span></div>';
+      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum serviço encontrado para "' + escapeHtml(t) + '".</div>';
       lista.style.display = 'block';
       return;
     }
@@ -6138,13 +6148,6 @@ ${conteudo}
   // Mantém função antiga só pra compatibilidade (não chamada mais)
   function addItemProduto() { document.getElementById('busca-produto')?.focus(); }
   function addItemServico() { document.getElementById('busca-servico')?.focus(); }
-  function addItemAvulso() {
-    _orcItensTemp.push({
-      tipo: 'avulso', produto_id: null, servico_id: null,
-      descricao: '', quantidade: 1, valor_unitario: 0, desconto_item: 0
-    });
-    renderItensOrc();
-  }
   function removerItemOrc(idx) {
     _orcItensTemp.splice(idx, 1);
     renderItensOrc();
@@ -6165,7 +6168,7 @@ ${conteudo}
     const tbody = document.getElementById('orc-itens-tbody');
     if (!tbody) return;
     if (_orcItensTemp.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhum item ainda. Use os botões acima.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhum item ainda. Use as buscas acima pra adicionar produtos ou serviços.</td></tr>';
       recalcularOrc();
       return;
     }
@@ -6252,7 +6255,7 @@ ${conteudo}
       const orc = await api('GET', '/api/orcamentos/' + id);
 
       // Confirmação prévia
-      if (!confirm(`Converter orçamento Nº ${orc.numero} em VENDA?\n\nO modal de venda vai abrir já preenchido com os dados. Você confere e finaliza.\n\n⚠️ Produtos terão estoque baixado quando salvar a venda.`)) return;
+      if (!confirm(`Converter orçamento Nº ${orc.numero} em VENDA?\n\nO modal de venda vai abrir já preenchido. Você confere a forma de pagamento e finaliza.\n\n⚠️ Produtos baixam estoque ao salvar. Serviços não mexem estoque.`)) return;
 
       // Marca que estamos convertendo (pra usar ao salvar a venda)
       window._convertendoOrcamento = id;

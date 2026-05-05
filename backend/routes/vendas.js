@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Busca produtos cadastrados (itens livres como serviços/avulsos não precisam ter)
+    // Busca produtos E serviços cadastrados (todo item precisa estar em um dos dois)
     const nomes = [...new Set(itens.map(i => i.produto))];
     const prodResult = await client.query(
       'SELECT * FROM produtos WHERE empresa_id=$1 AND nome = ANY($2::text[])',
@@ -70,19 +70,30 @@ router.post('/', async (req, res) => {
     );
     const produtosByNome = new Map(prodResult.rows.map(p => [p.nome, p]));
 
-    // Soma quantidades por produto (apenas dos cadastrados, pra checar estoque)
+    const servResult = await client.query(
+      'SELECT * FROM servicos WHERE empresa_id=$1 AND ativo=TRUE AND nome = ANY($2::text[])',
+      [req.user.empresaId, nomes]
+    );
+    const servicosByNome = new Map(servResult.rows.map(s => [s.nome, s]));
+
+    // Soma quantidades por nome (pra checar estoque dos produtos)
     const qtdPorNome = {};
     for (const it of itens) qtdPorNome[it.produto] = (qtdPorNome[it.produto] || 0) + Number(it.qtd);
 
-    // Valida estoque APENAS para os que estão cadastrados.
-    // Itens não cadastrados (serviços/avulsos) passam livremente.
+    // Valida cada item: precisa estar em produtos OU serviços. Senão bloqueia.
     for (const nome in qtdPorNome) {
       const p = produtosByNome.get(nome);
-      if (!p) continue; // item livre
-      if (toNum(p.estoque) < qtdPorNome[nome]) {
+      const s = servicosByNome.get(nome);
+      if (!p && !s) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `"${nome}" não está cadastrado como produto nem como serviço. Cadastre antes de vender.` });
+      }
+      // Se for produto, valida estoque
+      if (p && toNum(p.estoque) < qtdPorNome[nome]) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Estoque insuficiente para "${nome}". Disponível: ${toNum(p.estoque)}, solicitado: ${qtdPorNome[nome]}.` });
       }
+      // Se for serviço, passa direto (sem estoque)
     }
 
     // Calcula totais
@@ -108,10 +119,10 @@ router.post('/', async (req, res) => {
     );
     const venda = vendaIns.rows[0];
 
-    // Para cada item: baixa estoque + movimentação (APENAS para produtos cadastrados)
+    // Para cada item: produto baixa estoque + movimentação. Serviço só passa direto.
     for (const it of itens) {
       const p = produtosByNome.get(it.produto);
-      if (!p) continue; // item livre (serviço/avulso): sem estoque nem movimentação
+      if (!p) continue; // é serviço (já foi validado lá em cima): sem estoque, sem movimentação
       await client.query(
         'UPDATE produtos SET estoque = estoque - $1 WHERE id = $2 AND empresa_id = $3',
         [Number(it.qtd), p.id, req.user.empresaId]
