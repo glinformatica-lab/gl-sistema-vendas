@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Busca produtos e valida estoque
+    // Busca produtos cadastrados (itens livres como serviços/avulsos não precisam ter)
     const nomes = [...new Set(itens.map(i => i.produto))];
     const prodResult = await client.query(
       'SELECT * FROM produtos WHERE empresa_id=$1 AND nome = ANY($2::text[])',
@@ -70,13 +70,15 @@ router.post('/', async (req, res) => {
     );
     const produtosByNome = new Map(prodResult.rows.map(p => [p.nome, p]));
 
-    // Soma quantidades por produto
+    // Soma quantidades por produto (apenas dos cadastrados, pra checar estoque)
     const qtdPorNome = {};
     for (const it of itens) qtdPorNome[it.produto] = (qtdPorNome[it.produto] || 0) + Number(it.qtd);
 
+    // Valida estoque APENAS para os que estão cadastrados.
+    // Itens não cadastrados (serviços/avulsos) passam livremente.
     for (const nome in qtdPorNome) {
       const p = produtosByNome.get(nome);
-      if (!p) { await client.query('ROLLBACK'); return res.status(400).json({ error: `Produto "${nome}" não está cadastrado.` }); }
+      if (!p) continue; // item livre
       if (toNum(p.estoque) < qtdPorNome[nome]) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Estoque insuficiente para "${nome}". Disponível: ${toNum(p.estoque)}, solicitado: ${qtdPorNome[nome]}.` });
@@ -106,9 +108,10 @@ router.post('/', async (req, res) => {
     );
     const venda = vendaIns.rows[0];
 
-    // Para cada item: baixa estoque + movimentação
+    // Para cada item: baixa estoque + movimentação (APENAS para produtos cadastrados)
     for (const it of itens) {
       const p = produtosByNome.get(it.produto);
+      if (!p) continue; // item livre (serviço/avulso): sem estoque nem movimentação
       await client.query(
         'UPDATE produtos SET estoque = estoque - $1 WHERE id = $2 AND empresa_id = $3',
         [Number(it.qtd), p.id, req.user.empresaId]
