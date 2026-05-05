@@ -1135,14 +1135,14 @@
       <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:14px;">
         <!-- Buscar produto -->
         <div style="position:relative;">
-          <input type="text" id="busca-produto" autocomplete="off" placeholder="🔍 Buscar produto pelo nome..."
+          <input type="text" id="busca-produto" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar produto pelo nome..."
                  oninput="filtrarProdutos(this.value)" onfocus="filtrarProdutos(this.value)"
                  style="width:100%;padding:10px 12px;border:2px solid #3960f9;border-radius:6px;font-size:14px;background:#f0f4ff;">
           <div id="lista-produtos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #3960f9;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         </div>
         <!-- Buscar serviço -->
         <div style="position:relative;">
-          <input type="text" id="busca-servico" autocomplete="off" placeholder="🔍 Buscar serviço pelo nome..."
+          <input type="text" id="busca-servico" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar serviço pelo nome..."
                  oninput="filtrarServicos(this.value)" onfocus="filtrarServicos(this.value)"
                  style="width:100%;padding:10px 12px;border:2px solid #16a34a;border-radius:6px;font-size:14px;background:#f0fdf4;">
           <div id="lista-servicos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #16a34a;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
@@ -6003,6 +6003,19 @@ ${conteudo}
   function filtrarProdutos(termo) {
     const lista = document.getElementById('lista-produtos');
     const t = (termo || '').trim().toLowerCase();
+    // Caso especial: sem produtos cadastrados
+    if (!_produtosCacheLocal || _produtosCacheLocal.length === 0) {
+      lista.innerHTML = `
+        <div style="padding:16px;text-align:center;">
+          <div style="color:#dc2626;font-size:13px;font-weight:600;margin-bottom:6px;">⚠️ Nenhum produto cadastrado</div>
+          <div style="color:#666;font-size:12px;margin-bottom:10px;">Cadastre produtos antes de adicioná-los ao orçamento.</div>
+          <button onclick="fecharOrcamento(); showPage('produtos');" style="background:#3960f9;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ir para Produtos →</button>
+          <div style="color:#888;font-size:11px;margin-top:8px;">Ou use "+ Item Avulso" se for único.</div>
+        </div>
+      `;
+      lista.style.display = 'block';
+      return;
+    }
     let resultados = _produtosCacheLocal;
     if (t) {
       resultados = _produtosCacheLocal.filter(p =>
@@ -6011,7 +6024,7 @@ ${conteudo}
       );
     }
     if (resultados.length === 0) {
-      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum produto encontrado.</div>';
+      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum produto encontrado para "' + escapeHtml(t) + '".</div>';
       lista.style.display = 'block';
       return;
     }
@@ -6298,6 +6311,7 @@ ${conteudo}
   }
 
   function escapeAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function escapeHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   // ====== RENOVAÇÃO DE ASSINATURA ======
   let _planoRenovacao = null;
