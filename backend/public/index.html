@@ -1130,11 +1130,27 @@
 
       <!-- Itens -->
       <h3 style="color:var(--azul);font-size:15px;margin:22px 0 12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">Itens do orçamento</h3>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="btn" onclick="addItemProduto()" style="font-size:13px;padding:8px 14px;background:#3960f9;">+ Produto</button>
-        <button class="btn" onclick="addItemServico()" style="font-size:13px;padding:8px 14px;background:#16a34a;">+ Serviço</button>
-        <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:8px 14px;background:#f59e0b;color:#fff;">+ Item Avulso</button>
+
+      <!-- Buscas com autocomplete + botão item avulso -->
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:14px;">
+        <!-- Buscar produto -->
+        <div style="position:relative;">
+          <input type="text" id="busca-produto" autocomplete="off" placeholder="🔍 Buscar produto pelo nome..."
+                 oninput="filtrarProdutos(this.value)" onfocus="filtrarProdutos(this.value)"
+                 style="width:100%;padding:10px 12px;border:2px solid #3960f9;border-radius:6px;font-size:14px;background:#f0f4ff;">
+          <div id="lista-produtos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #3960f9;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+        </div>
+        <!-- Buscar serviço -->
+        <div style="position:relative;">
+          <input type="text" id="busca-servico" autocomplete="off" placeholder="🔍 Buscar serviço pelo nome..."
+                 oninput="filtrarServicos(this.value)" onfocus="filtrarServicos(this.value)"
+                 style="width:100%;padding:10px 12px;border:2px solid #16a34a;border-radius:6px;font-size:14px;background:#f0fdf4;">
+          <div id="lista-servicos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #16a34a;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+        </div>
+        <!-- Botão item avulso -->
+        <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:10px 16px;background:#f59e0b;color:#fff;white-space:nowrap;">+ Item Avulso</button>
       </div>
+
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px;">
           <thead style="background:#f1f5f9;">
@@ -5983,36 +5999,111 @@ ${conteudo}
       document.getElementById('orc-cliente-nome').value = opt.textContent;
     }
   }
-  function addItemProduto() {
-    if (_produtosCacheLocal.length === 0) { alert('Cadastre produtos antes.'); return; }
-    const opcoes = _produtosCacheLocal.map(p =>
-      `${p.nome} — R$ ${parseFloat(p.preco_venda).toFixed(2)} (estoque: ${p.estoque || 0})`
-    );
-    const escolhido = prompt('Digite o número do produto:\n\n' + opcoes.map((o,i) => (i+1) + ') ' + o).join('\n'));
-    const idx = parseInt(escolhido) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= _produtosCacheLocal.length) return;
-    const p = _produtosCacheLocal[idx];
+  // === AUTOCOMPLETE de produtos e serviços ===
+  function filtrarProdutos(termo) {
+    const lista = document.getElementById('lista-produtos');
+    const t = (termo || '').trim().toLowerCase();
+    let resultados = _produtosCacheLocal;
+    if (t) {
+      resultados = _produtosCacheLocal.filter(p =>
+        (p.nome || '').toLowerCase().includes(t) ||
+        (p.codigo || '').toLowerCase().includes(t)
+      );
+    }
+    if (resultados.length === 0) {
+      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum produto encontrado.</div>';
+      lista.style.display = 'block';
+      return;
+    }
+    lista.innerHTML = resultados.slice(0, 30).map(p => {
+      const estoque = parseFloat(p.estoque) || 0;
+      const preco = parseFloat(p.precoVenda) || 0;
+      const semEstoque = estoque <= 0;
+      return `
+        <div onclick="selecionarProduto(${p.id})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;${semEstoque ? 'opacity:0.6;' : ''}" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='#fff'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.nome)}</div>
+            <div style="font-size:11px;color:#888;">${p.codigo ? 'Cód: ' + escapeHtml(p.codigo) + ' · ' : ''}Estoque: <strong style="color:${semEstoque ? '#dc2626' : '#16a34a'};">${estoque}</strong></div>
+          </div>
+          <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:10px;">${formatarBRL(preco)}</div>
+        </div>
+      `;
+    }).join('');
+    lista.style.display = 'block';
+  }
+  function selecionarProduto(id) {
+    const p = _produtosCacheLocal.find(x => x.id === id);
+    if (!p) return;
     _orcItensTemp.push({
       tipo: 'produto', produto_id: p.id, servico_id: null,
-      descricao: p.nome, quantidade: 1, valor_unitario: parseFloat(p.preco_venda) || 0,
+      descricao: p.nome,
+      quantidade: 1,
+      valor_unitario: parseFloat(p.precoVenda) || 0,
       desconto_item: 0
     });
+    document.getElementById('busca-produto').value = '';
+    document.getElementById('lista-produtos').style.display = 'none';
     renderItensOrc();
   }
-  function addItemServico() {
-    if (_servicosCache.length === 0) { alert('Cadastre serviços antes.'); return; }
-    const opcoes = _servicosCache.map(s => `${s.nome} — R$ ${parseFloat(s.valor).toFixed(2)}`);
-    const escolhido = prompt('Digite o número do serviço:\n\n' + opcoes.map((o,i) => (i+1) + ') ' + o).join('\n'));
-    const idx = parseInt(escolhido) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= _servicosCache.length) return;
-    const s = _servicosCache[idx];
+
+  function filtrarServicos(termo) {
+    const lista = document.getElementById('lista-servicos');
+    const t = (termo || '').trim().toLowerCase();
+    let resultados = _servicosCache;
+    if (t) {
+      resultados = _servicosCache.filter(s =>
+        (s.nome || '').toLowerCase().includes(t) ||
+        (s.descricao || '').toLowerCase().includes(t)
+      );
+    }
+    if (resultados.length === 0) {
+      lista.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;text-align:center;">Nenhum serviço encontrado.<br><span style="font-size:11px;">Cadastre em "Serviços" no menu.</span></div>';
+      lista.style.display = 'block';
+      return;
+    }
+    lista.innerHTML = resultados.slice(0, 30).map(s => `
+      <div onclick="selecionarServico(${s.id})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='#fff'">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.nome)}</div>
+          ${s.descricao ? `<div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.descricao)}</div>` : ''}
+        </div>
+        <div style="font-weight:700;color:#16a34a;white-space:nowrap;margin-left:10px;">${formatarBRL(s.valor)}</div>
+      </div>
+    `).join('');
+    lista.style.display = 'block';
+  }
+  function selecionarServico(id) {
+    const s = _servicosCache.find(x => x.id === id);
+    if (!s) return;
     _orcItensTemp.push({
       tipo: 'servico', produto_id: null, servico_id: s.id,
-      descricao: s.nome, quantidade: 1, valor_unitario: parseFloat(s.valor) || 0,
+      descricao: s.nome,
+      quantidade: 1,
+      valor_unitario: parseFloat(s.valor) || 0,
       desconto_item: 0
     });
+    document.getElementById('busca-servico').value = '';
+    document.getElementById('lista-servicos').style.display = 'none';
     renderItensOrc();
   }
+
+  // Fecha listas ao clicar fora
+  document.addEventListener('click', function(e) {
+    const buscaProd = document.getElementById('busca-produto');
+    const listaProd = document.getElementById('lista-produtos');
+    const buscaServ = document.getElementById('busca-servico');
+    const listaServ = document.getElementById('lista-servicos');
+    if (buscaProd && listaProd && !buscaProd.contains(e.target) && !listaProd.contains(e.target)) {
+      listaProd.style.display = 'none';
+    }
+    if (buscaServ && listaServ && !buscaServ.contains(e.target) && !listaServ.contains(e.target)) {
+      listaServ.style.display = 'none';
+    }
+  });
+
+  // Mantém função antiga só pra compatibilidade (não chamada mais)
+  function addItemProduto() { document.getElementById('busca-produto')?.focus(); }
+  function addItemServico() { document.getElementById('busca-servico')?.focus(); }
   function addItemAvulso() {
     _orcItensTemp.push({
       tipo: 'avulso', produto_id: null, servico_id: null,
