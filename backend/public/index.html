@@ -1075,17 +1075,25 @@
 
   <!-- Modal de Serviço -->
   <div id="modal-servico" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
-    <div style="background:#fff;padding:24px;border-radius:14px;max-width:520px;width:96%;max-height:92vh;overflow-y:auto;">
-      <h2 id="titulo-modal-servico" style="color:var(--azul);margin:0 0 16px 0;">Novo Serviço</h2>
+    <div style="background:#fff;padding:28px;border-radius:14px;max-width:480px;width:92%;max-height:92vh;overflow-y:auto;">
+      <h2 id="titulo-modal-servico" style="color:var(--azul);margin:0 0 18px 0;">Novo Serviço</h2>
       <input type="hidden" id="serv-id">
-      <label>Nome *</label>
-      <input type="text" id="serv-nome" placeholder="Ex: Troca de óleo" required>
-      <label>Descrição (opcional)</label>
-      <textarea id="serv-descricao" rows="2" placeholder="Detalhes do serviço..."></textarea>
-      <label>Valor (R$) *</label>
-      <input type="number" id="serv-valor" step="0.01" min="0" placeholder="0,00" required>
-      <div id="serv-erro" class="erro" style="display:none;"></div>
-      <div style="display:flex;gap:10px;margin-top:14px;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Nome do serviço *</label>
+          <input type="text" id="serv-nome" placeholder="Ex: Troca de óleo" required style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Descrição (opcional)</label>
+          <textarea id="serv-descricao" rows="2" placeholder="Detalhes do serviço..." style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;"></textarea>
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Valor (R$) *</label>
+          <input type="number" id="serv-valor" step="0.01" min="0" placeholder="0,00" required style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+        </div>
+      </div>
+      <div id="serv-erro" class="erro" style="display:none;margin-top:12px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
         <button class="btn" onclick="salvarServico()" style="flex:1;">Salvar</button>
         <button class="btn" onclick="fecharServico()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
       </div>
@@ -1094,68 +1102,77 @@
 
   <!-- Modal de Orçamento -->
   <div id="modal-orcamento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:flex-start;padding:20px 0;overflow-y:auto;">
-    <div style="background:#fff;padding:24px;border-radius:14px;max-width:980px;width:96%;margin:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="background:#fff;padding:28px;border-radius:14px;max-width:980px;width:96%;margin:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
         <h2 id="titulo-modal-orc" style="color:var(--azul);margin:0;">Novo Orçamento</h2>
-        <button onclick="fecharOrcamento()" style="background:transparent;border:none;font-size:28px;color:#999;cursor:pointer;line-height:1;">&times;</button>
+        <button onclick="fecharOrcamento()" style="background:transparent;border:none;font-size:28px;color:#999;cursor:pointer;line-height:1;padding:0;">&times;</button>
       </div>
       <input type="hidden" id="orc-id">
 
-      <!-- Cabeçalho -->
-      <div style="display:grid;grid-template-columns:1fr 140px;gap:12px;margin-bottom:8px;">
+      <!-- Cabeçalho: Cliente e Validade -->
+      <div style="display:grid;grid-template-columns:1fr 140px;gap:14px;margin-bottom:14px;">
         <div>
-          <label>Cliente *</label>
-          <select id="orc-cliente-id" onchange="onClienteOrcChange()">
-            <option value="">— Selecione ou digite abaixo —</option>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Cliente cadastrado</label>
+          <select id="orc-cliente-id" onchange="onClienteOrcChange()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+            <option value="">— Selecione (ou digite o nome abaixo) —</option>
           </select>
         </div>
         <div>
-          <label>Validade (dias)</label>
-          <input type="number" id="orc-validade" value="7" min="1" max="365">
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Validade (dias)</label>
+          <input type="number" id="orc-validade" value="7" min="1" max="365" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
         </div>
       </div>
-      <label>Nome do cliente *</label>
-      <input type="text" id="orc-cliente-nome" placeholder="Cliente sem cadastro? Digite o nome aqui">
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Nome do cliente *</label>
+        <input type="text" id="orc-cliente-nome" placeholder="Cliente sem cadastro? Digite o nome completo aqui" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+      </div>
 
       <!-- Itens -->
-      <h3 style="color:var(--azul);font-size:16px;margin:18px 0 10px;">Itens do orçamento</h3>
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <button class="btn" onclick="addItemProduto()" style="font-size:13px;padding:8px 12px;background:#3960f9;">+ Produto</button>
-        <button class="btn" onclick="addItemServico()" style="font-size:13px;padding:8px 12px;background:#16a34a;">+ Serviço</button>
-        <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:8px 12px;background:#f59e0b;color:#fff;">+ Item Avulso</button>
+      <h3 style="color:var(--azul);font-size:15px;margin:22px 0 12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">Itens do orçamento</h3>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="btn" onclick="addItemProduto()" style="font-size:13px;padding:8px 14px;background:#3960f9;">+ Produto</button>
+        <button class="btn" onclick="addItemServico()" style="font-size:13px;padding:8px 14px;background:#16a34a;">+ Serviço</button>
+        <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:8px 14px;background:#f59e0b;color:#fff;">+ Item Avulso</button>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead style="background:#f1f5f9;">
-          <tr>
-            <th style="padding:8px;text-align:left;">Tipo</th>
-            <th style="padding:8px;text-align:left;">Descrição</th>
-            <th style="padding:8px;text-align:center;width:80px;">Qtd</th>
-            <th style="padding:8px;text-align:right;width:110px;">Vlr Unit</th>
-            <th style="padding:8px;text-align:right;width:110px;">Total</th>
-            <th style="padding:8px;width:50px;"></th>
-          </tr>
-        </thead>
-        <tbody id="orc-itens-tbody"></tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px;">
+          <thead style="background:#f1f5f9;">
+            <tr>
+              <th style="padding:8px;text-align:center;width:50px;">Tipo</th>
+              <th style="padding:8px;text-align:left;">Descrição</th>
+              <th style="padding:8px;text-align:center;width:90px;">Qtd</th>
+              <th style="padding:8px;text-align:right;width:120px;">Vlr Unit</th>
+              <th style="padding:8px;text-align:right;width:120px;">Total</th>
+              <th style="padding:8px;width:60px;"></th>
+            </tr>
+          </thead>
+          <tbody id="orc-itens-tbody"></tbody>
+        </table>
+      </div>
 
-      <!-- Totais e detalhes -->
-      <div style="display:grid;grid-template-columns:1fr 280px;gap:18px;margin-top:18px;">
-        <div>
-          <label>Observações</label>
-          <textarea id="orc-observacoes" rows="2" placeholder="Garantia, prazos, etc."></textarea>
-          <label>Condições de pagamento</label>
-          <input type="text" id="orc-condicoes" placeholder="Ex: À vista 5% desc. ou 3x s/ juros">
+      <!-- Detalhes e Totais -->
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:18px;margin-top:20px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Observações</label>
+            <textarea id="orc-observacoes" rows="2" placeholder="Garantia, prazos, etc." style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;"></textarea>
+          </div>
+          <div>
+            <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Condições de pagamento</label>
+            <input type="text" id="orc-condicoes" placeholder="Ex: À vista 5% desc. ou 3x s/ juros" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+          </div>
         </div>
-        <div style="background:#f6f8fc;padding:14px;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:14px;">
-            <span>Subtotal:</span>
+        <div style="background:#f6f8fc;padding:16px;border-radius:8px;height:fit-content;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;">
+            <span style="color:#666;">Subtotal:</span>
             <strong id="orc-subtotal">R$ 0,00</strong>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:14px;">
-            <span>Desconto:</span>
-            <input type="number" id="orc-desconto" step="0.01" min="0" value="0" oninput="recalcularOrc()" style="width:100px;text-align:right;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;">
+            <span style="color:#666;">Desconto:</span>
+            <input type="number" id="orc-desconto" step="0.01" min="0" value="0" oninput="recalcularOrc()" style="width:110px;text-align:right;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;">
           </div>
-          <hr style="border:none;border-top:1px solid #cbd5e1;margin:10px 0;">
+          <hr style="border:none;border-top:1px solid #cbd5e1;margin:12px 0;">
           <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:var(--azul);">
             <span>Total:</span>
             <span id="orc-total">R$ 0,00</span>
@@ -1163,9 +1180,9 @@
         </div>
       </div>
 
-      <div id="orc-erro" class="erro" style="display:none;margin-top:14px;"></div>
+      <div id="orc-erro" style="display:none;margin-top:14px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;"></div>
 
-      <div style="display:flex;gap:10px;margin-top:18px;">
+      <div style="display:flex;gap:10px;margin-top:22px;">
         <button class="btn" onclick="salvarOrcamento()" style="flex:1;">💾 Salvar Orçamento</button>
         <button class="btn" onclick="fecharOrcamento()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
       </div>
