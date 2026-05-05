@@ -1138,14 +1138,14 @@
           <input type="text" id="busca-produto" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar produto pelo nome..."
                  oninput="filtrarProdutos(this.value)" onfocus="filtrarProdutos(this.value)"
                  style="width:100%;padding:10px 12px;border:2px solid #3960f9;border-radius:6px;font-size:14px;background:#f0f4ff;">
-          <div id="lista-produtos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #3960f9;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+          <div id="orc-lista-produtos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #3960f9;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         </div>
         <!-- Buscar serviço -->
         <div style="position:relative;">
           <input type="text" id="busca-servico" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar serviço pelo nome..."
                  oninput="filtrarServicos(this.value)" onfocus="filtrarServicos(this.value)"
                  style="width:100%;padding:10px 12px;border:2px solid #16a34a;border-radius:6px;font-size:14px;background:#f0fdf4;">
-          <div id="lista-servicos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #16a34a;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+          <div id="orc-lista-servicos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #16a34a;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         </div>
         <!-- Botão item avulso -->
         <button class="btn" onclick="addItemAvulso()" style="font-size:13px;padding:10px 16px;background:#f59e0b;color:#fff;white-space:nowrap;">+ Item Avulso</button>
@@ -6022,7 +6022,7 @@ ${conteudo}
   }
   // === AUTOCOMPLETE de produtos e serviços ===
   function filtrarProdutos(termo) {
-    const lista = document.getElementById('lista-produtos');
+    const lista = document.getElementById('orc-lista-produtos');
     const t = (termo || '').trim().toLowerCase();
     // Caso especial: sem produtos cadastrados
     if (!_produtosCacheLocal || _produtosCacheLocal.length === 0) {
@@ -6076,12 +6076,12 @@ ${conteudo}
       desconto_item: 0
     });
     document.getElementById('busca-produto').value = '';
-    document.getElementById('lista-produtos').style.display = 'none';
+    document.getElementById('orc-lista-produtos').style.display = 'none';
     renderItensOrc();
   }
 
   function filtrarServicos(termo) {
-    const lista = document.getElementById('lista-servicos');
+    const lista = document.getElementById('orc-lista-servicos');
     const t = (termo || '').trim().toLowerCase();
     let resultados = _servicosCache;
     if (t) {
@@ -6117,16 +6117,16 @@ ${conteudo}
       desconto_item: 0
     });
     document.getElementById('busca-servico').value = '';
-    document.getElementById('lista-servicos').style.display = 'none';
+    document.getElementById('orc-lista-servicos').style.display = 'none';
     renderItensOrc();
   }
 
   // Fecha listas ao clicar fora
   document.addEventListener('click', function(e) {
     const buscaProd = document.getElementById('busca-produto');
-    const listaProd = document.getElementById('lista-produtos');
+    const listaProd = document.getElementById('orc-lista-produtos');
     const buscaServ = document.getElementById('busca-servico');
-    const listaServ = document.getElementById('lista-servicos');
+    const listaServ = document.getElementById('orc-lista-servicos');
     if (buscaProd && listaProd && !buscaProd.contains(e.target) && !listaProd.contains(e.target)) {
       listaProd.style.display = 'none';
     }
