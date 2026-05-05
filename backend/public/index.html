@@ -6130,6 +6130,14 @@ ${conteudo}
   }
   function atualizarItemOrc(idx, campo, valor) {
     _orcItensTemp[idx][campo] = valor;
+    // Atualiza só o total dessa linha sem re-renderizar (mantém foco no input)
+    const tr = document.querySelector(`#orc-itens-tbody tr:nth-child(${idx + 1})`);
+    if (tr) {
+      const tdTotal = tr.querySelectorAll('td')[4];
+      const it = _orcItensTemp[idx];
+      const totalLinha = (parseFloat(it.quantidade) || 1) * (parseFloat(it.valor_unitario) || 0) - (parseFloat(it.desconto_item) || 0);
+      if (tdTotal) tdTotal.textContent = formatarBRL(totalLinha);
+    }
     recalcularOrc();
   }
   function renderItensOrc() {
@@ -6145,13 +6153,13 @@ ${conteudo}
       <tr>
         <td style="padding:6px;text-align:center;font-size:18px;">${tipoLabels[it.tipo] || ''}</td>
         <td style="padding:6px;">
-          <input type="text" value="${escapeAttr(it.descricao)}" onchange="atualizarItemOrc(${i},'descricao',this.value)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;" placeholder="Descrição do item">
+          <input type="text" value="${escapeAttr(it.descricao)}" oninput="atualizarItemOrc(${i},'descricao',this.value)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;" placeholder="Descrição do item">
         </td>
         <td style="padding:6px;">
-          <input type="number" step="0.001" min="0.001" value="${it.quantidade}" onchange="atualizarItemOrc(${i},'quantidade',parseFloat(this.value)||1)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;font-size:13px;">
+          <input type="number" step="0.001" min="0.001" value="${it.quantidade}" oninput="atualizarItemOrc(${i},'quantidade',parseFloat(this.value)||1)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;font-size:13px;">
         </td>
         <td style="padding:6px;">
-          <input type="number" step="0.01" min="0" value="${it.valor_unitario}" onchange="atualizarItemOrc(${i},'valor_unitario',parseFloat(this.value)||0)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
+          <input type="number" step="0.01" min="0" value="${it.valor_unitario}" oninput="atualizarItemOrc(${i},'valor_unitario',parseFloat(this.value)||0)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
         </td>
         <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL((it.quantidade||1) * (it.valor_unitario||0) - (it.desconto_item||0))}</td>
         <td style="padding:6px;text-align:center;">
