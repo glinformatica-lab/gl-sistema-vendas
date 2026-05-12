@@ -2120,14 +2120,15 @@
   // ====== Carregamento inicial via API: popula todos os arrays a partir do servidor ======
   async function recarregarTudoDaApi() {
     try {
-      const [forn, prods, clis, vds, ents, cp, cr] = await Promise.all([
+      const [forn, prods, clis, vds, ents, cp, cr, servs] = await Promise.all([
         api('GET', '/api/fornecedores'),
         api('GET', '/api/produtos'),
         api('GET', '/api/clientes'),
         api('GET', '/api/vendas'),
         api('GET', '/api/entradas'),
         api('GET', '/api/contas-pagar'),
-        api('GET', '/api/contas-receber')
+        api('GET', '/api/contas-receber'),
+        api('GET', '/api/servicos').catch(() => [])
       ]);
       // Normaliza datas (Postgres devolve como timestamp ISO; convertemos para YYYY-MM-DD)
       vds.forEach(v => { v.data = normalizarDataIso(v.data); });
@@ -2155,6 +2156,8 @@
       dbContasReceber.length = 0; dbContasReceber.push(...cr);
       // Movimentações são carregadas sob demanda (ao abrir histórico de produto)
       dbMovimentacoes.length = 0;
+      // Atualiza cache de serviços pra estar disponível na Nova Venda
+      _servicosCache = servs || [];
       console.log('[API] Dados carregados:', {
         produtos: dbProdutos.length, clientes: dbClientes.length, vendas: dbVendas.length,
         entradas: dbEntradas.length, cp: dbContasPagar.length, cr: dbContasReceber.length
@@ -2798,7 +2801,10 @@
   }
   function renderListaProdutos() {
     const dl = document.getElementById('lista-produtos');
-    dl.innerHTML = dbProdutos.map(p => `<option value="${p.nome}">`).join('');
+    // Inclui produtos cadastrados + serviços cadastrados (ambos podem ser vendidos)
+    const prodOpts = dbProdutos.map(p => `<option value="${p.nome}" label="📦 ${p.nome}">`);
+    const servOpts = (_servicosCache || []).map(s => `<option value="${s.nome}" label="🔧 ${s.nome} (serviço)">`);
+    dl.innerHTML = [...prodOpts, ...servOpts].join('');
   }
   function gerarCodigoProduto() {
     let max = 1000;
@@ -2927,7 +2933,14 @@
     `).join('');
   }
   function getProduto(nome) {
-    return dbProdutos.find(p => p.nome.toLowerCase() === (nome||'').toLowerCase().trim());
+    const n = (nome||'').toLowerCase().trim();
+    // Busca primeiro em produtos cadastrados
+    const p = dbProdutos.find(p => p.nome.toLowerCase() === n);
+    if (p) return p;
+    // Se não achou, busca em serviços e devolve no mesmo formato
+    const s = (_servicosCache || []).find(s => s.nome.toLowerCase() === n);
+    if (s) return { nome: s.nome, precoVenda: parseFloat(s.valor) || 0, estoque: 999999, _isServico: true };
+    return null;
   }
   renderListaFornecedores();
   renderListaProdutos();
@@ -6312,6 +6325,7 @@ ${conteudo}
     try {
       const orc = await api('GET', '/api/orcamentos/' + id);
       _orcVisualizando = orc;
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
       const tipoLabels = { 'produto': 'Produto', 'servico': 'Serviço', 'avulso': 'Item' };
       const itensHtml = (orc.itens || []).map(it => `
         <tr>
@@ -6323,11 +6337,11 @@ ${conteudo}
         </tr>
       `).join('');
       document.getElementById('orc-view-conteudo').innerHTML = `
-        <style>
-          .empresa-header .lbl { font-weight: 700; color: #222; }
-        </style>
-        ${cabecalhoEmpresaParaRecibo()}
-        <h2 style="text-align:center;margin:0 0 18px;color:#1e3a8a;font-size:20px;letter-spacing:1px;">ORÇAMENTO Nº ${orc.numero}</h2>
+        <div style="text-align:center;border-bottom:2px solid #1e3a8a;padding-bottom:16px;margin-bottom:18px;">
+          <h2 style="color:#1e3a8a;margin:0 0 4px;">${escapeHtml(empresa.nome || 'Empresa')}</h2>
+          ${empresa.cnpj ? `<div style="font-size:13px;color:#666;">CNPJ: ${escapeHtml(empresa.cnpj)}</div>` : ''}
+          <h3 style="margin:14px 0 0;font-size:18px;">ORÇAMENTO Nº ${orc.numero}</h3>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:14px;">
           <div>
             <strong>Cliente:</strong> ${escapeHtml(orc.cliente_nome || '—')}<br>
@@ -6378,7 +6392,6 @@ ${conteudo}
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento ${_orcVisualizando.numero}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 30px; color: #1e293b; max-width: 800px; margin: 0 auto; }
-        .empresa-header .lbl { font-weight: 700; color: #222; }
         @media print { body { padding: 0; } }
       </style>
       </head><body>${conteudo}</body></html>`);
