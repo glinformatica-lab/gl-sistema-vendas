@@ -2721,6 +2721,7 @@
   // "Banco de dados" em memória (ponto único de verdade para fornecedores/produtos)
   let dbFornecedores = [];
   let dbProdutos = [];
+  let _servicosCache = [];
   let dbContasPagar = [];
   let _nextContaPagarId = 1;
   function proximaContaPagarId() { return _nextContaPagarId++; }
@@ -5818,7 +5819,6 @@ ${conteudo}
   }
 
   // ====== SERVIÇOS ======
-  let _servicosCache = [];
   async function carregarServicos() {
     try {
       _servicosCache = await api('GET', '/api/servicos');
