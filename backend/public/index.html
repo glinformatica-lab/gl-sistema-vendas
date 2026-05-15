@@ -1217,6 +1217,38 @@
     </div>
   </div>
 
+  <!-- Modal Escolher Tamanho do Cupom -->
+  <div id="modal-cupom-tamanho" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:28px;border-radius:14px;max-width:480px;width:92%;">
+      <h2 style="color:var(--azul);margin:0 0 12px;">Imprimir Comprovante</h2>
+      <p style="color:#666;margin:0 0 18px;font-size:14px;">Escolha o formato:</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="imprimirCupomEscolhido('a4')" style="background:#3960f9;color:#fff;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">📄</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Folha A4 (impressora normal)</div>
+            <div style="font-size:12px;opacity:0.85;font-weight:400;">Recibo completo com logo</div>
+          </div>
+        </button>
+        <button onclick="imprimirCupomEscolhido('80mm')" style="background:#16a34a;color:#fff;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">🧾</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Cupom 80mm (térmica padrão)</div>
+            <div style="font-size:12px;opacity:0.85;font-weight:400;">Bobina mais larga</div>
+          </div>
+        </button>
+        <button onclick="imprimirCupomEscolhido('58mm')" style="background:#7c3aed;color:#fff;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">📋</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">Cupom 58mm (térmica pequena)</div>
+            <div style="font-size:12px;opacity:0.85;font-weight:400;">Bobina mais estreita</div>
+          </div>
+        </button>
+        <button onclick="document.getElementById('modal-cupom-tamanho').style.display='none'" style="background:#eceef2;color:var(--azul);border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Renovação de Assinatura -->
   <div id="modal-renovacao" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:32px;border-radius:14px;max-width:780px;width:96%;max-height:92vh;overflow-y:auto;">
@@ -4468,8 +4500,17 @@
       }
       const ehEdicao = _vendaEditandoId !== null;
       const msgOrc = orcamentoOrigemId ? ' Orçamento marcado como convertido.' : '';
-      alert(`Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!${msgOrc}\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}`);
+      const msgPrincipal = `Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!${msgOrc}\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}`;
       closeNovaVenda();
+      // Pergunta se quer imprimir cupom (apenas em venda NOVA, não em edição)
+      if (!ehEdicao && confirm(msgPrincipal + '\n\nDeseja imprimir o comprovante agora?')) {
+        // Busca a venda recém criada do cache atualizado e abre modal de escolha de tamanho
+        const vendaCompleta = dbVendas.find(x => x.id === venda.id) || venda;
+        _vendaImprimindo = vendaCompleta;
+        document.getElementById('modal-cupom-tamanho').style.display = 'flex';
+      } else if (ehEdicao) {
+        alert(msgPrincipal);
+      }
     } catch (err) {
       mostrarErro(err.message);
     }
@@ -4544,14 +4585,147 @@
     `;
   }
 
+  // Ao invés de imprimir direto, abre modal pra escolher tamanho
+  let _vendaImprimindo = null;
   function imprimirVenda(id) {
     const v = dbVendas.find(x => x.id === id);
     if(!v) { alert('Venda não encontrada.'); return; }
+    _vendaImprimindo = v;
+    document.getElementById('modal-cupom-tamanho').style.display = 'flex';
+  }
+  function imprimirCupomEscolhido(tamanho) {
+    document.getElementById('modal-cupom-tamanho').style.display = 'none';
+    const v = _vendaImprimindo;
+    if(!v) return;
     const w = window.open('', '_blank', 'width=900,height=700');
     if(!w) { alert('Não foi possível abrir a janela de impressão.'); return; }
-    w.document.write(gerarHtmlImpressaoVenda(v));
+    let html;
+    if (tamanho === '80mm') html = gerarHtmlCupom80mm(v);
+    else if (tamanho === '58mm') html = gerarHtmlCupom58mm(v);
+    else html = gerarHtmlImpressaoVenda(v);
+    w.document.write(html);
     w.document.close();
     w.addEventListener('load', () => { w.focus(); w.print(); });
+  }
+
+  // CUPOM 80mm
+  function gerarHtmlCupom80mm(v) {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[v.pagamento] || v.pagamento;
+    const linhasItens = v.itens.map(it => `
+      <div class="item">
+        <div class="item-nome">${escapeHtml(it.produto)}</div>
+        <div class="item-detalhe">${it.qtd} x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
+      </div>
+    `).join('');
+    const parcelasHtml = (v.parcelas && v.parcelas.length > 1)
+      ? `<div class="bloco"><div class="bloco-titulo">PARCELAS</div>${v.parcelas.map(p => `<div class="linha"><span>${p.numero}/${p.total} - ${formatarDataBR(p.vencimento)}</span><strong>${formatarBRL(p.valor)}</strong></div>`).join('')}</div>` : '';
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Cupom #${v.id}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  body { font-family: 'Courier New', monospace; padding: 6mm 4mm; margin: 0; width: 72mm; font-size: 11px; color: #000; line-height: 1.4; }
+  .center { text-align: center; }
+  .empresa-nome { font-size: 14px; font-weight: bold; text-transform: uppercase; }
+  .empresa-info { font-size: 10px; margin-top: 2px; }
+  .linha-tracejada { border-top: 1px dashed #000; margin: 6px 0; }
+  .titulo { font-size: 12px; font-weight: bold; text-align: center; margin: 6px 0; text-transform: uppercase; }
+  .info { display: flex; justify-content: space-between; font-size: 10px; margin: 2px 0; }
+  .item { margin: 4px 0; }
+  .item-nome { font-weight: bold; font-size: 11px; }
+  .item-detalhe { font-size: 10px; margin-left: 8px; }
+  .bloco { margin-top: 6px; }
+  .bloco-titulo { font-size: 11px; font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 3px; }
+  .linha { display: flex; justify-content: space-between; font-size: 10px; margin: 2px 0; }
+  .total-final { font-size: 14px; font-weight: bold; text-align: center; padding: 6px 0; border: 1px solid #000; margin: 8px 0; }
+  .footer { text-align: center; font-size: 9px; margin-top: 8px; }
+  @media print { body { padding: 4mm 3mm; } }
+</style></head><body>
+  <div class="center">
+    <div class="empresa-nome">${escapeHtml(empresa.nome || 'Empresa')}</div>
+    ${empresa.cnpj ? `<div class="empresa-info">CNPJ: ${escapeHtml(empresa.cnpj)}</div>` : ''}
+    ${empresa.telefone ? `<div class="empresa-info">Tel: ${escapeHtml(empresa.telefone)}</div>` : ''}
+    ${empresa.endereco ? `<div class="empresa-info">${escapeHtml(empresa.endereco)}</div>` : ''}
+  </div>
+  <div class="linha-tracejada"></div>
+  <div class="titulo">COMPROVANTE DE VENDA</div>
+  <div class="info"><span>Venda Nº:</span><strong>#${v.id}</strong></div>
+  <div class="info"><span>Data:</span><strong>${formatarDataBR(v.data)}</strong></div>
+  <div class="info"><span>Cliente:</span><strong>${escapeHtml(v.cliente)}</strong></div>
+  <div class="info"><span>Pagto:</span><strong>${pagamentoLabel}</strong></div>
+  <div class="linha-tracejada"></div>
+  <div class="bloco-titulo">ITENS</div>
+  ${linhasItens}
+  <div class="linha-tracejada"></div>
+  <div class="linha"><span>Subtotal:</span><strong>${formatarBRL(v.subtotal || v.total)}</strong></div>
+  ${parseFloat(v.desconto) > 0 ? `<div class="linha"><span>Desconto:</span><strong>- ${formatarBRL(v.desconto)}</strong></div>` : ''}
+  <div class="total-final">TOTAL: ${formatarBRL(v.total)}</div>
+  ${parcelasHtml}
+  ${v.obs ? `<div class="linha-tracejada"></div><div style="font-size:10px;">Obs: ${escapeHtml(v.obs)}</div>` : ''}
+  <div class="linha-tracejada"></div>
+  <div class="footer">
+    <strong>NÃO É DOCUMENTO FISCAL</strong><br>
+    Apenas comprovante interno<br>
+    ${new Date().toLocaleString('pt-BR')}
+  </div>
+</body></html>`;
+  }
+
+  // CUPOM 58mm (mais compacto)
+  function gerarHtmlCupom58mm(v) {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[v.pagamento] || v.pagamento;
+    const linhasItens = v.itens.map(it => `
+      <div class="item">
+        <div class="item-nome">${escapeHtml(it.produto)}</div>
+        <div class="item-detalhe">${it.qtd}x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
+      </div>
+    `).join('');
+    const parcelasHtml = (v.parcelas && v.parcelas.length > 1)
+      ? `<div class="linha-tracejada"></div><div class="bloco-titulo">PARCELAS</div>${v.parcelas.map(p => `<div class="linha"><span>${p.numero}/${p.total} ${formatarDataBR(p.vencimento)}</span><strong>${formatarBRL(p.valor)}</strong></div>`).join('')}` : '';
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Cupom #${v.id}</title>
+<style>
+  @page { size: 58mm auto; margin: 0; }
+  body { font-family: 'Courier New', monospace; padding: 4mm 2mm; margin: 0; width: 54mm; font-size: 9px; color: #000; line-height: 1.3; }
+  .center { text-align: center; }
+  .empresa-nome { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+  .empresa-info { font-size: 8px; margin-top: 1px; }
+  .linha-tracejada { border-top: 1px dashed #000; margin: 4px 0; }
+  .titulo { font-size: 10px; font-weight: bold; text-align: center; margin: 4px 0; text-transform: uppercase; }
+  .info { display: flex; justify-content: space-between; font-size: 8px; margin: 1px 0; }
+  .item { margin: 3px 0; }
+  .item-nome { font-weight: bold; font-size: 9px; word-wrap: break-word; }
+  .item-detalhe { font-size: 8px; margin-left: 4px; }
+  .bloco-titulo { font-size: 9px; font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 2px; }
+  .linha { display: flex; justify-content: space-between; font-size: 8px; margin: 1px 0; }
+  .total-final { font-size: 11px; font-weight: bold; text-align: center; padding: 4px 0; border: 1px solid #000; margin: 6px 0; }
+  .footer { text-align: center; font-size: 7px; margin-top: 6px; }
+  @media print { body { padding: 3mm 2mm; } }
+</style></head><body>
+  <div class="center">
+    <div class="empresa-nome">${escapeHtml(empresa.nome || 'Empresa')}</div>
+    ${empresa.cnpj ? `<div class="empresa-info">CNPJ: ${escapeHtml(empresa.cnpj)}</div>` : ''}
+    ${empresa.telefone ? `<div class="empresa-info">Tel: ${escapeHtml(empresa.telefone)}</div>` : ''}
+  </div>
+  <div class="linha-tracejada"></div>
+  <div class="titulo">VENDA #${v.id}</div>
+  <div class="info"><span>Data:</span><strong>${formatarDataBR(v.data)}</strong></div>
+  <div class="info"><span>Cliente:</span><strong>${escapeHtml((v.cliente||'').substring(0,20))}</strong></div>
+  <div class="info"><span>Pagto:</span><strong>${pagamentoLabel}</strong></div>
+  <div class="linha-tracejada"></div>
+  <div class="bloco-titulo">ITENS</div>
+  ${linhasItens}
+  <div class="linha-tracejada"></div>
+  <div class="linha"><span>Subtotal:</span><strong>${formatarBRL(v.subtotal || v.total)}</strong></div>
+  ${parseFloat(v.desconto) > 0 ? `<div class="linha"><span>Desconto:</span><strong>- ${formatarBRL(v.desconto)}</strong></div>` : ''}
+  <div class="total-final">TOTAL: ${formatarBRL(v.total)}</div>
+  ${parcelasHtml}
+  <div class="linha-tracejada"></div>
+  <div class="footer">
+    <strong>NÃO É DOC. FISCAL</strong><br>
+    Comprovante interno<br>
+    ${new Date().toLocaleString('pt-BR')}
+  </div>
+</body></html>`;
   }
   function gerarHtmlImpressaoVenda(v) {
     const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[v.pagamento] || v.pagamento;
