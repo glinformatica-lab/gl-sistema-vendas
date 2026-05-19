@@ -3926,7 +3926,7 @@
           <td>${pagTxt}</td>
           <td>
             <button class="btn-link" onclick="editarVenda(${v.id})">Editar</button> |
-            <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>
+            <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>${v.orcamentoIdVinculado ? ` | <button class="btn-link" style="color:#d97706;font-weight:600;" onclick="cancelarVendaEReabrirOrcamento(${v.id}, ${v.orcamentoIdVinculado}, ${v.orcamentoNumeroVinculado})" title="Cancela esta venda e reabre o orçamento Nº ${v.orcamentoNumeroVinculado} para edição">⏪ Voltar pra Orç. Nº ${v.orcamentoNumeroVinculado}</button>` : ''}
           </td>
         </tr>
       `;
@@ -4583,6 +4583,28 @@
         </div>
       </div>
     `;
+  }
+
+  // Cancela uma venda e reabre o orçamento vinculado pra edição
+  async function cancelarVendaEReabrirOrcamento(vendaId, orcamentoId, orcamentoNumero) {
+    const msg = `Confirma cancelar esta venda e voltar pra Orçamento Nº ${orcamentoNumero}?\n\n` +
+                `✓ A venda será EXCLUÍDA permanentemente\n` +
+                `✓ Estoque dos produtos será DEVOLVIDO\n` +
+                `✓ Contas a receber geradas serão removidas\n` +
+                `✓ O orçamento Nº ${orcamentoNumero} voltará pro status "Aprovado" (pra você editar e converter novamente)\n\n` +
+                `Essa ação não pode ser desfeita. Continuar?`;
+    if (!confirm(msg)) return;
+    try {
+      await api('POST', `/api/vendas/${vendaId}/cancelar-e-reabrir-orcamento`);
+      alert(`Pronto!\n\nVenda #${vendaId} cancelada.\nOrçamento Nº ${orcamentoNumero} reaberto.\n\nAcesse "Orçamentos", edite o que precisar e converta novamente.`);
+      await recarregarTudoDaApi();
+      // Se a tela de orçamentos estiver visível, recarrega ela também
+      if (typeof carregarOrcamentos === 'function') {
+        try { await carregarOrcamentos(); } catch (e) {}
+      }
+    } catch (err) {
+      alert('Erro ao cancelar venda: ' + (err.message || err));
+    }
   }
 
   // Ao invés de imprimir direto, abre modal pra escolher tamanho

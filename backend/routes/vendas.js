@@ -27,11 +27,17 @@ function calcularParcelas(total, n, dataPrimeiraIso, intervaloDias) {
   return parcelas;
 }
 
-// Listar vendas
+// Listar vendas (com info de orçamento vinculado, se houver)
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
-      'SELECT * FROM vendas WHERE empresa_id=$1 ORDER BY data DESC, id DESC',
+      `SELECT v.*,
+              o.id AS orcamento_id_vinculado,
+              o.numero AS orcamento_numero_vinculado
+       FROM vendas v
+       LEFT JOIN orcamentos o ON o.venda_id = v.id AND o.empresa_id = v.empresa_id
+       WHERE v.empresa_id=$1
+       ORDER BY v.data DESC, v.id DESC`,
       [req.user.empresaId]
     );
     res.json(r.rows.map(v => ({
@@ -210,6 +216,80 @@ router.delete('/:id', async (req, res) => {
     await client.query('ROLLBACK');
     console.error('[vendas/delete]', err);
     res.status(500).json({ error: 'Erro ao excluir venda.' });
+  } finally {
+    client.release();
+  }
+});
+
+// Cancelar venda E reabrir orçamento vinculado (se houver)
+// Devolve estoque, remove contas a receber, marca orçamento de volta como 'aprovado'
+router.post('/:id/cancelar-e-reabrir-orcamento', async (req, res) => {
+  const vendaId = parseInt(req.params.id);
+  if (isNaN(vendaId)) return res.status(400).json({ error: 'ID inválido.' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) Localiza o orçamento vinculado (se houver)
+    const orcQ = await client.query(
+      "SELECT id, numero FROM orcamentos WHERE venda_id=$1 AND empresa_id=$2 LIMIT 1",
+      [vendaId, req.user.empresaId]
+    );
+    const orcamento = orcQ.rows[0];
+
+    // 2) Devolve estoque
+    const movs = await client.query(
+      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
+      [vendaId, req.user.empresaId]
+    );
+    for (const m of movs.rows) {
+      await client.query(
+        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
+        [m.qtd, req.user.empresaId, m.produto_codigo]
+      );
+    }
+    await client.query(
+      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
+      [vendaId, req.user.empresaId]
+    );
+
+    // 3) Remove contas a receber
+    await client.query(
+      "DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2",
+      [vendaId, req.user.empresaId]
+    );
+
+    // 4) Apaga a venda
+    const r = await client.query(
+      'DELETE FROM vendas WHERE id=$1 AND empresa_id=$2 RETURNING id',
+      [vendaId, req.user.empresaId]
+    );
+    if (r.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Venda não encontrada.' });
+    }
+
+    // 5) Se tinha orçamento vinculado, volta ele pra status 'aprovado' e limpa venda_id
+    let orcamentoReaberto = null;
+    if (orcamento) {
+      await client.query(
+        "UPDATE orcamentos SET status='aprovado', venda_id=NULL, atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2",
+        [orcamento.id, req.user.empresaId]
+      );
+      orcamentoReaberto = { id: orcamento.id, numero: orcamento.numero };
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      venda_cancelada: vendaId,
+      orcamento_reaberto: orcamentoReaberto
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[vendas/cancelar-e-reabrir-orcamento]', err);
+    res.status(500).json({ error: 'Erro ao cancelar venda e reabrir orçamento.' });
   } finally {
     client.release();
   }
