@@ -2115,6 +2115,21 @@
     localStorage.removeItem('empresa');
     window.location.href = '/login.html';
   }
+  // Auto-refresh: após qualquer ação de escrita (POST/PUT/DELETE), agenda atualização da tela
+  // Usa debounce de 250ms pra agrupar múltiplas chamadas seguidas em uma única atualização
+  let _autoRefreshTimer = null;
+  let _autoRefreshDisabled = false; // pode ser usado pra desabilitar em fluxos específicos
+  function agendarAutoRefresh() {
+    if (_autoRefreshDisabled) return;
+    if (_autoRefreshTimer) clearTimeout(_autoRefreshTimer);
+    _autoRefreshTimer = setTimeout(() => {
+      _autoRefreshTimer = null;
+      if (typeof atualizarTela === 'function') {
+        atualizarTela().catch(e => console.warn('[auto-refresh]', e.message));
+      }
+    }, 250);
+  }
+
   async function api(method, path, body) {
     const opts = {
       method,
@@ -2136,6 +2151,8 @@
       } catch(e) {}
     }
     if (!r.ok) throw new Error((data && data.error) || `Erro ${r.status}`);
+    // Auto-refresh tela após sucesso de qualquer escrita (POST/PUT/DELETE/PATCH)
+    if (method !== 'GET' && method !== 'HEAD') agendarAutoRefresh();
     return data;
   }
 
@@ -2198,6 +2215,27 @@
       console.error('[API] Falha ao carregar:', err);
       alert('Não foi possível carregar os dados: ' + err.message);
     }
+  }
+
+  // ====== ATUALIZAR TELA (chama recarregar + renderiza TUDO) ======
+  // Use essa função após qualquer ação de escrita (criar/editar/excluir/quitar/etc)
+  // pra que toda a interface atualize automaticamente sem precisar de F5
+  async function atualizarTela() {
+    await recarregarTudoDaApi();
+    // Renderiza todas as listagens (com try pra cada, pra falha de uma não quebrar as outras)
+    const renders = [
+      'renderProdutos', 'renderClientes', 'renderVendas', 'renderFornecedores',
+      'renderEntradasFornecedores', 'renderContasPagar', 'renderContasReceber',
+      'renderCardsVendas', 'renderResumoFinanceiro', 'renderListaClientes',
+      'renderListaFornecedores', 'renderListaProdutos'
+    ];
+    for (const fn of renders) {
+      try { if (typeof window[fn] === 'function') window[fn](); } catch(e) { console.warn(fn, e.message); }
+    }
+    // Telas extras (orçamentos, serviços, caixa) - chama se função existe
+    try { if (typeof carregarOrcamentos === 'function') await carregarOrcamentos(); } catch(e) {}
+    try { if (typeof carregarServicos === 'function') await carregarServicos(); } catch(e) {}
+    try { if (typeof carregarCaixa === 'function') await carregarCaixa(); } catch(e) {}
   }
 
   // ====== Navegação entre páginas ======
@@ -2331,7 +2369,7 @@
     } catch(e) {}
     window._papelAtual = papelAtual;
 
-    await recarregarTudoDaApi();
+    await atualizarTela();
     renderContasPagar();
     renderProdutos();
     renderEntradasFornecedores();
@@ -3344,7 +3382,7 @@
         pagamento, vencimento,
         obs: document.getElementById('snf-obs').value.trim()
       });
-      await recarregarTudoDaApi();
+      await atualizarTela();
       renderProdutos();
       renderEntradasFornecedores();
       renderContasPagar();
@@ -3783,7 +3821,7 @@
         pagamento, vencimento,
         obs: document.getElementById('cnf-obs').value.trim()
       });
-      await recarregarTudoDaApi();
+      await atualizarTela();
       renderProdutos();
       renderEntradasFornecedores();
       renderContasPagar();
@@ -4488,7 +4526,7 @@
       }
 
       // Recarrega tudo (a venda mexe em vários lugares)
-      await recarregarTudoDaApi();
+      await atualizarTela();
       renderProdutos();
       renderVendas();
       renderContasReceber();
@@ -4597,7 +4635,7 @@
     try {
       await api('POST', `/api/vendas/${vendaId}/cancelar-e-reabrir-orcamento`);
       alert(`Pronto!\n\nVenda #${vendaId} cancelada.\nOrçamento Nº ${orcamentoNumero} reaberto.\n\nAcesse "Orçamentos", edite o que precisar e converta novamente.`);
-      await recarregarTudoDaApi();
+      await atualizarTela();
       // Se a tela de orçamentos estiver visível, recarrega ela também
       if (typeof carregarOrcamentos === 'function') {
         try { await carregarOrcamentos(); } catch (e) {}
