@@ -1695,9 +1695,10 @@
       <table id="tabela-itens-venda">
         <thead>
           <tr>
-            <th style="width:45%;">Produto</th>
-            <th style="width:12%;">Qtd</th>
-            <th style="width:18%;">Preço Unit. (R$)</th>
+            <th style="width:38%;">Produto</th>
+            <th style="width:10%;text-align:center;" title="Estoque disponível">Estoque</th>
+            <th style="width:10%;">Qtd</th>
+            <th style="width:17%;">Preço Unit. (R$)</th>
             <th style="width:20%;text-align:right;">Subtotal</th>
             <th style="width:5%;"></th>
           </tr>
@@ -2875,7 +2876,15 @@
   function renderListaProdutos() {
     const dl = document.getElementById('lista-produtos');
     // Inclui produtos cadastrados + serviços cadastrados (ambos podem ser vendidos)
-    const prodOpts = dbProdutos.map(p => `<option value="${p.nome}" label="📦 ${p.nome}">`);
+    // Mostra estoque ao lado do nome no autocomplete
+    const prodOpts = dbProdutos.map(p => {
+      const est = Number(p.estoque) || 0;
+      let status;
+      if (est === 0) status = 'SEM ESTOQUE';
+      else if (est < 10) status = `estoque baixo: ${est}`;
+      else status = `${est} em estoque`;
+      return `<option value="${p.nome}" label="📦 ${p.nome} — ${status}">`;
+    });
     const servOpts = (_servicosCache || []).map(s => `<option value="${s.nome}" label="🔧 ${s.nome} (serviço)">`);
     dl.innerHTML = [...prodOpts, ...servOpts].join('');
   }
@@ -4314,12 +4323,41 @@
     document.querySelector('#form-nova-venda button[type="submit"]').textContent = 'Salvar Venda';
     toggleParcelasVenda();
   }
+  // Atualiza a célula de estoque numa linha de venda com a cor correta
+  function atualizarEstoqueLinha(tr) {
+    const tdEstoque = tr.querySelector('.nv-item-estoque');
+    if (!tdEstoque) return;
+    const nome = tr.querySelector('.nv-item-produto').value;
+    const p = getProduto(nome);
+    if (!p) {
+      // Sem produto selecionado ainda
+      tdEstoque.innerHTML = '<span style="color:#94a3b8;font-size:12px;">—</span>';
+      return;
+    }
+    if (p._isServico) {
+      // É serviço: não tem estoque
+      tdEstoque.innerHTML = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;white-space:nowrap;">🔧 Serviço</span>';
+      return;
+    }
+    const est = Number(p.estoque) || 0;
+    let bg, cor, txt;
+    if (est === 0) {
+      bg = '#fee2e2'; cor = '#991b1b'; txt = '❌ Esgotado';
+    } else if (est < 10) {
+      bg = '#fef3c7'; cor = '#92400e'; txt = `⚠️ ${est} un.`;
+    } else {
+      bg = '#dcfce7'; cor = '#166534'; txt = `✅ ${est} un.`;
+    }
+    tdEstoque.innerHTML = `<span style="display:inline-block;padding:2px 10px;border-radius:10px;background:${bg};color:${cor};font-size:12px;font-weight:700;white-space:nowrap;">${txt}</span>`;
+  }
+
   function adicionarItemVenda(dados) {
     const d = dados || {};
     const tbody = document.getElementById('tbody-itens-venda');
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="text" class="nv-item-produto" list="lista-produtos" placeholder="Nome do produto" value="${d.produto || ''}" required></td>
+      <td class="nv-item-estoque" style="text-align:center;"><span style="color:#94a3b8;font-size:12px;">—</span></td>
       <td><input type="number" class="nv-item-qtd" min="1" step="1" value="${d.qtd || 1}" required></td>
       <td><input type="number" class="nv-item-preco" min="0.01" step="0.01" value="${d.preco != null ? d.preco : ''}" placeholder="0,00" required></td>
       <td class="nv-item-subtotal" style="text-align:right;font-weight:700;white-space:nowrap;">R$ 0,00</td>
@@ -4334,7 +4372,12 @@
         tr.querySelector('.nv-item-preco').value = p.precoVenda.toFixed(2);
         recalcularLinhaVenda(tr);
       }
+      atualizarEstoqueLinha(tr);
     });
+    // Também atualiza ao digitar (sem precisar sair do campo)
+    tr.querySelector('.nv-item-produto').addEventListener('input', () => atualizarEstoqueLinha(tr));
+    // Se já veio com produto preenchido (ex: vindo de orçamento), atualiza na hora
+    if (d.produto) atualizarEstoqueLinha(tr);
     recalcularLinhaVenda(tr);
   }
   function removerItemVenda(btn) {
