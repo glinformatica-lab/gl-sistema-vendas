@@ -418,6 +418,8 @@
     @media (max-width:1200px) {
       #page-minha-conta > div[style*="grid-template-columns"] { grid-template-columns: 1fr 1fr !important; }
     }
+    /* Cabeçalho profissional (recibo de venda, orçamento, etc) */
+    .empresa-header .lbl { color:#666; font-weight:600; }
   </style>
 </head>
 <body>
@@ -6559,7 +6561,6 @@ ${conteudo}
     try {
       const orc = await api('GET', '/api/orcamentos/' + id);
       _orcVisualizando = orc;
-      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
       const tipoLabels = { 'produto': 'Produto', 'servico': 'Serviço', 'avulso': 'Item' };
       const itensHtml = (orc.itens || []).map(it => `
         <tr>
@@ -6571,10 +6572,9 @@ ${conteudo}
         </tr>
       `).join('');
       document.getElementById('orc-view-conteudo').innerHTML = `
-        <div style="text-align:center;border-bottom:2px solid #1e3a8a;padding-bottom:16px;margin-bottom:18px;">
-          <h2 style="color:#1e3a8a;margin:0 0 4px;">${escapeHtml(empresa.nome || 'Empresa')}</h2>
-          ${empresa.cnpj ? `<div style="font-size:13px;color:#666;">CNPJ: ${escapeHtml(empresa.cnpj)}</div>` : ''}
-          <h3 style="margin:14px 0 0;font-size:18px;">ORÇAMENTO Nº ${orc.numero}</h3>
+        ${cabecalhoEmpresaParaRecibo()}
+        <div style="text-align:center;margin-bottom:18px;">
+          <h2 style="color:#1e3a8a;margin:0;font-size:22px;letter-spacing:1px;">ORÇAMENTO Nº ${orc.numero}</h2>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:14px;">
           <div>
@@ -6626,6 +6626,7 @@ ${conteudo}
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento ${_orcVisualizando.numero}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 30px; color: #1e293b; max-width: 800px; margin: 0 auto; }
+        .empresa-header .lbl { color:#666; font-weight:600; }
         @media print { body { padding: 0; } }
       </style>
       </head><body>${conteudo}</body></html>`);
