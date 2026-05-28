@@ -46,6 +46,13 @@
     .plano.trial-card.selecionado { border-color:#d97706; background:linear-gradient(135deg, #fef3c7, #fff); }
     .plano.trial-card h3 { color:#b45309; }
     .plano.trial-card::after { content:'GRÁTIS'; position:absolute; top:-10px; right:14px; background:#f59e0b; color:#fff; padding:3px 12px; border-radius:14px; font-size:11px; font-weight:700; }
+    /* Card Plano Pro em desenvolvimento */
+    .plano.em-breve { background:linear-gradient(135deg, #f1f5f9, #fff); border-color:#cbd5e1; border-style:dashed; cursor:default; opacity:0.92; }
+    .plano.em-breve:hover { border-color:#cbd5e1; transform:none; box-shadow:none; }
+    .plano.em-breve h3 { color:#64748b; }
+    .plano.em-breve::after { content:'EM BREVE'; position:absolute; top:-10px; right:14px; background:#7c3aed; color:#fff; padding:3px 12px; border-radius:14px; font-size:11px; font-weight:700; }
+    .plano.em-breve .preco { color:#94a3b8; }
+    .plano.em-breve .badge-dev { display:inline-block; background:#ede9fe; color:#6d28d9; font-size:12px; font-weight:700; padding:5px 12px; border-radius:8px; margin-bottom:10px; }
 
     /* Formulário */
     .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
@@ -133,6 +140,23 @@
         <li>Parcele em até 12x sem juros</li>
         <li>Atendimento prioritário</li>
       </ul>
+    </div>
+
+    <div class="plano em-breve" id="plano-pro">
+      <h3>⚡ Plano Pro</h3>
+      <div class="badge-dev">🔧 Em desenvolvimento</div>
+      <div class="preco">
+        <span class="moeda">R$</span>249<span class="periodo">,90 / mês</span>
+      </div>
+      <div class="desc">Módulo fiscal completo</div>
+      <ul>
+        <li>Tudo do Plano Anual</li>
+        <li><strong>Emissão de NF-e</strong> <span style="color:#7c3aed;font-weight:700;">(em breve)</span></li>
+        <li><strong>Emissão de NFC-e</strong> <span style="color:#7c3aed;font-weight:700;">(em breve)</span></li>
+      </ul>
+      <div style="margin-top:16px;padding:12px;background:#ede9fe;border-radius:8px;font-size:13px;color:#6d28d9;text-align:center;font-weight:600;">
+        🚀 Estamos construindo!<br>Em breve disponível.
+      </div>
     </div>
   </div>
 
