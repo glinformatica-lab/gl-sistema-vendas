@@ -935,10 +935,40 @@
         <button type="button" class="chip" data-periodo="ano" onclick="setRelatorioPeriodo('ano')">Ano atual</button>
         <button type="button" class="chip" data-periodo="tudo" onclick="setRelatorioPeriodo('tudo')">Tudo</button>
       </div>
-      <div style="margin:8px 0 18px 0;">
+      <div style="margin:8px 0 18px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <button class="btn" onclick="imprimirRelatorio()">&#128424; Imprimir / Exportar</button>
+        <button class="btn" style="background:#16a34a;" onclick="abrirFechamentoMensal()">&#128203; Fechamento Mensal p/ Contador</button>
       </div>
       <div id="relatorio-conteudo"></div>
+    </div>
+
+    <!-- Modal Fechamento Mensal -->
+    <div id="modal-fechamento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+      <div style="background:#fff;padding:28px;border-radius:14px;max-width:460px;width:92%;">
+        <h2 style="color:var(--azul);margin:0 0 6px;">&#128203; Fechamento Mensal</h2>
+        <p style="color:#667;margin:0 0 18px;font-size:14px;">Gera um documento com Relatório de Vendas, Compras e Resumo Financeiro do mês — pronto pra imprimir ou salvar em PDF e enviar pro contador.</p>
+        <div style="display:flex;gap:10px;margin-bottom:18px;">
+          <div style="flex:1;">
+            <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:4px;">Mês</label>
+            <select id="fech-mes" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+              <option value="2">Março</option><option value="3">Abril</option>
+              <option value="4">Maio</option><option value="5">Junho</option>
+              <option value="6">Julho</option><option value="7">Agosto</option>
+              <option value="8">Setembro</option><option value="9">Outubro</option>
+              <option value="10">Novembro</option><option value="11">Dezembro</option>
+            </select>
+          </div>
+          <div style="width:110px;">
+            <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:4px;">Ano</label>
+            <input type="number" id="fech-ano" min="2020" max="2099" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn" style="flex:1;background:#eceef2;color:var(--azul);" onclick="document.getElementById('modal-fechamento').style.display='none'">Cancelar</button>
+          <button class="btn" style="flex:2;background:#16a34a;" onclick="gerarFechamentoMensal()">&#128424; Gerar Documento</button>
+        </div>
+      </div>
     </div>
 
     <!-- Usuários -->
@@ -5634,6 +5664,189 @@ ${conteudo}
 </body></html>`);
     w.document.close();
     w.addEventListener('load', () => { w.focus(); w.print(); });
+  }
+
+  // ====== FECHAMENTO MENSAL P/ CONTADOR ======
+  function abrirFechamentoMensal() {
+    const agora = new Date();
+    // Pré-seleciona o mês passado (geralmente o que se fecha)
+    let mesPassado = agora.getMonth() - 1;
+    let ano = agora.getFullYear();
+    if (mesPassado < 0) { mesPassado = 11; ano -= 1; }
+    document.getElementById('fech-mes').value = mesPassado;
+    document.getElementById('fech-ano').value = ano;
+    document.getElementById('modal-fechamento').style.display = 'flex';
+  }
+
+  function gerarFechamentoMensal() {
+    const mes = parseInt(document.getElementById('fech-mes').value);
+    const ano = parseInt(document.getElementById('fech-ano').value);
+    if (isNaN(mes) || isNaN(ano)) { alert('Selecione mês e ano.'); return; }
+
+    // Intervalo do mês: do dia 1 ao último dia
+    const ini = new Date(ano, mes, 1, 0, 0, 0);
+    const fim = new Date(ano, mes + 1, 0, 23, 59, 59);
+    const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const periodoLabel = `${nomesMes[mes]} de ${ano}`;
+
+    // ===== 1) RELATÓRIO DE VENDAS =====
+    const vendas = dbVendas.filter(v => dataNoIntervalo(v.data, ini, fim))
+                           .sort((a,b) => (a.data||'').localeCompare(b.data||''));
+    const totalVendas = vendas.reduce((s,v) => s + (v.total||0), 0);
+    const descVendas  = vendas.reduce((s,v) => s + (v.desconto||0), 0);
+    const subtotalVendas = vendas.reduce((s,v) => s + (v.subtotal||0), 0);
+    const pagamentoLabel = { 'A Vista':'À vista','A Prazo':'A prazo','PIX':'PIX','Cartao':'Cartão','Boleto':'Boleto','Outros':'Outros' };
+    // Agrupa por forma de pagamento
+    const porPagamento = {};
+    for (const v of vendas) {
+      const pag = pagamentoLabel[v.pagamento] || v.pagamento || 'Outros';
+      porPagamento[pag] = (porPagamento[pag] || 0) + (v.total||0);
+    }
+    const linhasPagamento = Object.entries(porPagamento)
+      .map(([pag,val]) => `<tr><td>${pag}</td><td style="text-align:right;font-weight:700;">${formatarBRL(val)}</td></tr>`).join('');
+    const linhasVendas = vendas.length ? vendas.map(v => {
+      const pag = pagamentoLabel[v.pagamento] || v.pagamento;
+      const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
+      return `<tr>
+        <td>${formatarDataBR(v.data)}</td>
+        <td>#${v.id}</td>
+        <td>${escapeHtml(v.cliente||'')}</td>
+        <td style="text-align:center;">${v.itens?.length || 0}</td>
+        <td style="text-align:right;">${formatarBRL(v.subtotal||0)}</td>
+        <td style="text-align:right;">${formatarBRL(v.desconto||0)}</td>
+        <td style="text-align:right;font-weight:700;">${formatarBRL(v.total||0)}</td>
+        <td>${pagTxt}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;font-style:italic;">Nenhuma venda neste mês.</td></tr>';
+
+    // ===== 2) RELATÓRIO DE COMPRAS (entradas de fornecedor) =====
+    const compras = dbEntradas.filter(e => dataNoIntervalo(e.data, ini, fim))
+                              .sort((a,b) => (a.data||'').localeCompare(b.data||''));
+    const valorEntrada = (e) => Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0;
+    const totalCompras = compras.reduce((s,e) => s + valorEntrada(e), 0);
+    const linhasCompras = compras.length ? compras.map(e => {
+      const isNf = e.tipo === 'com-nf';
+      const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '—');
+      const badge = isNf ? 'COM NF' : 'SEM NF';
+      return `<tr>
+        <td>${formatarDataBR(e.data)}</td>
+        <td>${escapeHtml(e.fornecedor || '—')}</td>
+        <td>${badge}</td>
+        <td>${escapeHtml(documento)}</td>
+        <td style="text-align:right;font-weight:700;">${formatarBRL(valorEntrada(e))}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;font-style:italic;">Nenhuma entrada de mercadoria neste mês.</td></tr>';
+
+    // ===== 3) RESUMO FINANCEIRO =====
+    const cpPagas = dbContasPagar.filter(c => c.status === 'Paga' && dataNoIntervalo(c.dataPagamento || c.vencimento, ini, fim));
+    const cpPendentes = dbContasPagar.filter(c => c.status !== 'Paga' && dataNoIntervalo(c.vencimento, ini, fim));
+    const crRecebidas = dbContasReceber.filter(c => c.status === 'Recebida' && dataNoIntervalo(c.dataRecebimento || c.vencimento, ini, fim));
+    const crPendentes = dbContasReceber.filter(c => c.status !== 'Recebida' && dataNoIntervalo(c.vencimento, ini, fim));
+    const totalPago = cpPagas.reduce((s,c) => s + (c.valor||0), 0);
+    const totalAPagar = cpPendentes.reduce((s,c) => s + (c.valor||0), 0);
+    const totalRecebido = crRecebidas.reduce((s,c) => s + (c.valor||0), 0);
+    const totalAReceber = crPendentes.reduce((s,c) => s + (c.valor||0), 0);
+
+    // Monta o documento completo
+    const w = window.open('', '_blank', 'width=1100,height=800');
+    if (!w) { alert('Não foi possível abrir a janela. Verifique se o navegador está bloqueando pop-ups.'); return; }
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    document.getElementById('modal-fechamento').style.display = 'none';
+
+    w.document.write(`<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Fechamento ${periodoLabel}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #222; max-width: 1000px; margin: 0 auto; }
+  .empresa-header { display:flex; align-items:center; gap:16px; border-bottom:2px solid #3960f9; padding-bottom:16px; margin-bottom:8px; }
+  .empresa-header img { max-width:90px; max-height:70px; object-fit:contain; }
+  .empresa-header .lbl { color:#666; font-weight:600; }
+  .doc-titulo { text-align:center; margin:20px 0; }
+  .doc-titulo h1 { color:#1e3a8a; margin:0; font-size:26px; }
+  .doc-titulo .periodo { font-size:18px; color:#475569; margin-top:4px; font-weight:600; }
+  h2.secao { color:#1e3a8a; font-size:18px; margin:32px 0 12px; border-bottom:2px solid #1e3a8a; padding-bottom:6px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+  th, td { padding:7px 9px; text-align:left; border-bottom:1px solid #ddd; }
+  th { background:#f1f5f9; font-size:11px; text-transform:uppercase; }
+  .cards { display:flex; flex-wrap:wrap; gap:12px; margin:14px 0; }
+  .card { flex:1; min-width:150px; padding:14px 16px; border:1px solid #d2d6df; border-radius:10px; }
+  .card-title { font-size:11px; color:#889; text-transform:uppercase; font-weight:700; }
+  .card-value { font-size:22px; font-weight:900; margin-top:4px; }
+  .green { color:#16a34a; } .red { color:#dc2626; } .blue { color:#1e3a8a; }
+  .footer { margin-top:40px; text-align:center; font-size:11px; color:#889; border-top:1px solid #e2e8f0; padding-top:14px; }
+  .resumo-fin { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .resumo-box { border:1px solid #d2d6df; border-radius:10px; padding:16px; }
+  .resumo-box h3 { margin:0 0 10px; font-size:14px; color:#1e3a8a; }
+  .resumo-box .linha { display:flex; justify-content:space-between; padding:4px 0; font-size:13px; border-bottom:1px dashed #e2e8f0; }
+  @media print { body { padding:0; } h2.secao { page-break-after: avoid; } }
+  .quebra { page-break-before: always; }
+</style></head><body>
+  ${cabecalhoEmpresaParaRecibo()}
+  <div class="doc-titulo">
+    <h1>FECHAMENTO MENSAL</h1>
+    <div class="periodo">${periodoLabel}</div>
+    <div style="font-size:12px;color:#889;margin-top:4px;">Documento para a contabilidade · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+  </div>
+
+  <!-- 1. VENDAS -->
+  <h2 class="secao">1. Relatório de Vendas</h2>
+  <div class="cards">
+    <div class="card"><div class="card-title">Qtd de Vendas</div><div class="card-value blue">${vendas.length}</div></div>
+    <div class="card"><div class="card-title">Faturamento Bruto</div><div class="card-value">${formatarBRL(subtotalVendas)}</div></div>
+    <div class="card"><div class="card-title">Descontos</div><div class="card-value red">${formatarBRL(descVendas)}</div></div>
+    <div class="card"><div class="card-title">Faturamento Líquido</div><div class="card-value green">${formatarBRL(totalVendas)}</div></div>
+  </div>
+  ${linhasPagamento ? `
+  <h3 style="font-size:13px;color:#475569;margin:14px 0 6px;">Faturamento por forma de pagamento</h3>
+  <table style="max-width:400px;">
+    <thead><tr><th>Forma de Pagamento</th><th style="text-align:right;">Total</th></tr></thead>
+    <tbody>${linhasPagamento}</tbody>
+  </table>` : ''}
+  <h3 style="font-size:13px;color:#475569;margin:18px 0 6px;">Detalhamento das vendas</h3>
+  <table>
+    <thead><tr><th>Data</th><th>Nº</th><th>Cliente</th><th style="text-align:center;">Itens</th><th style="text-align:right;">Subtotal</th><th style="text-align:right;">Desc.</th><th style="text-align:right;">Total</th><th>Pagto</th></tr></thead>
+    <tbody>${linhasVendas}</tbody>
+  </table>
+
+  <!-- 2. COMPRAS -->
+  <h2 class="secao quebra">2. Relatório de Compras (Entradas de Mercadoria)</h2>
+  <div class="cards">
+    <div class="card"><div class="card-title">Qtd de Entradas</div><div class="card-value blue">${compras.length}</div></div>
+    <div class="card"><div class="card-title">Total em Compras</div><div class="card-value red">${formatarBRL(totalCompras)}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Data</th><th>Fornecedor</th><th>Tipo</th><th>Documento</th><th style="text-align:right;">Total</th></tr></thead>
+    <tbody>${linhasCompras}</tbody>
+  </table>
+
+  <!-- 3. RESUMO FINANCEIRO -->
+  <h2 class="secao quebra">3. Resumo Financeiro</h2>
+  <div class="cards">
+    <div class="card"><div class="card-title">Recebido no mês</div><div class="card-value green">${formatarBRL(totalRecebido)}</div></div>
+    <div class="card"><div class="card-title">Pago no mês</div><div class="card-value red">${formatarBRL(totalPago)}</div></div>
+    <div class="card"><div class="card-title">A Receber (pendente)</div><div class="card-value">${formatarBRL(totalAReceber)}</div></div>
+    <div class="card"><div class="card-title">A Pagar (pendente)</div><div class="card-value">${formatarBRL(totalAPagar)}</div></div>
+  </div>
+  <div class="resumo-fin">
+    <div class="resumo-box">
+      <h3>Contas a Receber</h3>
+      <div class="linha"><span>Recebidas no mês</span><strong class="green">${formatarBRL(totalRecebido)} (${crRecebidas.length})</strong></div>
+      <div class="linha"><span>Pendentes do mês</span><strong>${formatarBRL(totalAReceber)} (${crPendentes.length})</strong></div>
+    </div>
+    <div class="resumo-box">
+      <h3>Contas a Pagar</h3>
+      <div class="linha"><span>Pagas no mês</span><strong class="red">${formatarBRL(totalPago)} (${cpPagas.length})</strong></div>
+      <div class="linha"><span>Pendentes do mês</span><strong>${formatarBRL(totalAPagar)} (${cpPendentes.length})</strong></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>${escapeHtml(empresa.nome || 'GL Informática')}</strong> · Fechamento de ${periodoLabel}<br>
+    Documento gerado pelo GL Sistema de Vendas · NÃO substitui escrituração fiscal oficial
+  </div>
+</body></html>`);
+    w.document.close();
+    w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 400); });
   }
 
   // ====== GERENCIAMENTO DE USUÁRIOS (apenas admin) ======
