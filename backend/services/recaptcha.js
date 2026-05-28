@@ -12,7 +12,13 @@ async function validarRecaptcha(token, ip) {
     console.warn('[recaptcha] RECAPTCHA_SECRET_KEY não configurada — pulando validação.');
     return { ok: true, motivo: 'sem-secret-key' };
   }
+  // Token ausente: se for soft launch, deixa passar (alguns PCs/navegadores podem
+  // não conseguir gerar o token por bloqueio de extensão, firewall, etc).
   if (!token) {
+    if (!RECAPTCHA_OBRIGATORIO) {
+      console.warn('[recaptcha] Token ausente — permitindo passar (RECAPTCHA_OBRIGATORIO=false).');
+      return { ok: true, soft: true, motivo: 'token-ausente-permitido' };
+    }
     return { ok: false, motivo: 'Token de verificação ausente. Recarregue a página e tente novamente.' };
   }
   try {
@@ -28,6 +34,12 @@ async function validarRecaptcha(token, ip) {
     const data = await resp.json();
     if (!data.success) {
       console.warn('[recaptcha] Falhou:', data['error-codes']);
+      // Em modo soft launch, deixa passar mesmo se a validação falhar
+      // (problemas de domínio, token expirado, navegador bloqueado etc.)
+      if (!RECAPTCHA_OBRIGATORIO) {
+        console.warn('[recaptcha] Falha permitida (RECAPTCHA_OBRIGATORIO=false). Códigos:', data['error-codes']);
+        return { ok: true, soft: true, motivo: 'validacao-falhou-permitida', errorCodes: data['error-codes'] };
+      }
       return { ok: false, motivo: 'Verificação de segurança falhou. Recarregue a página e tente novamente.' };
     }
     if (typeof data.score === 'number' && data.score < SCORE_MINIMO) {
