@@ -568,10 +568,13 @@
       <div class="page-title">Clientes</div>
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoCliente()">&#43; Novo Cliente</button>
+        <button class="btn" style="background:#16a34a;" onclick="abrirImportarClientes()">&#128229; Importar Planilha</button>
+        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="baixarModeloClientes()" title="Baixar modelo XLSX vazio com os cabeçalhos certos">&#128196; Baixar Modelo</button>
         <input type="text" id="busca-clientes" placeholder="🔍 Buscar por nome, CPF/CNPJ, telefone ou cidade"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="renderClientes()">
         <span id="contador-clientes" style="color:#668;font-size:13px;"></span>
+        <input type="file" id="input-importar-clientes" accept=".xlsx,.xls,.csv" style="display:none;" onchange="processarArquivoClientes(this.files[0])">
       </div>
       <table>
         <thead>
@@ -590,6 +593,40 @@
     </div>
 
     <!-- Fornecedores -->
+    <!-- Modal Importar Clientes -->
+    <div id="modal-importar-clientes" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+      <div style="background:#fff;padding:24px;border-radius:14px;max-width:900px;width:96%;max-height:90vh;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h2 style="color:var(--azul);margin:0;">&#128229; Importar Clientes</h2>
+          <button onclick="document.getElementById('modal-importar-clientes').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+        </div>
+        <div id="importar-cli-resumo" style="background:#f1f5f9;padding:14px;border-radius:8px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;">
+          <div><strong style="color:#16a34a;font-size:20px;" id="importar-cli-novos">0</strong> <span style="color:#555;font-size:13px;">novos</span></div>
+          <div><strong style="color:#ca8a04;font-size:20px;" id="importar-cli-atualizar">0</strong> <span style="color:#555;font-size:13px;">serão atualizados</span></div>
+          <div><strong style="color:#dc2626;font-size:20px;" id="importar-cli-invalidos">0</strong> <span style="color:#555;font-size:13px;">inválidos (sem nome)</span></div>
+          <div><strong style="color:var(--azul);font-size:20px;" id="importar-cli-total">0</strong> <span style="color:#555;font-size:13px;">total na planilha</span></div>
+        </div>
+        <div style="overflow:auto;flex:1;border:1px solid var(--cinza-borda);border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead style="position:sticky;top:0;background:#f8fafc;">
+              <tr>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid var(--cinza-borda);">Status</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid var(--cinza-borda);">Nome</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid var(--cinza-borda);">CPF/CNPJ</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid var(--cinza-borda);">Telefone</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid var(--cinza-borda);">Cidade/UF</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-preview-clientes"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">
+          <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="document.getElementById('modal-importar-clientes').style.display='none'">Cancelar</button>
+          <button class="btn" style="background:#16a34a;" id="btn-confirmar-importar-clientes" onclick="confirmarImportarClientes()">&#10004; Confirmar Importação</button>
+        </div>
+      </div>
+    </div>
+
     <div id="page-fornecedores" style="display:none;">
       <div class="page-title">Fornecedores</div>
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -3930,6 +3967,161 @@
       `;
     }).join('');
     agendarSalvar();
+  }
+
+  // ====== IMPORTAÇÃO DE CLIENTES (XLSX/CSV) ======
+  let _clientesImportar = []; // Lista preparada pra envio (depois do parse)
+
+  // Gera modelo XLSX vazio com cabeçalhos certos pra cliente baixar
+  function baixarModeloClientes() {
+    const dados = [
+      ['Nome', 'CPF/CNPJ', 'Telefone', 'CEP', 'Endereço', 'Bairro', 'Cidade', 'UF'],
+      ['João da Silva', '123.456.789-00', '(62) 99999-0000', '74000-000', 'Rua Exemplo, 100', 'Centro', 'Goiânia', 'GO'],
+      ['Maria Santos', '12.345.678/0001-90', '(62) 98888-1111', '74900-000', 'Av. Modelo, 250', 'Jardim Maria Inês', 'Aparecida de Goiânia', 'GO'],
+      ['', '', '', '', '', '', '', '']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    // Define largura das colunas pra ficar legível
+    ws['!cols'] = [{wch:28},{wch:20},{wch:18},{wch:12},{wch:32},{wch:22},{wch:22},{wch:6}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, 'modelo-clientes.xlsx');
+  }
+
+  // Botão "Importar Planilha" → abre seletor de arquivo
+  function abrirImportarClientes() {
+    document.getElementById('input-importar-clientes').value = ''; // reset
+    document.getElementById('input-importar-clientes').click();
+  }
+
+  // Lê o arquivo escolhido e mostra preview no modal
+  async function processarArquivoClientes(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const data = ev.target.result;
+        const wb = XLSX.read(data, { type: 'array', cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) { alert('A planilha está vazia.'); return; }
+        // Lê todas as linhas como array
+        const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+        if (linhas.length < 2) {
+          alert('Planilha precisa de cabeçalho + pelo menos 1 linha de dados.');
+          return;
+        }
+        // Identifica colunas pelo cabeçalho (1ª linha) — flexível pra aceitar variações
+        const header = linhas[0].map(h => String(h || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+        const findCol = (nomes) => {
+          for (const n of nomes) {
+            const i = header.findIndex(h => h === n || h.includes(n));
+            if (i >= 0) return i;
+          }
+          return -1;
+        };
+        const idxNome     = findCol(['nome', 'cliente', 'razao social']);
+        const idxDoc      = findCol(['cpf/cnpj', 'cpf', 'cnpj', 'doc', 'documento']);
+        const idxTelefone = findCol(['telefone', 'celular', 'fone', 'whatsapp']);
+        const idxCep      = findCol(['cep']);
+        const idxEnd      = findCol(['endereco', 'endereço', 'rua', 'logradouro']);
+        const idxBairro   = findCol(['bairro']);
+        const idxCidade   = findCol(['cidade', 'municipio']);
+        const idxUf       = findCol(['uf', 'estado']);
+
+        if (idxNome < 0) {
+          alert('Não foi possível identificar a coluna "Nome" na planilha. Use o modelo baixando o botão "Baixar Modelo".');
+          return;
+        }
+
+        // Cria mapa rápido de clientes existentes pra detectar atualizações
+        const mapaPorDoc = {};
+        const mapaPorNome = {};
+        for (const c of dbClientes) {
+          const docN = String(c.doc || '').replace(/\D/g, '');
+          if (docN) mapaPorDoc[docN] = c;
+          if (c.nome) mapaPorNome[c.nome.toLowerCase().trim()] = c;
+        }
+
+        const preparados = [];
+        let novos = 0, atualizar = 0, invalidos = 0;
+        for (let i = 1; i < linhas.length; i++) {
+          const row = linhas[i] || [];
+          const nome = String(row[idxNome] || '').trim();
+          if (!nome) { invalidos++; continue; }
+          const doc = idxDoc >= 0 ? String(row[idxDoc] || '').trim() : '';
+          const docN = doc.replace(/\D/g, '');
+          // Decide se é atualização ou novo
+          const jaExiste = (docN && mapaPorDoc[docN]) || mapaPorNome[nome.toLowerCase()];
+          const status = jaExiste ? 'atualizar' : 'novo';
+          if (status === 'atualizar') atualizar++; else novos++;
+          preparados.push({
+            status,
+            nome,
+            doc: doc || null,
+            telefone: idxTelefone >= 0 ? String(row[idxTelefone] || '').trim() || null : null,
+            cep:      idxCep      >= 0 ? String(row[idxCep] || '').trim() || null : null,
+            endereco: idxEnd      >= 0 ? String(row[idxEnd] || '').trim() || null : null,
+            bairro:   idxBairro   >= 0 ? String(row[idxBairro] || '').trim() || null : null,
+            cidade:   idxCidade   >= 0 ? String(row[idxCidade] || '').trim() || null : null,
+            uf:       idxUf       >= 0 ? String(row[idxUf] || '').trim().toUpperCase().slice(0,2) || null : null
+          });
+        }
+        if (preparados.length === 0) {
+          alert('Nenhuma linha válida encontrada na planilha.');
+          return;
+        }
+        _clientesImportar = preparados;
+        // Preenche o resumo
+        document.getElementById('importar-cli-novos').textContent = novos;
+        document.getElementById('importar-cli-atualizar').textContent = atualizar;
+        document.getElementById('importar-cli-invalidos').textContent = invalidos;
+        document.getElementById('importar-cli-total').textContent = linhas.length - 1;
+        // Preenche tabela de preview
+        const tbody = document.getElementById('tbody-preview-clientes');
+        tbody.innerHTML = preparados.map(c => {
+          const corStatus = c.status === 'novo' ? '#16a34a' : '#ca8a04';
+          const badge = c.status === 'novo'
+            ? '<span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">NOVO</span>'
+            : '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">ATUALIZAR</span>';
+          return `<tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${badge}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:600;">${escapeHtml(c.nome)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(c.doc || '—')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(c.telefone || '—')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml([c.cidade, c.uf].filter(Boolean).join('-') || '—')}</td>
+          </tr>`;
+        }).join('');
+        document.getElementById('modal-importar-clientes').style.display = 'flex';
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao ler a planilha: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Confirma e envia pra API
+  async function confirmarImportarClientes() {
+    if (!_clientesImportar.length) return;
+    const btn = document.getElementById('btn-confirmar-importar-clientes');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Importando...';
+    try {
+      const r = await api('POST', '/api/clientes/importar', { clientes: _clientesImportar });
+      let msg = `✅ Importação concluída!\n\n`;
+      msg += `${r.criados} cliente(s) criado(s)\n`;
+      msg += `${r.atualizados} cliente(s) atualizado(s)\n`;
+      if (r.erros && r.erros.length) msg += `\n⚠️ ${r.erros.length} erro(s):\n` + r.erros.slice(0, 5).join('\n');
+      alert(msg);
+      document.getElementById('modal-importar-clientes').style.display = 'none';
+      _clientesImportar = [];
+      // atualizarTela() já é chamado automaticamente pelo api()
+    } catch (err) {
+      alert('Erro ao importar: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '&#10004; Confirmar Importação';
+    }
   }
 
   // ====== RENDERIZAÇÃO: VENDAS ======
