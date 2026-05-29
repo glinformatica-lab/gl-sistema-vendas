@@ -1127,6 +1127,74 @@
           </div>
         </div>
 
+        <!-- Modal: Pré-qualificação Plano Pro -->
+        <div id="modal-interesse-pro" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;padding:20px;">
+          <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <h2 style="color:#7c3aed;margin:0;font-size:20px;">⚡ Interesse no Plano Pro</h2>
+              <button onclick="document.getElementById('modal-interesse-pro').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;">&times;</button>
+            </div>
+            <p style="color:#557;font-size:13px;margin:0 0 16px;">Antes de te conectar com o suporte, responde 4 perguntas rápidas pra agilizar tudo:</p>
+
+            <!-- Pergunta 1: Regime -->
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:6px;">1. Qual é o regime tributário da sua empresa?</label>
+              <select id="iq-regime" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;">
+                <option value="">— Selecione —</option>
+                <option value="mei">MEI (Microempreendedor Individual)</option>
+                <option value="simples">Simples Nacional (ME ou EPP)</option>
+                <option value="presumido">Lucro Presumido</option>
+                <option value="real">Lucro Real</option>
+                <option value="nao-sei">Não sei / Não tenho certeza</option>
+              </select>
+            </div>
+
+            <!-- Pergunta 2: IE -->
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:6px;">2. Sua empresa tem Inscrição Estadual ativa?</label>
+              <select id="iq-ie" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;">
+                <option value="">— Selecione —</option>
+                <option value="sim">Sim, tenho IE ativa</option>
+                <option value="nao">Não, sou isento ou não tenho</option>
+                <option value="nao-sei">Não sei</option>
+              </select>
+            </div>
+
+            <!-- Pergunta 3: Certificado A1 -->
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:6px;">3. Você tem certificado digital A1 (e-CNPJ)?</label>
+              <select id="iq-cert" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;">
+                <option value="">— Selecione —</option>
+                <option value="sim">Sim, tenho A1 válido</option>
+                <option value="nao">Não tenho ainda</option>
+                <option value="nao-sei">Não sei o que é</option>
+              </select>
+              <p style="font-size:11px;color:#778;margin:4px 0 0;">Custo médio: R$ 150/ano. Comprado em Serasa, Certisign, AC Safeweb.</p>
+            </div>
+
+            <!-- Pergunta 4: O que vai emitir -->
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:6px;">4. O que você precisa emitir?</label>
+              <select id="iq-emite" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;">
+                <option value="">— Selecione —</option>
+                <option value="nfce">NFC-e (cupom fiscal - balcão)</option>
+                <option value="nfe">NF-e (venda entre empresas)</option>
+                <option value="ambos">Os dois (NFC-e e NF-e)</option>
+                <option value="nao-sei">Não sei qual preciso</option>
+              </select>
+            </div>
+
+            <!-- Aviso dinâmico (aparece quando preencher) -->
+            <div id="iq-aviso" style="display:none;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px;"></div>
+
+            <!-- Botões -->
+            <div style="display:flex;gap:10px;">
+              <button class="btn" style="flex:1;background:#eceef2;color:var(--azul);" onclick="document.getElementById('modal-interesse-pro').style.display='none'">Cancelar</button>
+              <button id="iq-btn-enviar" class="btn" style="flex:2;background:#7c3aed;color:#fff;" onclick="enviarInteresseProPlano()">📱 Enviar pelo WhatsApp</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Card Suporte -->
         <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
           <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">💬 Suporte</h3>
@@ -7199,12 +7267,83 @@ ${conteudo}
   }
 
   // ====== MINHA CONTA ======
-  // Manifesta interesse no Plano Pro — abre WhatsApp com mensagem pronta
+  // Abre modal de pré-qualificação pro Plano Pro
   function manifestarInteresseProPlano() {
+    // Limpa campos do modal
+    ['iq-regime','iq-ie','iq-cert','iq-emite'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    const av = document.getElementById('iq-aviso');
+    if (av) { av.style.display = 'none'; av.innerHTML = ''; }
+    document.getElementById('modal-interesse-pro').style.display = 'flex';
+    // Adiciona listeners pra mostrar aviso dinâmico
+    ['iq-regime','iq-ie','iq-cert','iq-emite'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.listenerAdded) {
+        el.addEventListener('change', atualizarAvisoInteresse);
+        el.dataset.listenerAdded = '1';
+      }
+    });
+  }
+
+  // Mostra aviso dinâmico com base nas respostas
+  function atualizarAvisoInteresse() {
+    const regime = document.getElementById('iq-regime').value;
+    const emite  = document.getElementById('iq-emite').value;
+    const ie     = document.getElementById('iq-ie').value;
+    const av     = document.getElementById('iq-aviso');
+    if (!av) return;
+    let msg = '', bg = '', cor = '';
+    // MEI tentando emitir NFCe → grande problema
+    if (regime === 'mei' && (emite === 'nfce' || emite === 'ambos')) {
+      msg = '⚠️ <strong>Atenção:</strong> MEI não pode emitir NFC-e por lei. Pra emitir cupom fiscal eletrônico você precisa virar Microempresa (ME) no Simples Nacional. Vamos conversar pra te orientar.';
+      bg = '#fef3c7'; cor = '#92400e';
+    } else if (regime === 'mei' && emite === 'nfe') {
+      msg = '✅ MEI pode emitir NF-e em algumas situações (B2B/interestadual). Vamos confirmar seu caso.';
+      bg = '#dbeafe'; cor = '#1e40af';
+    } else if (ie === 'nao' && (emite === 'nfce' || emite === 'ambos')) {
+      msg = '⚠️ <strong>Importante:</strong> sem Inscrição Estadual ativa, não dá pra emitir NFC-e. Vamos ver como regularizar.';
+      bg = '#fef3c7'; cor = '#92400e';
+    } else if (regime && emite && ie && document.getElementById('iq-cert').value) {
+      msg = '✅ Tudo certo pelas respostas! Te chamo no WhatsApp pra acertar os detalhes finais.';
+      bg = '#dcfce7'; cor = '#166534';
+    }
+    if (msg) {
+      av.innerHTML = msg;
+      av.style.background = bg;
+      av.style.color = cor;
+      av.style.display = '';
+    } else {
+      av.style.display = 'none';
+    }
+  }
+
+  // Envia interesse via WhatsApp com resumo completo
+  function enviarInteresseProPlano() {
+    const regime = document.getElementById('iq-regime').value;
+    const ie     = document.getElementById('iq-ie').value;
+    const cert   = document.getElementById('iq-cert').value;
+    const emite  = document.getElementById('iq-emite').value;
+    if (!regime || !ie || !cert || !emite) {
+      alert('Por favor, responda as 4 perguntas antes de continuar.');
+      return;
+    }
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
-    const msg = `Olá! Tenho interesse no Plano Pro do GL Sistema (com emissão de NF-e e NFC-e).\n\nEmpresa: ${empresa.nome || ''}\n\nPode me dar mais informações?`;
+    const labels = {
+      regime: {mei:'MEI', simples:'Simples Nacional', presumido:'Lucro Presumido', real:'Lucro Real', 'nao-sei':'Não sei'},
+      ie:     {sim:'Sim, tem IE ativa', nao:'Não tem ou é isento', 'nao-sei':'Não sabe'},
+      cert:   {sim:'Sim, tem A1 válido', nao:'Não tem ainda', 'nao-sei':'Não sabe o que é'},
+      emite:  {nfce:'NFC-e (balcão)', nfe:'NF-e (B2B)', ambos:'NFC-e e NF-e', 'nao-sei':'Não sabe'}
+    };
+    const msg = `Olá! Tenho interesse no Plano Pro do GL Sistema.\n\n` +
+                `*Empresa:* ${empresa.nome || '—'}\n\n` +
+                `*Respostas da pré-qualificação:*\n` +
+                `1. Regime: ${labels.regime[regime]}\n` +
+                `2. Inscrição Estadual: ${labels.ie[ie]}\n` +
+                `3. Certificado A1: ${labels.cert[cert]}\n` +
+                `4. Quer emitir: ${labels.emite[emite]}\n\n` +
+                `Pode me passar mais informações sobre como ativar o Plano Pro?`;
     const url = `https://wa.me/5562992347572?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
+    document.getElementById('modal-interesse-pro').style.display = 'none';
   }
 
   async function carregarMinhaConta() {
