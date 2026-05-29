@@ -28,6 +28,7 @@ app.use('/api/contas-receber',  autenticar, verificarAcesso, require('./routes/c
 app.use('/api/usuarios',        autenticar, verificarAcesso, require('./routes/usuarios'));
 app.use('/api/empresa',         autenticar, verificarAcesso, require('./routes/empresa'));
 app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/caixa'));
+app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
 
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
@@ -52,6 +53,14 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
+  // Avisa se chave de criptografia do certificado não está configurada
+  try {
+    const { validarChaveConfigurada } = require('./services/cripto');
+    if (!validarChaveConfigurada()) {
+      console.warn('[cripto] ⚠️ CERT_ENCRYPTION_KEY não configurada. Upload de certificado A1 vai falhar.');
+      console.warn('[cripto] ⚠️ Defina CERT_ENCRYPTION_KEY com 64 caracteres hex nas variáveis de ambiente.');
+    }
+  } catch (e) {}
   // Inicia jobs em background (verificação de trials e licenças)
   try {
     require('./services/jobs').iniciarJobs();

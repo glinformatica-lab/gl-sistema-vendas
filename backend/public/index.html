@@ -420,6 +420,13 @@
     }
     /* Cabeçalho profissional (recibo de venda, orçamento, etc) */
     .empresa-header .lbl { color:#666; font-weight:600; }
+
+    /* Configurações Fiscais: tabs e tooltips */
+    .cf-tab { background:none; border:none; padding:12px 20px; font-size:14px; font-weight:600; color:#557; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.15s; }
+    .cf-tab:hover { color:var(--azul); background:#f6f8fc; }
+    .cf-tab-ativa { color:var(--azul); border-bottom-color:var(--azul); }
+    .cf-help { display:inline-block; width:18px; height:18px; line-height:18px; text-align:center; font-size:11px; border-radius:50%; background:#dbeafe; color:#1e40af; cursor:help; margin-left:4px; }
+    .cf-help:hover { background:#bfdbfe; }
   </style>
 </head>
 <body>
@@ -440,6 +447,7 @@
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
     <button class="menu-btn admin-only" onclick="showPage('usuarios')">&#128101; Usuários</button>
     <button class="menu-btn admin-only" onclick="showPage('configuracoes')">&#9881;&#65039; Configurações</button>
+    <button class="menu-btn admin-only fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
     <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
     <div style="flex:1;"></div>
     <div id="info-usuario" style="padding:14px 24px;border-top:1px solid var(--cinza-borda);font-size:12px;color:#668;"></div>
@@ -1071,6 +1079,140 @@
           <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="carregarConfigEmpresa()">Descartar Alterações</button>
         </div>
       </form>
+    </div>
+
+    <!-- Configurações Fiscais (Plano Pro) -->
+    <div id="page-configuracoes-fiscais" style="display:none;">
+      <div class="page-title">🧾 Configurações Fiscais <span style="font-size:12px;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:10px;font-weight:600;margin-left:10px;">PLANO PRO</span></div>
+      <p style="color:#557;font-size:13px;margin:0 0 18px;max-width:760px;">Configure aqui os dados necessários para emissão de NFC-e e NF-e. Em caso de dúvida, consulte seu contador.</p>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--cinza-borda);margin-bottom:20px;">
+        <button class="cf-tab cf-tab-ativa" data-tab="empresa" onclick="trocarTabFiscal('empresa')">🏢 Dados Fiscais da Empresa</button>
+        <button class="cf-tab" data-tab="certificado" onclick="trocarTabFiscal('certificado')">🔒 Certificado A1</button>
+        <button class="cf-tab" data-tab="padroes" onclick="trocarTabFiscal('padroes')">⚙️ Padrões Fiscais</button>
+      </div>
+
+      <!-- TAB 1: Dados Fiscais da Empresa -->
+      <div id="cf-tab-empresa" class="cf-tab-conteudo" style="max-width:760px;">
+        <form id="form-fiscal-empresa" onsubmit="event.preventDefault(); salvarFiscalEmpresa();" style="display:flex;flex-direction:column;gap:14px;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px #0001;">
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Regime Tributário <span class="cf-help" data-help="O regime define como sua empresa paga impostos. Pergunte ao seu contador.">❓</span></label>
+            <select id="cf-regime" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <option value="">— Selecione —</option>
+              <option value="mei">MEI (Microempreendedor Individual)</option>
+              <option value="simples">Simples Nacional</option>
+              <option value="presumido">Lucro Presumido</option>
+              <option value="real">Lucro Real</option>
+            </select>
+            <p id="cf-aviso-regime" style="display:none;font-size:12px;padding:8px;border-radius:6px;margin-top:6px;"></p>
+          </div>
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Inscrição Estadual (IE) <span class="cf-help" data-help="Número da IE ativa da sua empresa. Necessária pra emitir NFC-e. Verifique na Sefaz do seu estado.">❓</span></label>
+            <input type="text" id="cf-ie" placeholder="Ex: 12.345.678-9" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+          </div>
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">CNAE Principal <span class="cf-help" data-help="Código de atividade econômica principal (7 dígitos). Ex: 4751-2/01 (comércio varejista de informática)">❓</span></label>
+            <input type="text" id="cf-cnae" placeholder="Ex: 4751-2/01" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button type="submit" class="btn" style="background:#16a34a;">💾 Salvar Dados Fiscais</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- TAB 2: Certificado A1 -->
+      <div id="cf-tab-certificado" class="cf-tab-conteudo" style="display:none;max-width:760px;">
+        <div style="background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px #0001;">
+
+          <!-- Status do certificado atual -->
+          <div id="cf-cert-status" style="margin-bottom:20px;">
+            <!-- Preenchido dinamicamente -->
+          </div>
+
+          <!-- Aviso de segurança -->
+          <div style="background:#dbeafe;padding:14px;border-radius:8px;margin-bottom:18px;font-size:13px;color:#1e40af;line-height:1.5;">
+            🔒 <strong>Sobre o seu certificado:</strong> a senha é criptografada com AES-256 antes de salvar. O arquivo fica armazenado de forma segura e só seu admin pode trocar/remover. Todas as ações ficam registradas em auditoria.
+          </div>
+
+          <!-- Upload -->
+          <div id="cf-cert-upload-area">
+            <h3 style="font-size:15px;color:var(--azul);margin:0 0 10px;">📤 Enviar novo certificado</h3>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Arquivo do certificado (.pfx ou .p12)</label>
+              <input type="file" id="cf-cert-arquivo" accept=".pfx,.p12" style="width:100%;padding:8px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <p style="font-size:11px;color:#778;margin:4px 0 0;">Tamanho máximo: 200KB. Comprado em Serasa, Certisign, AC Safeweb (~R$ 150/ano).</p>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Senha do certificado</label>
+              <input type="password" id="cf-cert-senha" placeholder="Senha que você usou ao gerar" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Data de validade do certificado</label>
+              <input type="date" id="cf-cert-validade" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <p style="font-size:11px;color:#778;margin:4px 0 0;">Encontrada no momento da compra (geralmente 1 ano após a emissão).</p>
+            </div>
+            <button onclick="uploadCertificadoA1()" class="btn" style="background:#16a34a;">📤 Enviar Certificado</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Padrões Fiscais -->
+      <div id="cf-tab-padroes" class="cf-tab-conteudo" style="display:none;max-width:760px;">
+        <form id="form-fiscal-padroes" onsubmit="event.preventDefault(); salvarPadroesFiscais();" style="display:flex;flex-direction:column;gap:14px;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 10px #0001;">
+
+          <p style="font-size:13px;color:#557;margin:0 0 8px;">Esses padrões são usados quando o produto não tem definição própria. Ajuda você não precisar configurar produto por produto.</p>
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">CFOP padrão para venda à vista <span class="cf-help" data-help="Código de 4 dígitos. Ex: 5102 (venda dentro do estado), 5405 (venda com substituição tributária)">❓</span></label>
+            <input type="text" id="cf-cfop-vista" maxlength="4" placeholder="5102" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+          </div>
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">CFOP padrão para venda a prazo <span class="cf-help" data-help="Geralmente o mesmo da venda à vista (5102 ou 6102 fora do estado)">❓</span></label>
+            <input type="text" id="cf-cfop-prazo" maxlength="4" placeholder="5102" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+          </div>
+
+          <div>
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Origem da Mercadoria padrão <span class="cf-help" data-help="0=Nacional (a maioria), 1=Importação direta, 2=Adquirida no mercado interno">❓</span></label>
+            <select id="cf-origem" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <option value="0">0 - Nacional</option>
+              <option value="1">1 - Estrangeira - Importação direta</option>
+              <option value="2">2 - Estrangeira - Adquirida no mercado interno</option>
+              <option value="3">3 - Nacional, com conteúdo de importação superior a 40%</option>
+              <option value="4">4 - Nacional, produzida em conformidade com processos produtivos básicos</option>
+              <option value="5">5 - Nacional, com conteúdo de importação inferior ou igual a 40%</option>
+              <option value="6">6 - Estrangeira - Importação direta, sem similar nacional</option>
+              <option value="7">7 - Estrangeira - Adquirida no mercado interno, sem similar nacional</option>
+              <option value="8">8 - Nacional, mercadoria produzida com conteúdo de importação superior a 70%</option>
+            </select>
+          </div>
+
+          <div id="cf-csosn-area">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">CSOSN padrão (Simples Nacional) <span class="cf-help" data-help="Código de Situação Tributária. Ex: 102 (Tributada sem permissão de crédito), 500 (ST cobrada anteriormente)">❓</span></label>
+            <select id="cf-csosn" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+              <option value="">— Selecione —</option>
+              <option value="101">101 - Tributada com permissão de crédito</option>
+              <option value="102">102 - Tributada sem permissão de crédito</option>
+              <option value="103">103 - Isenção do ICMS no Simples Nacional</option>
+              <option value="201">201 - Tributada com permissão de crédito e cobrança do ICMS por ST</option>
+              <option value="202">202 - Tributada sem permissão de crédito e com cobrança do ICMS por ST</option>
+              <option value="300">300 - Imune</option>
+              <option value="400">400 - Não tributada pelo Simples Nacional</option>
+              <option value="500">500 - ICMS cobrado anteriormente por ST ou por antecipação</option>
+              <option value="900">900 - Outros</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button type="submit" class="btn" style="background:#16a34a;">💾 Salvar Padrões</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Minha Conta -->
@@ -2079,6 +2221,56 @@
         <label>Estoque Inicial</label>
         <input type="number" id="npr-estoque" min="0" step="1" value="0" style="max-width:150px;">
       </div>
+
+      <!-- Dados Fiscais (só Pro) - colapsável -->
+      <div id="npr-fiscal-section" class="fiscal-only" style="display:none;margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;">
+        <div onclick="toggleFiscalProduto()" style="background:#f6f8fc;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-radius:8px 8px 0 0;">
+          <strong style="color:var(--azul);font-size:14px;">🧾 Dados Fiscais <span style="color:#778;font-weight:normal;font-size:12px;">(opcional - obrigatório só pra emitir NF-e/NFC-e)</span></strong>
+          <span id="npr-fiscal-arrow">▼</span>
+        </div>
+        <div id="npr-fiscal-content" style="padding:14px;display:none;">
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-field">
+              <label>NCM <span class="cf-help" data-help="Nomenclatura Comum do Mercosul - 8 dígitos. Consulte a tabela TIPI ou pergunte ao seu contador.">❓</span></label>
+              <input type="text" id="npr-ncm" maxlength="10" placeholder="Ex: 84713012">
+            </div>
+            <div class="form-field">
+              <label>CEST <span class="cf-help" data-help="Código Especificador de Substituição Tributária - 7 dígitos. Opcional, só pra produtos com ST.">❓</span></label>
+              <input type="text" id="npr-cest" maxlength="9" placeholder="Opcional">
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-field">
+              <label>CFOP padrão <span class="cf-help" data-help="Código Fiscal da Operação - 4 dígitos. Se vazio, usa o CFOP padrão da empresa.">❓</span></label>
+              <input type="text" id="npr-cfop" maxlength="4" placeholder="Ex: 5102">
+            </div>
+            <div class="form-field">
+              <label>Origem <span class="cf-help" data-help="0=Nacional (mais comum), 1=Importação direta, 2=Mercado interno">❓</span></label>
+              <select id="npr-origem">
+                <option value="">Padrão da empresa</option>
+                <option value="0">0 - Nacional</option>
+                <option value="1">1 - Importação direta</option>
+                <option value="2">2 - Mercado interno</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom:0;">
+            <div class="form-field">
+              <label>CSOSN (Simples) <span class="cf-help" data-help="Código de Situação Tributária pro Simples Nacional. Ex: 102 (Tributada sem crédito)">❓</span></label>
+              <input type="text" id="npr-csosn" maxlength="3" placeholder="Ex: 102">
+            </div>
+            <div class="form-field">
+              <label>CST (Outros regimes) <span class="cf-help" data-help="Código de Situação Tributária pra Lucro Presumido/Real. Ex: 00 (Tributada integralmente)">❓</span></label>
+              <input type="text" id="npr-cst" maxlength="3" placeholder="Ex: 00">
+            </div>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Unidade Tributável <span class="cf-help" data-help="Geralmente UN, KG, L, M. Se vazio, usa a unidade comercial.">❓</span></label>
+            <input type="text" id="npr-und-trib" maxlength="6" placeholder="Ex: UN">
+          </div>
+        </div>
+      </div>
+
       <!-- Seção de movimentação (só aparece ao editar) -->
       <div id="produto-mov-section" style="display:none;">
         <div class="section-title">Movimentação do Produto</div>
@@ -2459,6 +2651,7 @@
     if(pg === 'servicos') carregarServicos();
     if(pg === 'orcamentos') carregarOrcamentos();
     if(pg === 'configuracoes') carregarConfigEmpresa();
+    if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
     if(pg === 'minha-conta') carregarMinhaConta();
     if(pg === 'caixa') carregarCaixa();
   }
@@ -2480,6 +2673,8 @@
       if(papelAtual !== 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
       }
+      // Mostra/esconde menu fiscal (Plano Pro)
+      if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
       // Banner de licença (trial / vencimento próximo / expirado)
       try {
         const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -3121,6 +3316,22 @@
     document.getElementById('npr-preco-custo').value = (p.precoCusto || 0).toFixed(2);
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
+    // Preenche campos fiscais (só relevante pra Pro, mas preenche sempre)
+    const setVal = (id, val) => { const el=document.getElementById(id); if(el) el.value = val || ''; };
+    setVal('npr-ncm',      p.ncm);
+    setVal('npr-cest',     p.cest);
+    setVal('npr-cfop',     p.cfopPadrao);
+    setVal('npr-origem',   p.origemMercadoria);
+    setVal('npr-csosn',    p.csosn);
+    setVal('npr-cst',      p.cst);
+    setVal('npr-und-trib', p.unidadeTributavel);
+    // Se tem dados fiscais preenchidos, expande a seção automaticamente
+    if (p.ncm || p.cfopPadrao || p.csosn) {
+      const sec = document.getElementById('npr-fiscal-content');
+      const arrow = document.getElementById('npr-fiscal-arrow');
+      if (sec) sec.style.display = '';
+      if (arrow) arrow.textContent = '▲';
+    }
     // Código e estoque não são editáveis (histórico está vinculado)
     document.getElementById('npr-codigo').disabled  = true;
     document.getElementById('npr-estoque').disabled = true;
@@ -3633,6 +3844,25 @@
     document.getElementById('npr-codigo').disabled  = false;
     document.getElementById('npr-estoque').disabled = false;
     document.getElementById('produto-mov-section').style.display = 'none';
+    // Reset dos campos fiscais (form.reset não cobre se usuário não tocou)
+    ['npr-ncm','npr-cest','npr-cfop','npr-origem','npr-csosn','npr-cst','npr-und-trib'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    // Colapsa a seção fiscal de volta
+    const _sec = document.getElementById('npr-fiscal-content');
+    const _arrow = document.getElementById('npr-fiscal-arrow');
+    if (_sec) _sec.style.display = 'none';
+    if (_arrow) _arrow.textContent = '▼';
+  }
+  // Toggle da seção colapsável de Dados Fiscais
+  function toggleFiscalProduto() {
+    const sec = document.getElementById('npr-fiscal-content');
+    const arrow = document.getElementById('npr-fiscal-arrow');
+    if (!sec) return;
+    const aberto = sec.style.display !== 'none';
+    sec.style.display = aberto ? 'none' : '';
+    if (arrow) arrow.textContent = aberto ? '▼' : '▲';
   }
   document.getElementById('form-novo-produto-rapido').addEventListener('submit', async function(e){
     e.preventDefault();
@@ -3663,11 +3893,24 @@
         } catch (e) { /* ignora se já existe (corrida) */ }
       }
 
+      // Pega campos fiscais (só são enviados se a seção estiver visível - cliente Pro)
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const camposFiscais = empresa.moduloFiscalAtivo ? {
+        ncm: document.getElementById('npr-ncm')?.value.replace(/\D/g,'').trim() || null,
+        cest: document.getElementById('npr-cest')?.value.replace(/\D/g,'').trim() || null,
+        cfopPadrao: document.getElementById('npr-cfop')?.value.trim() || null,
+        origemMercadoria: document.getElementById('npr-origem')?.value || null,
+        csosn: document.getElementById('npr-csosn')?.value.trim() || null,
+        cst: document.getElementById('npr-cst')?.value.trim() || null,
+        unidadeTributavel: document.getElementById('npr-und-trib')?.value.trim() || null
+      } : {};
+
       // ===== MODO EDIÇÃO =====
       if(_produtoEditandoIdx !== null) {
         const p = dbProdutos[_produtoEditandoIdx];
         const atualizado = await api('PUT', `/api/produtos/${p.id}`, {
-          nome, categoria, fornecedor, precoCusto, precoVenda
+          nome, categoria, fornecedor, precoCusto, precoVenda,
+          ...camposFiscais
         });
         dbProdutos[_produtoEditandoIdx] = atualizado;
         renderListaProdutos();
@@ -3678,7 +3921,8 @@
 
       // ===== MODO CADASTRO =====
       const novo = await api('POST', '/api/produtos', {
-        codigo: codigoInput, nome, categoria, fornecedor, estoque, precoCusto, precoVenda
+        codigo: codigoInput, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
+        ...camposFiscais
       });
       dbProdutos.push(novo);
       renderListaProdutos();
@@ -7344,6 +7588,196 @@ ${conteudo}
     const url = `https://wa.me/5562992347572?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     document.getElementById('modal-interesse-pro').style.display = 'none';
+  }
+
+  // ====== CONFIGURAÇÕES FISCAIS (Plano Pro) ======
+
+  // Mostra/esconde o menu fiscal conforme módulo ativo
+  function atualizarVisibilidadeFiscal() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const ativo = !!empresa.moduloFiscalAtivo;
+    document.querySelectorAll('.fiscal-only').forEach(el => {
+      el.style.display = ativo ? '' : 'none';
+    });
+  }
+
+  // Troca a tab ativa nas Configurações Fiscais
+  function trocarTabFiscal(tab) {
+    document.querySelectorAll('.cf-tab').forEach(b => b.classList.toggle('cf-tab-ativa', b.dataset.tab === tab));
+    document.querySelectorAll('.cf-tab-conteudo').forEach(c => c.style.display = 'none');
+    const ativa = document.getElementById('cf-tab-' + tab);
+    if (ativa) ativa.style.display = '';
+  }
+
+  // Tooltip dos "?" — usa o atributo data-help
+  document.addEventListener('click', function(e) {
+    const h = e.target.closest('.cf-help');
+    if (h && h.dataset.help) {
+      alert(h.dataset.help);
+    }
+  });
+
+  // Carrega dados fiscais da empresa quando entra na tela
+  async function carregarConfigFiscais() {
+    try {
+      const f = await api('GET', '/api/fiscal/empresa');
+      // Tab 1: Dados Fiscais
+      document.getElementById('cf-regime').value = f.regimeTributario || '';
+      document.getElementById('cf-ie').value = f.inscricaoEstadual || '';
+      document.getElementById('cf-cnae').value = f.cnaePrincipal || '';
+      atualizarAvisoRegime();
+      // Tab 3: Padrões
+      document.getElementById('cf-cfop-vista').value = f.cfopPadraoVista || '';
+      document.getElementById('cf-cfop-prazo').value = f.cfopPadraoPrazo || '';
+      document.getElementById('cf-origem').value = f.origemMercadoriaPadrao || '0';
+      document.getElementById('cf-csosn').value = f.csosnPadrao || '';
+      // Tab 2: Status do certificado
+      renderStatusCertificado(f);
+    } catch (err) {
+      if (err.message && err.message.includes('Plano Pro')) {
+        document.getElementById('page-configuracoes-fiscais').innerHTML =
+          '<div style="padding:40px;text-align:center;color:#dc2626;font-size:16px;">🔒 Esta tela é exclusiva do Plano Pro. <a href="#" onclick="showPage(\'minha-conta\');return false;" style="color:var(--azul);">Saiba mais</a></div>';
+      } else {
+        alert('Erro ao carregar dados fiscais: ' + err.message);
+      }
+    }
+  }
+
+  // Mostra aviso especial pra MEI selecionado
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'cf-regime') atualizarAvisoRegime();
+  });
+
+  function atualizarAvisoRegime() {
+    const v = document.getElementById('cf-regime')?.value;
+    const av = document.getElementById('cf-aviso-regime');
+    if (!av) return;
+    if (v === 'mei') {
+      av.innerHTML = '⚠️ <strong>MEI:</strong> não pode emitir NFC-e por lei. Pode emitir NF-e em alguns casos (B2B / interestadual). Considere virar Microempresa (ME) no Simples Nacional pra ter emissão completa.';
+      av.style.background = '#fef3c7';
+      av.style.color = '#92400e';
+      av.style.display = '';
+    } else if (v) {
+      av.innerHTML = '✅ Esse regime permite emissão de NFC-e e NF-e.';
+      av.style.background = '#dcfce7';
+      av.style.color = '#166534';
+      av.style.display = '';
+    } else {
+      av.style.display = 'none';
+    }
+  }
+
+  async function salvarFiscalEmpresa() {
+    const dados = {
+      regimeTributario: document.getElementById('cf-regime').value,
+      inscricaoEstadual: document.getElementById('cf-ie').value.trim(),
+      cnaePrincipal: document.getElementById('cf-cnae').value.trim()
+    };
+    try {
+      await api('PUT', '/api/fiscal/empresa', dados);
+      alert('✅ Dados fiscais salvos com sucesso!');
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  async function salvarPadroesFiscais() {
+    const dados = {
+      cfopPadraoVista: document.getElementById('cf-cfop-vista').value.trim(),
+      cfopPadraoPrazo: document.getElementById('cf-cfop-prazo').value.trim(),
+      origemMercadoriaPadrao: document.getElementById('cf-origem').value,
+      csosnPadrao: document.getElementById('cf-csosn').value
+    };
+    try {
+      await api('PUT', '/api/fiscal/empresa', dados);
+      alert('✅ Padrões fiscais salvos!');
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  function renderStatusCertificado(f) {
+    const div = document.getElementById('cf-cert-status');
+    if (!div) return;
+    if (f.temCertificado) {
+      const validade = f.certificadoA1Validade ? new Date(f.certificadoA1Validade) : null;
+      let validadeTxt = '—';
+      let bgValidade = '#dcfce7', corValidade = '#166534';
+      if (validade) {
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const dias = Math.round((validade - hoje) / 86400000);
+        validadeTxt = formatarDataBR(f.certificadoA1Validade);
+        if (dias < 0) {
+          validadeTxt += ' (VENCIDO há ' + (-dias) + ' dias)';
+          bgValidade = '#fee2e2'; corValidade = '#991b1b';
+        } else if (dias < 30) {
+          validadeTxt += ' (vence em ' + dias + ' dias)';
+          bgValidade = '#fef3c7'; corValidade = '#92400e';
+        } else {
+          validadeTxt += ' (' + dias + ' dias restantes)';
+        }
+      }
+      div.innerHTML = `
+        <div style="background:#dcfce7;padding:14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <strong style="color:#166534;">✅ Certificado A1 instalado</strong><br>
+            <span style="font-size:13px;color:#445;">${escapeHtml(f.certificadoA1Nome || 'certificado.pfx')}</span><br>
+            <span style="font-size:12px;background:${bgValidade};color:${corValidade};padding:2px 8px;border-radius:6px;font-weight:600;display:inline-block;margin-top:4px;">Validade: ${validadeTxt}</span>
+          </div>
+          <button onclick="removerCertificadoA1()" class="btn" style="background:#dc2626;font-size:13px;">🗑️ Remover</button>
+        </div>`;
+    } else {
+      div.innerHTML = `
+        <div style="background:#fef3c7;padding:14px;border-radius:8px;color:#92400e;">
+          <strong>⚠️ Nenhum certificado instalado</strong><br>
+          <span style="font-size:13px;">Faça upload do seu certificado A1 (.pfx) abaixo pra começar a emitir NFC-e/NF-e.</span>
+        </div>`;
+    }
+  }
+
+  async function uploadCertificadoA1() {
+    const fileInput = document.getElementById('cf-cert-arquivo');
+    const senha = document.getElementById('cf-cert-senha').value;
+    const validade = document.getElementById('cf-cert-validade').value;
+    if (!fileInput.files || !fileInput.files[0]) { alert('Selecione o arquivo do certificado (.pfx).'); return; }
+    if (!senha) { alert('Informe a senha do certificado.'); return; }
+    if (!validade) {
+      if (!confirm('Você não informou a data de validade. Isso pode dificultar o controle de vencimento. Continuar mesmo assim?')) return;
+    }
+    const file = fileInput.files[0];
+    if (file.size > 150000) { alert('Arquivo muito grande. Certificados A1 normalmente têm menos de 50KB.'); return; }
+    // Converte arquivo pra base64
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64 = e.target.result.split(',')[1]; // remove "data:...;base64,"
+      try {
+        await api('POST', '/api/fiscal/certificado', {
+          conteudoBase64: base64,
+          senha: senha,
+          nomeArquivo: file.name,
+          validade: validade || null
+        });
+        alert('✅ Certificado enviado com sucesso!');
+        document.getElementById('cf-cert-arquivo').value = '';
+        document.getElementById('cf-cert-senha').value = '';
+        document.getElementById('cf-cert-validade').value = '';
+        carregarConfigFiscais();
+      } catch (err) {
+        alert('Erro ao enviar certificado: ' + err.message);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function removerCertificadoA1() {
+    if (!confirm('Tem certeza que quer remover o certificado A1?\n\nSem ele, você não conseguirá emitir NF-e nem NFC-e até enviar um novo.')) return;
+    try {
+      await api('DELETE', '/api/fiscal/certificado');
+      alert('Certificado removido.');
+      carregarConfigFiscais();
+    } catch (err) {
+      alert('Erro ao remover: ' + err.message);
+    }
   }
 
   async function carregarMinhaConta() {

@@ -34,12 +34,18 @@ router.get('/', async (req, res) => {
 
 // Cadastrar produto
 router.post('/', async (req, res) => {
-  const { codigo, nome, categoria, fornecedor, estoque, precoCusto, precoVenda } = req.body || {};
+  const {
+    codigo, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
+    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel
+  } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
   if (!precoVenda || precoVenda <= 0) return res.status(400).json({ error: 'Preço de venda deve ser maior que zero.' });
+  // Valida NCM se foi enviado (8 dígitos)
+  if (ncm && !/^\d{8}$/.test(String(ncm).replace(/\D/g, ''))) {
+    return res.status(400).json({ error: 'NCM deve ter 8 dígitos numéricos.' });
+  }
   try {
-    // Gera código automático se vazio (próximo após o maior numérico já existente)
     let codigoFinal = (codigo || '').trim();
     if (!codigoFinal) {
       const r = await db.query(
@@ -56,13 +62,21 @@ router.post('/', async (req, res) => {
       codigoFinal = String(max + 1);
     }
     const ins = await db.query(
-      `INSERT INTO produtos (empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      `INSERT INTO produtos (
+         empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda,
+         ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, fornecedor.trim(),
-       Number(estoque) || 0, Number(precoCusto), Number(precoVenda)]
+       Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
+       ncm ? String(ncm).replace(/\D/g, '') : null,
+       cest ? String(cest).replace(/\D/g, '') : null,
+       cfopPadrao || null,
+       origemMercadoria || null,
+       csosn || null,
+       cst || null,
+       unidadeTributavel || null]
     );
     const p = ins.rows[0];
-    // Se tiver estoque inicial, registra movimentação
     if (Number(estoque) > 0) {
       await db.query(
         `INSERT INTO movimentacoes (empresa_id, produto_codigo, produto_nome, data, tipo, qtd, origem)
@@ -85,15 +99,31 @@ router.post('/', async (req, res) => {
 
 // Editar produto (não altera estoque diretamente — estoque vem por movimentações)
 router.put('/:id', async (req, res) => {
-  const { nome, categoria, fornecedor, precoCusto, precoVenda } = req.body || {};
+  const {
+    nome, categoria, fornecedor, precoCusto, precoVenda,
+    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel
+  } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
   if (!precoVenda || precoVenda <= 0) return res.status(400).json({ error: 'Preço de venda deve ser maior que zero.' });
+  if (ncm && !/^\d{8}$/.test(String(ncm).replace(/\D/g, ''))) {
+    return res.status(400).json({ error: 'NCM deve ter 8 dígitos numéricos.' });
+  }
   try {
     const r = await db.query(
-      `UPDATE produtos SET nome=$1, categoria=$2, fornecedor=$3, preco_custo=$4, preco_venda=$5
-       WHERE id=$6 AND empresa_id=$7 RETURNING *`,
+      `UPDATE produtos SET
+         nome=$1, categoria=$2, fornecedor=$3, preco_custo=$4, preco_venda=$5,
+         ncm=$6, cest=$7, cfop_padrao=$8, origem_mercadoria=$9,
+         csosn=$10, cst=$11, unidade_tributavel=$12
+       WHERE id=$13 AND empresa_id=$14 RETURNING *`,
       [nome.trim(), categoria || null, fornecedor.trim(), Number(precoCusto), Number(precoVenda),
+       ncm ? String(ncm).replace(/\D/g, '') : null,
+       cest ? String(cest).replace(/\D/g, '') : null,
+       cfopPadrao || null,
+       origemMercadoria || null,
+       csosn || null,
+       cst || null,
+       unidadeTributavel || null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
