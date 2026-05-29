@@ -1104,6 +1104,29 @@
           </p>
         </div>
 
+        <!-- Card Módulo Fiscal (Plano Pro) -->
+        <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">🧾 Módulo Fiscal <span id="mc-fiscal-badge" style="display:none;font-size:11px;padding:2px 10px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:700;vertical-align:middle;margin-left:8px;">ATIVO</span></h3>
+          <div id="mc-fiscal-conteudo" style="font-size:14px;line-height:1.5;color:#445;">
+            <p style="margin:0 0 10px;">Permite emitir <strong>NFC-e</strong> (cupom fiscal eletrônico) e <strong>NF-e</strong> direto pelo sistema, com envio automático pra Sefaz.</p>
+            <ul style="margin:0 0 12px 0;padding-left:20px;color:#557;font-size:13px;">
+              <li>Emissão de NFC-e e NF-e <span style="color:#7c3aed;font-weight:600;">(em desenvolvimento)</span></li>
+              <li>Fechamento mensal com XMLs anexados</li>
+              <li>Envio direto pro contador</li>
+            </ul>
+            <div id="mc-fiscal-valor" style="background:#f1f5f9;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;">
+              <strong style="color:#1e3a8a;">+ R$ 150,00/mês</strong> sobre o plano atual<br>
+              <span style="color:#668;font-size:12px;">Plano Pro completo: R$ 249,90/mês</span>
+            </div>
+            <button id="mc-btn-interesse-pro" class="btn admin-only" onclick="manifestarInteresseProPlano()" style="background:#7c3aed;color:#fff;width:100%;font-size:13px;padding:10px;">⚡ Tenho interesse no Plano Pro</button>
+          </div>
+          <div id="mc-fiscal-ativo-conteudo" style="display:none;font-size:14px;line-height:1.5;color:#445;">
+            <p style="margin:0 0 10px;color:#16a34a;font-weight:600;">✅ Módulo Fiscal ativo!</p>
+            <p style="margin:0 0 6px;font-size:13px;">Ativado em: <span id="mc-fiscal-data">—</span></p>
+            <p style="margin:0;font-size:13px;color:#668;">Acesse <strong>Configurações Fiscais</strong> pra cadastrar certificado, NCM, CFOP e regime tributário.</p>
+          </div>
+        </div>
+
         <!-- Card Suporte -->
         <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
           <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">💬 Suporte</h3>
@@ -7176,6 +7199,14 @@ ${conteudo}
   }
 
   // ====== MINHA CONTA ======
+  // Manifesta interesse no Plano Pro — abre WhatsApp com mensagem pronta
+  function manifestarInteresseProPlano() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const msg = `Olá! Tenho interesse no Plano Pro do GL Sistema (com emissão de NF-e e NFC-e).\n\nEmpresa: ${empresa.nome || ''}\n\nPode me dar mais informações?`;
+    const url = `https://wa.me/5562992347572?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
+
   async function carregarMinhaConta() {
     try {
       const me = await api('GET', '/api/auth/me');
@@ -7222,6 +7253,32 @@ ${conteudo}
           btnRenovar.style.display = 'inline-block';
         } else {
           btnRenovar.style.display = 'none';
+        }
+      }
+
+      // Card Módulo Fiscal (Plano Pro)
+      const fiscalAtivo = !!e.moduloFiscalAtivo;
+      const fiscalBadge = document.getElementById('mc-fiscal-badge');
+      const fiscalInteresse = document.getElementById('mc-fiscal-conteudo');
+      const fiscalAtivoConteudo = document.getElementById('mc-fiscal-ativo-conteudo');
+      const btnInteresse = document.getElementById('mc-btn-interesse-pro');
+      if (fiscalAtivo) {
+        if (fiscalBadge) fiscalBadge.style.display = 'inline-block';
+        if (fiscalInteresse) fiscalInteresse.style.display = 'none';
+        if (fiscalAtivoConteudo) {
+          fiscalAtivoConteudo.style.display = '';
+          if (e.moduloFiscalAtivadoEm) {
+            const d = new Date(e.moduloFiscalAtivadoEm);
+            document.getElementById('mc-fiscal-data').textContent = isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
+          }
+        }
+      } else {
+        if (fiscalBadge) fiscalBadge.style.display = 'none';
+        if (fiscalInteresse) fiscalInteresse.style.display = '';
+        if (fiscalAtivoConteudo) fiscalAtivoConteudo.style.display = 'none';
+        // Botão de interesse só pra admin
+        if (btnInteresse) {
+          btnInteresse.style.display = (u.papel === 'admin') ? '' : 'none';
         }
       }
       // Histórico de pagamentos: só mostra se for auto-assinatura
