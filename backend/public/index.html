@@ -1519,6 +1519,37 @@
     </div>
   </div>
 
+  <!-- Modal: Cancelar Venda (com motivo + senha admin) -->
+  <div id="modal-cancelar-venda" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:28px;border-radius:14px;max-width:500px;width:92%;">
+      <h2 style="color:#dc2626;margin:0 0 6px;">❌ Cancelar Venda</h2>
+      <p style="color:#557;font-size:13px;margin:0 0 18px;">Esta ação vai:</p>
+      <ul style="font-size:13px;color:#557;margin:0 0 18px;padding-left:20px;line-height:1.6;">
+        <li>Devolver o estoque dos produtos vendidos</li>
+        <li>Apagar todas as contas a receber dessa venda</li>
+        <li>Marcar a venda como <strong>CANCELADA</strong> (mantém no histórico, não some)</li>
+        <li>Remover a venda do faturamento do dashboard</li>
+      </ul>
+      <div style="background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;">
+        ⚠️ Esta ação <strong>não pode ser desfeita</strong>. Confirme com cautela.
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:4px;">Motivo do cancelamento <span style="color:#dc2626;">*</span></label>
+        <textarea id="cv-motivo" rows="3" maxlength="500" placeholder="Ex: Cliente desistiu, erro no preço, produto trocado..." style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
+        <p style="font-size:11px;color:#778;margin:4px 0 0;">Mínimo 5 caracteres. Vai ficar registrado no histórico.</p>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:4px;">Senha do administrador <span style="color:#dc2626;">*</span></label>
+        <input type="password" id="cv-senha" placeholder="Digite a senha de qualquer admin" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;">
+      </div>
+      <div id="cv-erro" style="display:none;background:#fee2e2;color:#991b1b;padding:10px;border-radius:8px;margin-bottom:14px;font-size:13px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn" style="flex:1;background:#eceef2;color:var(--azul);" onclick="fecharCancelarVenda()">Voltar</button>
+        <button class="btn" style="flex:2;background:#dc2626;color:#fff;" id="cv-btn-confirmar" onclick="confirmarCancelarVenda()">❌ Confirmar Cancelamento</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Escolher Tamanho do Cupom -->
   <div id="modal-cupom-tamanho" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:28px;border-radius:14px;max-width:480px;width:92%;">
@@ -3175,6 +3206,10 @@
   // ====== CLIENTES / VENDAS / CONTAS A RECEBER ======
   let dbClientes = [];
   let dbVendas = [];
+  // Helper: retorna só vendas ATIVAS (não canceladas) - usar em todos os cálculos de faturamento
+  function vendasAtivas() {
+    return dbVendas.filter(v => v.status !== 'cancelada');
+  }
   let _nextVendaId = 1;
   function proximaVendaId() { return _nextVendaId++; }
   let dbContasReceber = [];
@@ -4523,17 +4558,29 @@
       const pag = pagamentoLabel[v.pagamento] || v.pagamento;
       const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
       const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
+      const cancelada = v.status === 'cancelada';
+      // Linha riscada + cinza pra venda cancelada
+      const estiloLinha = cancelada
+        ? 'background:#fef2f2;color:#9ca3af;text-decoration:line-through;'
+        : '';
+      // Badge "CANCELADA" ao lado do nome do cliente
+      const badgeCancelada = cancelada
+        ? `<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;" title="${escapeAttr(v.motivoCancelamento || '')}\nPor: ${escapeAttr(v.canceladaPorNome || '')}\nEm: ${v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : ''}">❌ CANCELADA</span>`
+        : '';
+      // Botões: venda cancelada só pode imprimir; venda ativa tem todas opções
+      const acoes = cancelada
+        ? `<button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>`
+        : `<button class="btn-link" onclick="editarVenda(${v.id})">Editar</button> |
+           <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>${v.orcamentoIdVinculado ? ` | <button class="btn-link" style="color:#d97706;font-weight:600;" onclick="cancelarVendaEReabrirOrcamento(${v.id}, ${v.orcamentoIdVinculado}, ${v.orcamentoNumeroVinculado})" title="Cancela esta venda e reabre o orçamento Nº ${v.orcamentoNumeroVinculado} para edição">⏪ Voltar pra Orç. Nº ${v.orcamentoNumeroVinculado}</button>` : ''} |
+           <button class="btn-link admin-only" style="color:#dc2626;font-weight:600;" onclick="abrirCancelarVenda(${v.id})" title="Cancelar venda (precisa senha de admin)">❌ Cancelar</button>`;
       return `
-        <tr>
+        <tr style="${estiloLinha}">
           <td>${formatarDataBR(v.data)}</td>
-          <td>${v.cliente}</td>
+          <td>${v.cliente}${badgeCancelada}</td>
           <td>${itensTxt}</td>
           <td>${formatarBRL(v.total)}</td>
           <td>${pagTxt}</td>
-          <td>
-            <button class="btn-link" onclick="editarVenda(${v.id})">Editar</button> |
-            <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>${v.orcamentoIdVinculado ? ` | <button class="btn-link" style="color:#d97706;font-weight:600;" onclick="cancelarVendaEReabrirOrcamento(${v.id}, ${v.orcamentoIdVinculado}, ${v.orcamentoNumeroVinculado})" title="Cancela esta venda e reabre o orçamento Nº ${v.orcamentoNumeroVinculado} para edição">⏪ Voltar pra Orç. Nº ${v.orcamentoNumeroVinculado}</button>` : ''}
-          </td>
+          <td>${acoes}</td>
         </tr>
       `;
     }).join('');
@@ -4788,9 +4835,9 @@
     const dHoje = new Date();
     const dMesAnt = new Date(dHoje.getFullYear(), dHoje.getMonth() - 1, 1);
     const mesAnterior = dMesAnt.toISOString().slice(0, 7);
-    const vendasHoje = dbVendas.filter(v => v.data === hoje);
-    const vendasMes  = dbVendas.filter(v => (v.data || '').slice(0, 7) === mesAtual);
-    const vendasMesAnt = dbVendas.filter(v => (v.data || '').slice(0, 7) === mesAnterior);
+    const vendasHoje = vendasAtivas().filter(v => v.data === hoje);
+    const vendasMes  = vendasAtivas().filter(v => (v.data || '').slice(0, 7) === mesAtual);
+    const vendasMesAnt = vendasAtivas().filter(v => (v.data || '').slice(0, 7) === mesAnterior);
     const totalHoje = vendasHoje.reduce((s, v) => s + (v.total || 0), 0);
     const totalMes  = vendasMes.reduce((s, v) => s + (v.total || 0), 0);
     const totalMesAnt = vendasMesAnt.reduce((s, v) => s + (v.total || 0), 0);
@@ -5226,6 +5273,53 @@
   }
 
   // Cancela uma venda e reabre o orçamento vinculado pra edição
+  // Cancela venda finalizada (precisa senha de admin + motivo)
+  let _vendaCancelandoId = null;
+  function abrirCancelarVenda(vendaId) {
+    _vendaCancelandoId = vendaId;
+    document.getElementById('cv-motivo').value = '';
+    document.getElementById('cv-senha').value = '';
+    document.getElementById('cv-erro').style.display = 'none';
+    document.getElementById('modal-cancelar-venda').style.display = 'flex';
+    setTimeout(() => document.getElementById('cv-motivo').focus(), 50);
+  }
+  function fecharCancelarVenda() {
+    document.getElementById('modal-cancelar-venda').style.display = 'none';
+    _vendaCancelandoId = null;
+  }
+  async function confirmarCancelarVenda() {
+    if (!_vendaCancelandoId) return;
+    const motivo = document.getElementById('cv-motivo').value.trim();
+    const senha = document.getElementById('cv-senha').value;
+    const erro = document.getElementById('cv-erro');
+    erro.style.display = 'none';
+    if (motivo.length < 5) {
+      erro.textContent = 'Informe um motivo com pelo menos 5 caracteres.';
+      erro.style.display = '';
+      return;
+    }
+    if (!senha) {
+      erro.textContent = 'Digite a senha do administrador.';
+      erro.style.display = '';
+      return;
+    }
+    const btn = document.getElementById('cv-btn-confirmar');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Cancelando...';
+    try {
+      const r = await api('POST', `/api/vendas/${_vendaCancelandoId}/cancelar`, { motivo, senha });
+      fecharCancelarVenda();
+      alert(`✅ Venda cancelada!\n\nCancelada por: ${r.cancelada_por}\nMotivo: ${r.motivo}\n\nEstoque devolvido e contas a receber removidas.`);
+      // atualizarTela() é chamado automaticamente pelo api()
+    } catch (err) {
+      erro.textContent = err.message || 'Erro ao cancelar venda.';
+      erro.style.display = '';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '❌ Confirmar Cancelamento';
+    }
+  }
+
   async function cancelarVendaEReabrirOrcamento(vendaId, orcamentoId, orcamentoNumero) {
     const msg = `Confirma cancelar esta venda e voltar pra Orçamento Nº ${orcamentoNumero}?\n\n` +
                 `✓ A venda será EXCLUÍDA permanentemente\n` +
@@ -5934,7 +6028,7 @@
   // Relatório: Vendas por Período
   function relVendas() {
     const [ini, fim] = getIntervaloRelatorio(_relatorioPeriodo);
-    const vendas = dbVendas.filter(v => dataNoIntervalo(v.data, ini, fim))
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim))
                             .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
     if(vendas.length === 0) return vazio('Nenhuma venda neste período.');
     const total = vendas.reduce((s, v) => s + (v.total || 0), 0);
@@ -5971,7 +6065,7 @@
   // Relatório: Produtos Mais Vendidos
   function relProdutosVendidos() {
     const [ini, fim] = getIntervaloRelatorio(_relatorioPeriodo);
-    const vendas = dbVendas.filter(v => dataNoIntervalo(v.data, ini, fim));
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim));
     const ranking = {};
     for(const v of vendas) {
       for(const it of (v.itens || [])) {
@@ -6083,7 +6177,7 @@
   function relDre() {
     const [ini, fim] = getIntervaloRelatorio(_relatorioPeriodo);
     // Receita = vendas no período
-    const vendas = dbVendas.filter(v => dataNoIntervalo(v.data, ini, fim));
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim));
     const receitaBruta = vendas.reduce((s, v) => s + (v.subtotal || 0), 0);
     const descontos    = vendas.reduce((s, v) => s + (v.desconto || 0), 0);
     const receitaLiquida = receitaBruta - descontos;
@@ -6217,7 +6311,7 @@ ${conteudo}
     const periodoLabel = `${nomesMes[mes]} de ${ano}`;
 
     // ===== 1) RELATÓRIO DE VENDAS =====
-    const vendas = dbVendas.filter(v => dataNoIntervalo(v.data, ini, fim))
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim))
                            .sort((a,b) => (a.data||'').localeCompare(b.data||''));
     const totalVendas = vendas.reduce((s,v) => s + (v.total||0), 0);
     const descVendas  = vendas.reduce((s,v) => s + (v.desconto||0), 0);

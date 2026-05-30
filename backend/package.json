@@ -18,6 +18,7 @@
     "migrate-v10": "node db/migrate-v10.js",
     "migrate-v11": "node db/migrate-v11.js",
     "migrate-v12": "node db/migrate-v12.js",
+    "migrate-v13": "node db/migrate-v13.js",
     "init-master": "node db/init-master.js"
   },
   "engines": {

@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const camelizar = (row) => {
@@ -216,6 +217,107 @@ router.delete('/:id', async (req, res) => {
     await client.query('ROLLBACK');
     console.error('[vendas/delete]', err);
     res.status(500).json({ error: 'Erro ao excluir venda.' });
+  } finally {
+    client.release();
+  }
+});
+
+// Cancelar venda (mantém histórico, marca como 'cancelada')
+// Requer: senha de QUALQUER admin da empresa + motivo
+// Faz: devolve estoque, apaga contas a receber, marca venda como cancelada
+router.post('/:id/cancelar', async (req, res) => {
+  const vendaId = parseInt(req.params.id);
+  if (isNaN(vendaId)) return res.status(400).json({ error: 'ID inválido.' });
+
+  const { senha, motivo } = req.body || {};
+  const motivoNorm = (motivo || '').trim();
+  if (!senha) return res.status(400).json({ error: 'Senha do administrador é obrigatória.' });
+  if (motivoNorm.length < 5) return res.status(400).json({ error: 'Informe um motivo (mínimo 5 caracteres).' });
+  if (motivoNorm.length > 500) return res.status(400).json({ error: 'Motivo muito longo (máx 500 caracteres).' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) Valida senha contra QUALQUER admin da empresa
+    const admins = await client.query(
+      "SELECT id, nome, senha_hash FROM usuarios WHERE empresa_id=$1 AND papel='admin'",
+      [req.user.empresaId]
+    );
+    if (admins.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Nenhum administrador cadastrado.' });
+    }
+    let adminValidado = null;
+    for (const a of admins.rows) {
+      try {
+        if (await bcrypt.compare(senha, a.senha_hash)) { adminValidado = a; break; }
+      } catch (e) {}
+    }
+    if (!adminValidado) {
+      await client.query('ROLLBACK');
+      return res.status(401).json({ error: 'Senha de administrador incorreta.' });
+    }
+
+    // 2) Confirma que a venda existe e ainda está ATIVA
+    const vQ = await client.query(
+      'SELECT id, status FROM vendas WHERE id=$1 AND empresa_id=$2',
+      [vendaId, req.user.empresaId]
+    );
+    if (vQ.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Venda não encontrada.' });
+    }
+    if (vQ.rows[0].status === 'cancelada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Venda já está cancelada.' });
+    }
+
+    // 3) Devolve estoque (e apaga movimentações de saída pra não duplicar)
+    const movs = await client.query(
+      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
+      [vendaId, req.user.empresaId]
+    );
+    for (const m of movs.rows) {
+      await client.query(
+        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
+        [m.qtd, req.user.empresaId, m.produto_codigo]
+      );
+    }
+    await client.query(
+      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
+      [vendaId, req.user.empresaId]
+    );
+
+    // 4) Remove contas a receber geradas pela venda
+    await client.query(
+      "DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2",
+      [vendaId, req.user.empresaId]
+    );
+
+    // 5) Marca a venda como cancelada (preserva histórico)
+    const r = await client.query(
+      `UPDATE vendas SET
+         status = 'cancelada',
+         cancelada_em = NOW(),
+         cancelada_por_id = $1,
+         cancelada_por_nome = $2,
+         motivo_cancelamento = $3
+       WHERE id=$4 AND empresa_id=$5 RETURNING id`,
+      [adminValidado.id, adminValidado.nome, motivoNorm, vendaId, req.user.empresaId]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      venda_id: vendaId,
+      cancelada_por: adminValidado.nome,
+      motivo: motivoNorm
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[vendas/cancelar]', err);
+    res.status(500).json({ error: 'Erro ao cancelar venda: ' + err.message });
   } finally {
     client.release();
   }
