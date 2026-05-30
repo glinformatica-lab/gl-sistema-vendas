@@ -445,6 +445,7 @@
     <button class="menu-btn" onclick="showPage('caixa')">&#128181; Caixa</button>
     <button class="menu-btn admin-only" onclick="showPage('financeiro')">&#128184; Financeiro</button>
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
+    <button class="menu-btn admin-only" onclick="showPage('cancelamentos')">&#128711; Cancelamentos</button>
     <button class="menu-btn admin-only" onclick="showPage('usuarios')">&#128101; Usuários</button>
     <button class="menu-btn admin-only" onclick="showPage('configuracoes')">&#9881;&#65039; Configurações</button>
     <button class="menu-btn admin-only fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
@@ -1215,6 +1216,58 @@
       </div>
     </div>
 
+    <!-- Cancelamentos -->
+    <div id="page-cancelamentos" style="display:none;">
+      <div class="page-title">🚫 Histórico de Cancelamentos</div>
+      <p style="color:#557;font-size:13px;margin:0 0 16px;max-width:760px;">Todas as vendas que foram canceladas com motivo. Útil pra auditoria e controle interno.</p>
+
+      <!-- Filtros -->
+      <div style="background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 10px #0001;margin-bottom:18px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#557;margin-bottom:4px;">Data início</label>
+            <input type="date" id="fc-ini" oninput="renderCancelamentos()" style="width:100%;padding:8px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#557;margin-bottom:4px;">Data fim</label>
+            <input type="date" id="fc-fim" oninput="renderCancelamentos()" style="width:100%;padding:8px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#557;margin-bottom:4px;">Cancelada por</label>
+            <select id="fc-usuario" oninput="renderCancelamentos()" style="width:100%;padding:8px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#557;margin-bottom:4px;">Buscar no motivo/cliente</label>
+            <input type="text" id="fc-busca" oninput="renderCancelamentos()" placeholder="Ex: cliente, desistiu, erro..." style="width:100%;padding:8px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn" style="background:#eceef2;color:var(--azul);font-size:12px;padding:6px 14px;" onclick="limparFiltrosCancelamentos()">🧹 Limpar filtros</button>
+          <span id="fc-contador" style="font-size:13px;color:#557;font-weight:600;"></span>
+        </div>
+      </div>
+
+      <!-- Lista de cancelamentos -->
+      <div style="background:#fff;border-radius:10px;box-shadow:0 2px 10px #0001;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f6f8fc;">
+            <tr>
+              <th style="padding:12px;text-align:left;">Venda</th>
+              <th style="padding:12px;text-align:left;">Cliente</th>
+              <th style="padding:12px;text-align:right;">Valor</th>
+              <th style="padding:12px;text-align:left;">Motivo</th>
+              <th style="padding:12px;text-align:left;">Cancelada por</th>
+              <th style="padding:12px;text-align:left;">Data/Hora</th>
+              <th style="padding:12px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cancelamentos"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Minha Conta -->
     <div id="page-minha-conta" style="display:none;">
       <div class="page-title">Minha Conta</div>
@@ -1516,6 +1569,20 @@
         </div>
       </div>
       <div id="orc-view-conteudo" style="padding:24px;"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Detalhes do Cancelamento -->
+  <div id="modal-detalhes-cancelamento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:92%;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="color:#dc2626;margin:0;font-size:20px;">❌ Detalhes do Cancelamento</h2>
+        <button onclick="document.getElementById('modal-detalhes-cancelamento').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+      </div>
+      <div id="detalhes-cancelamento-conteudo"></div>
+      <div style="margin-top:18px;text-align:right;">
+        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="document.getElementById('modal-detalhes-cancelamento').style.display='none'">Fechar</button>
+      </div>
     </div>
   </div>
 
@@ -2683,6 +2750,7 @@
     if(pg === 'orcamentos') carregarOrcamentos();
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
+    if(pg === 'cancelamentos') carregarCancelamentos();
     if(pg === 'minha-conta') carregarMinhaConta();
     if(pg === 'caixa') carregarCaixa();
   }
@@ -4565,7 +4633,7 @@
         : '';
       // Badge "CANCELADA" ao lado do nome do cliente
       const badgeCancelada = cancelada
-        ? `<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;" title="${escapeAttr(v.motivoCancelamento || '')}\nPor: ${escapeAttr(v.canceladaPorNome || '')}\nEm: ${v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : ''}">❌ CANCELADA</span>`
+        ? `<button onclick="verDetalhesCancelamento(${v.id})" style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;border:none;cursor:pointer;" title="Clique pra ver detalhes do cancelamento">❌ CANCELADA</button>`
         : '';
       // Botões: venda cancelada só pode imprimir; venda ativa tem todas opções
       const acoes = cancelada
@@ -5273,8 +5341,144 @@
   }
 
   // Cancela uma venda e reabre o orçamento vinculado pra edição
+  // ====== HISTÓRICO DE CANCELAMENTOS ======
+  function carregarCancelamentos() {
+    // Popula filtro de usuários únicos que cancelaram
+    const usuarios = [...new Set(
+      dbVendas.filter(v => v.status === 'cancelada' && v.canceladaPorNome).map(v => v.canceladaPorNome)
+    )].sort();
+    const sel = document.getElementById('fc-usuario');
+    if (sel) {
+      const atual = sel.value;
+      sel.innerHTML = '<option value="">Todos</option>' + usuarios.map(u => `<option value="${escapeAttr(u)}">${escapeHtml(u)}</option>`).join('');
+      sel.value = atual;
+    }
+    renderCancelamentos();
+  }
+
+  function renderCancelamentos() {
+    const tbody = document.getElementById('tbody-cancelamentos');
+    const contador = document.getElementById('fc-contador');
+    if (!tbody) return;
+    const ini = document.getElementById('fc-ini')?.value || '';
+    const fim = document.getElementById('fc-fim')?.value || '';
+    const usuarioF = document.getElementById('fc-usuario')?.value || '';
+    const busca = (document.getElementById('fc-busca')?.value || '').toLowerCase().trim();
+
+    let lista = dbVendas.filter(v => v.status === 'cancelada');
+
+    // Filtro por período (usa data do cancelamento)
+    if (ini || fim) {
+      lista = lista.filter(v => {
+        if (!v.canceladaEm) return false;
+        const dataCanc = String(v.canceladaEm).slice(0, 10);
+        if (ini && dataCanc < ini) return false;
+        if (fim && dataCanc > fim) return false;
+        return true;
+      });
+    }
+    // Filtro por usuário que cancelou
+    if (usuarioF) {
+      lista = lista.filter(v => v.canceladaPorNome === usuarioF);
+    }
+    // Filtro de busca livre (motivo, cliente, ID)
+    if (busca) {
+      lista = lista.filter(v =>
+        (v.motivoCancelamento || '').toLowerCase().includes(busca) ||
+        (v.cliente || '').toLowerCase().includes(busca) ||
+        String(v.id).includes(busca)
+      );
+    }
+
+    // Ordena por data de cancelamento (mais recente primeiro)
+    lista.sort((a, b) => String(b.canceladaEm || '').localeCompare(String(a.canceladaEm || '')));
+
+    const totalCancelado = lista.reduce((s, v) => s + (Number(v.total) || 0), 0);
+    if (contador) {
+      contador.textContent = lista.length === 0
+        ? 'Nenhum cancelamento'
+        : `${lista.length} cancelamento(s) · Total: ${formatarBRL(totalCancelado)}`;
+    }
+
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:30px;font-style:italic;">Nenhum cancelamento encontrado com esses filtros.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = lista.map(v => {
+      const dataCanc = v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : '—';
+      const motivoCurto = (v.motivoCancelamento || '').length > 60
+        ? escapeHtml(v.motivoCancelamento.slice(0, 60)) + '...'
+        : escapeHtml(v.motivoCancelamento || '—');
+      return `
+        <tr style="border-top:1px solid #eef2f7;">
+          <td style="padding:10px 12px;">
+            <strong>#${v.id}</strong><br>
+            <span style="font-size:11px;color:#889;">${formatarDataBR(v.data)}</span>
+          </td>
+          <td style="padding:10px 12px;">${escapeHtml(v.cliente || '—')}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;color:#dc2626;">${formatarBRL(v.total)}</td>
+          <td style="padding:10px 12px;font-style:italic;color:#557;">"${motivoCurto}"</td>
+          <td style="padding:10px 12px;">${escapeHtml(v.canceladaPorNome || '—')}</td>
+          <td style="padding:10px 12px;font-size:12px;color:#557;">${dataCanc}</td>
+          <td style="padding:10px 12px;text-align:center;">
+            <button class="btn-link" style="color:var(--azul);font-weight:600;" onclick="verDetalhesCancelamento(${v.id})">👁️ Detalhes</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function limparFiltrosCancelamentos() {
+    ['fc-ini', 'fc-fim', 'fc-usuario', 'fc-busca'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    renderCancelamentos();
+  }
+
   // Cancela venda finalizada (precisa senha de admin + motivo)
   let _vendaCancelandoId = null;
+
+  // Mostra modal com detalhes completos do cancelamento de uma venda
+  function verDetalhesCancelamento(vendaId) {
+    const v = dbVendas.find(x => x.id === vendaId);
+    if (!v) { alert('Venda não encontrada.'); return; }
+    const div = document.getElementById('detalhes-cancelamento-conteudo');
+    const dataCanc = v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : '—';
+    const itensTxt = (v.itens && v.itens.length)
+      ? v.itens.map(it => `<li>${escapeHtml(it.produto)} — ${it.qtd} × ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></li>`).join('')
+      : '<li><em>Sem itens registrados</em></li>';
+    div.innerHTML = `
+      <div style="background:#fee2e2;border-left:4px solid #dc2626;padding:14px;border-radius:6px;margin-bottom:16px;">
+        <div style="font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Motivo do Cancelamento</div>
+        <div style="font-size:15px;color:#7f1d1d;line-height:1.4;">${escapeHtml(v.motivoCancelamento || '(motivo não informado)')}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:#f1f5f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Cancelada Por</div>
+          <div style="font-size:14px;color:#1e293b;font-weight:700;margin-top:2px;">${escapeHtml(v.canceladaPorNome || '—')}</div>
+        </div>
+        <div style="background:#f1f5f9;padding:10px;border-radius:8px;">
+          <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Data/Hora</div>
+          <div style="font-size:14px;color:#1e293b;font-weight:700;margin-top:2px;">${dataCanc}</div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e2e8f0;padding-top:14px;">
+        <h3 style="font-size:14px;color:var(--azul);margin:0 0 10px;">📋 Dados da Venda Original</h3>
+        <div style="font-size:13px;color:#445;line-height:1.7;">
+          <strong>Venda:</strong> #${v.id} (${formatarDataBR(v.data)})<br>
+          <strong>Cliente:</strong> ${escapeHtml(v.cliente || '—')}<br>
+          <strong>Pagamento:</strong> ${escapeHtml(v.pagamento || '—')}${v.parcelas && v.parcelas.length > 1 ? ` (${v.parcelas.length}x)` : ''}<br>
+          <strong>Total:</strong> ${formatarBRL(v.total)}
+        </div>
+        <h4 style="font-size:13px;color:var(--azul);margin:12px 0 6px;">Itens:</h4>
+        <ul style="margin:0;padding-left:20px;font-size:13px;color:#445;">${itensTxt}</ul>
+      </div>
+    `;
+    document.getElementById('modal-detalhes-cancelamento').style.display = 'flex';
+  }
+
   function abrirCancelarVenda(vendaId) {
     _vendaCancelandoId = vendaId;
     document.getElementById('cv-motivo').value = '';
