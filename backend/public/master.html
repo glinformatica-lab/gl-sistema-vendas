@@ -302,6 +302,21 @@
   </div>
 </div>
 
+<!-- Modal: Gerenciar Cliente (multi-empresa) -->
+<div class="modal" id="modal-gerenciar-cliente">
+  <div class="modal-card" style="max-width:760px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h2 style="margin:0;color:var(--azul);">👥 Gerenciar Cliente</h2>
+      <button onclick="document.getElementById('modal-gerenciar-cliente').classList.remove('show');" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+    </div>
+    <div id="gc-email" style="background:#dbeafe;color:#1e40af;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:16px;"></div>
+    <div id="gc-lista-empresas" style="display:flex;flex-direction:column;gap:12px;"></div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e6ee;">
+      <button class="btn" style="background:#0891b2;color:#fff;width:100%;" onclick="criarEmpresaExtraDoGerenciar()">+ Criar Mais Uma Empresa Pra Esse Cliente</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const API = '';
   function getToken() { return localStorage.getItem('master-token'); }
@@ -364,6 +379,12 @@
 
   function fmtBRL(n) {
     return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function escapeAttr(s) {
+    return String(s == null ? '' : s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   }
   function fmtData(iso) {
     if (!iso) return '-';
@@ -428,40 +449,68 @@
         tbody.innerHTML = '<tr><td colspan="9" class="vazio">Nenhuma empresa cadastrada ainda.</td></tr>';
         return;
       }
-      tbody.innerHTML = _empresasCache.map(e => {
-        const dias = diasRestantes(e.dataVencimento);
-        const diasLabel = e.dataVencimento
-          ? (dias < 0 ? `<span style="color:var(--vermelho);">vencido há ${-dias}d</span>` : `${dias}d`)
-          : '-';
-        const planoLabel = e.moduloFiscalAtivo
-          ? `<span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:8px;font-weight:700;font-size:11px;">PRO</span>`
-          : e.plano;
-        const fiscalBadge = e.moduloFiscalAtivo
-          ? `<span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:10px;font-weight:700;font-size:11px;">ON</span>`
-          : `<span style="background:#f3f4f6;color:#6b7280;padding:2px 10px;border-radius:10px;font-weight:600;font-size:11px;">OFF</span>`;
-        return `
-          <tr>
-            <td><strong>${e.nome}</strong>${e.observacao ? `<br><span class="small">${e.observacao}</span>` : ''}</td>
-            <td>${e.cnpj || '-'}</td>
-            <td><span class="status status-${e.status}">${e.status}</span></td>
-            <td>${planoLabel}</td>
-            <td style="text-align:center;">${fiscalBadge}</td>
-            <td>${fmtData(e.dataVencimento)} <span class="small">(${diasLabel})</span></td>
-            <td>${e.qtdUsuarios}</td>
-            <td>${fmtBRL(e.valorMensalidade)}</td>
-            <td>
-              <button class="btn-action" onclick="acessarEmpresa(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#7c3aed;border-color:#7c3aed;">🔓 Acessar</button>
-              <button class="btn-action" onclick="abrirEditar(${e.id})">Editar</button>
-              <button class="btn-action" onclick="abrirPagamento(${e.id})" style="color:var(--verde);border-color:var(--verde);">+Pgto</button>
-              <button class="btn-action" onclick="abrirCriarEmpresaExtra(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#0891b2;border-color:#0891b2;" title="Criar empresa adicional pro mesmo cliente">+Empresa</button>
-              ${e.status === 'bloqueada'
-                ? `<button class="btn-action" onclick="desbloquearEmpresa(${e.id})">Desbloquear</button>`
-                : `<button class="btn-action danger" onclick="bloquearEmpresa(${e.id})">Bloquear</button>`}
-              <button class="btn-action danger" onclick="excluirEmpresa(${e.id})">Excluir</button>
-            </td>
-          </tr>
-        `;
-      }).join('');
+      // Agrupa por grupo_id (cliente). Empresas sem grupo viram "grupos de 1".
+      const grupos = new Map(); // chave: grupo_id ou 'solo-' + empresaId
+      for (const e of _empresasCache) {
+        const chave = e.grupoId || ('solo-' + e.id);
+        if (!grupos.has(chave)) grupos.set(chave, []);
+        grupos.get(chave).push(e);
+      }
+
+      let html = '';
+      for (const [chave, empresasGrupo] of grupos) {
+        const ehGrupo = empresasGrupo.length > 1;
+        if (ehGrupo) {
+          // Cabeçalho do grupo
+          const primeira = empresasGrupo[0];
+          const emailCliente = primeira.emailAdmin || '(sem admin)';
+          html += `
+            <tr style="background:#dbeafe;">
+              <td colspan="9" style="padding:10px 16px;font-weight:700;color:#1e40af;font-size:13px;">
+                📋 CLIENTE MULTI-EMPRESA: ${escapeHtml(emailCliente)} · <strong>${empresasGrupo.length} empresas</strong>
+                <button class="btn-action" onclick="abrirGerenciarCliente('${escapeAttr(emailCliente)}')" style="float:right;background:#1e40af;color:#fff;border-color:#1e40af;font-size:11px;">👥 Gerenciar Cliente</button>
+              </td>
+            </tr>
+          `;
+        }
+        // Linhas das empresas
+        for (const e of empresasGrupo) {
+          const dias = diasRestantes(e.dataVencimento);
+          const diasLabel = e.dataVencimento
+            ? (dias < 0 ? `<span style="color:var(--vermelho);">vencido há ${-dias}d</span>` : `${dias}d`)
+            : '-';
+          const planoLabel = e.moduloFiscalAtivo
+            ? `<span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:8px;font-weight:700;font-size:11px;">PRO</span>`
+            : e.plano;
+          const fiscalBadge = e.moduloFiscalAtivo
+            ? `<span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:10px;font-weight:700;font-size:11px;">ON</span>`
+            : `<span style="background:#f3f4f6;color:#6b7280;padding:2px 10px;border-radius:10px;font-weight:600;font-size:11px;">OFF</span>`;
+          const indent = ehGrupo ? 'padding-left:32px;' : '';
+          html += `
+            <tr ${ehGrupo ? 'style="background:#f8fafc;"' : ''}>
+              <td style="${indent}"><strong>${ehGrupo ? '└─ ' : ''}${escapeHtml(e.nome)}</strong>${e.observacao ? `<br><span class="small">${escapeHtml(e.observacao)}</span>` : ''}</td>
+              <td>${e.cnpj || '-'}</td>
+              <td><span class="status status-${e.status}">${e.status}</span></td>
+              <td>${planoLabel}</td>
+              <td style="text-align:center;">${fiscalBadge}</td>
+              <td>${fmtData(e.dataVencimento)} <span class="small">(${diasLabel})</span></td>
+              <td>${e.qtdUsuarios}</td>
+              <td>${fmtBRL(e.valorMensalidade)}</td>
+              <td>
+                <button class="btn-action" onclick="acessarEmpresa(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#7c3aed;border-color:#7c3aed;">🔓 Acessar</button>
+                <button class="btn-action" onclick="abrirEditar(${e.id})">Editar</button>
+                <button class="btn-action" onclick="abrirPagamento(${e.id})" style="color:var(--verde);border-color:var(--verde);">+Pgto</button>
+                ${!ehGrupo ? `<button class="btn-action" onclick="abrirCriarEmpresaExtra(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#0891b2;border-color:#0891b2;" title="Criar empresa adicional pro mesmo cliente">+Empresa</button>` : ''}
+                ${e.status === 'bloqueada'
+                  ? `<button class="btn-action" onclick="desbloquearEmpresa(${e.id})">Desbloquear</button>`
+                  : `<button class="btn-action danger" onclick="bloquearEmpresa(${e.id})">Bloquear</button>`}
+                <button class="btn-action danger" onclick="excluirEmpresa(${e.id})">Excluir</button>
+              </td>
+            </tr>
+          `;
+        }
+      }
+      tbody.innerHTML = html;
     } catch(err) {
       tbody.innerHTML = `<tr><td colspan="8" class="vazio" style="color:var(--vermelho);">Erro: ${err.message}</td></tr>`;
     }
@@ -522,6 +571,71 @@
   let _empresaPagamentoId = null;
   // ====== MULTI-EMPRESA: criar empresa extra pro mesmo cliente ======
   let _empresaExtraOrigemId = null;
+
+  // ====== GERENCIAR CLIENTE (multi-empresa) ======
+  let _emailClienteGerenciar = null;
+
+  async function abrirGerenciarCliente(emailCliente) {
+    _emailClienteGerenciar = emailCliente;
+    document.getElementById('gc-email').textContent = '📧 ' + emailCliente;
+    const lista = document.getElementById('gc-lista-empresas');
+    lista.innerHTML = '<p style="text-align:center;color:#889;padding:20px;">Carregando...</p>';
+    document.getElementById('modal-gerenciar-cliente').classList.add('show');
+
+    // Filtra empresas do cache pelo email do admin
+    const empresasDoCliente = _empresasCache.filter(e => e.emailAdmin === emailCliente);
+    if (empresasDoCliente.length === 0) {
+      lista.innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Nenhuma empresa encontrada pra esse cliente.</p>';
+      return;
+    }
+
+    lista.innerHTML = empresasDoCliente.map(e => {
+      const dias = diasRestantes(e.dataVencimento);
+      const diasLabel = e.dataVencimento
+        ? (dias < 0 ? `<span style="color:#dc2626;font-weight:700;">⚠️ Vencido há ${-dias} dias</span>` : (dias <= 7 ? `<span style="color:#f59e0b;font-weight:700;">⏰ Vence em ${dias} dias</span>` : `Vence em ${dias} dias`))
+        : 'Sem vencimento';
+      const statusCor = {
+        'ativa': '#16a34a', 'trial': '#f59e0b', 'bloqueada': '#dc2626', 'cancelada': '#6b7280'
+      }[e.status] || '#6b7280';
+      const proLabel = e.moduloFiscalAtivo
+        ? `<span style="background:#ede9fe;color:#6d28d9;padding:2px 8px;border-radius:8px;font-weight:700;font-size:11px;margin-left:8px;">🧾 PRO</span>`
+        : '';
+      return `
+        <div style="background:#f8fafc;border:1px solid #e2e6ee;border-radius:10px;padding:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#1e3a8a;">${escapeHtml(e.nome)}${proLabel}</div>
+              <div style="font-size:12px;color:#667;margin-top:4px;">
+                <span style="background:${statusCor};color:#fff;padding:2px 8px;border-radius:6px;font-weight:600;text-transform:uppercase;font-size:10px;">${e.status}</span>
+                · ${e.plano} · ${fmtBRL(e.valorMensalidade)}/mês
+              </div>
+            </div>
+            <div style="text-align:right;font-size:12px;">${diasLabel}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+            <button class="btn-action" onclick="acessarEmpresa(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}'); document.getElementById('modal-gerenciar-cliente').classList.remove('show');" style="color:#7c3aed;border-color:#7c3aed;">🔓 Acessar</button>
+            <button class="btn-action" onclick="document.getElementById('modal-gerenciar-cliente').classList.remove('show'); abrirEditar(${e.id})">✏️ Editar</button>
+            <button class="btn-action" onclick="document.getElementById('modal-gerenciar-cliente').classList.remove('show'); abrirPagamento(${e.id})" style="color:var(--verde);border-color:var(--verde);">💰 +Pgto</button>
+            ${e.status === 'bloqueada'
+              ? `<button class="btn-action" onclick="desbloquearEmpresa(${e.id}); document.getElementById('modal-gerenciar-cliente').classList.remove('show');">✓ Desbloquear</button>`
+              : `<button class="btn-action danger" onclick="bloquearEmpresa(${e.id}); document.getElementById('modal-gerenciar-cliente').classList.remove('show');">🚫 Bloquear</button>`}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function criarEmpresaExtraDoGerenciar() {
+    // Pega a primeira empresa do grupo (qualquer uma serve como origem)
+    if (!_emailClienteGerenciar) return;
+    const empresaOrigem = _empresasCache.find(e => e.emailAdmin === _emailClienteGerenciar);
+    if (!empresaOrigem) {
+      alert('Erro: não encontrei empresa origem.');
+      return;
+    }
+    document.getElementById('modal-gerenciar-cliente').classList.remove('show');
+    abrirCriarEmpresaExtra(empresaOrigem.id, empresaOrigem.nome);
+  }
 
   async function abrirCriarEmpresaExtra(empresaId, empresaNome) {
     _empresaExtraOrigemId = empresaId;

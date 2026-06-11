@@ -85,7 +85,9 @@ router.get('/empresas', async (req, res) => {
     const r = await db.query(`
       SELECT e.*,
              (SELECT COUNT(*)::int FROM usuarios u WHERE u.empresa_id = e.id) AS qtd_usuarios,
-             (SELECT MAX(criada_em) FROM vendas WHERE empresa_id = e.id) AS ultima_venda
+             (SELECT MAX(criada_em) FROM vendas WHERE empresa_id = e.id) AS ultima_venda,
+             (SELECT u.email FROM usuarios u WHERE u.empresa_id = e.id AND u.papel = 'admin' ORDER BY u.id ASC LIMIT 1) AS email_admin,
+             (SELECT u.grupo_id FROM usuarios u WHERE u.empresa_id = e.id AND u.papel = 'admin' ORDER BY u.id ASC LIMIT 1) AS grupo_id
       FROM empresas e
       ORDER BY e.criada_em DESC
     `);
