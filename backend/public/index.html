@@ -1270,6 +1270,20 @@
           </div>
         </div>
 
+        <!-- Card Minhas Empresas (multi-empresa) - apenas admin -->
+        <div id="mc-multi-card" class="admin-only" style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">🏢 Minhas Empresas <span id="mc-multi-badge" style="font-size:11px;padding:2px 10px;border-radius:10px;background:#dbeafe;color:#1e40af;font-weight:700;vertical-align:middle;margin-left:8px;">1</span></h3>
+          <div id="mc-multi-lista" style="font-size:13px;color:#445;margin-bottom:14px;">
+            <p style="color:#889;font-style:italic;">Carregando...</p>
+          </div>
+          <p style="font-size:12px;color:#668;margin:0 0 10px;line-height:1.5;">
+            💡 Tem outro negócio? Adicione uma empresa adicional ao seu plano por apenas <strong>R$ 49,90/mês</strong>. Mesmo login, dados separados.
+          </p>
+          <button class="btn" onclick="abrirContratarEmpresaExtra()" style="background:#0891b2;color:#fff;font-size:13px;padding:10px 14px;width:100%;">
+            ➕ Contratar Empresa Adicional
+          </button>
+        </div>
+
         <!-- Modal: Pré-qualificação Plano Pro -->
         <div id="modal-interesse-pro" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;padding:20px;">
           <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">
@@ -1529,6 +1543,51 @@
       </div>
       <p style="color:#557;font-size:13px;margin:0 0 14px;">Escolha qual empresa deseja acessar:</p>
       <div id="lista-empresas-trocar" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Contratar Empresa Extra -->
+  <div id="modal-contratar-extra" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:500px;width:92%;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="color:#0891b2;margin:0;font-size:20px;">🏢 Contratar Empresa Adicional</h2>
+        <button onclick="document.getElementById('modal-contratar-extra').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+      </div>
+
+      <div style="background:linear-gradient(135deg, #f0f9ff, #fef3c7);padding:14px;border-radius:10px;margin-bottom:18px;border-left:4px solid #0891b2;">
+        <div style="font-size:13px;color:#475569;line-height:1.6;">
+          <strong>Como funciona:</strong> ao pagar R$ 49,90, uma nova empresa é criada vinculada ao seu mesmo login.
+          Você vai ver as 2 empresas no menu e poderá trocar entre elas no botão "🔀 Trocar Empresa".
+          <br><br>Os dados (vendas, produtos, clientes) são <strong>totalmente separados</strong> entre as empresas.
+        </div>
+      </div>
+
+      <form onsubmit="event.preventDefault(); contratarEmpresaExtra();">
+        <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:4px;">Nome da nova empresa *</label>
+        <input type="text" id="ce-nome" required placeholder="Ex: Loja Filial Goiânia" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;margin-bottom:14px;">
+
+        <label style="display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:4px;">CNPJ da nova empresa (opcional)</label>
+        <input type="text" id="ce-cnpj" placeholder="00.000.000/0001-00" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:14px;margin-bottom:14px;">
+
+        <div style="background:#f1f5f9;padding:14px;border-radius:8px;font-size:13px;color:#445;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span>Empresa Adicional</span>
+            <strong>R$ 49,90</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#0c4a6e;padding-top:8px;border-top:1px solid #cbd5e1;">
+            <span>Total a pagar agora</span>
+            <span>R$ 49,90</span>
+          </div>
+          <div style="font-size:11px;color:#668;margin-top:6px;">A primeira mensalidade já dá acesso a partir do pagamento.</div>
+        </div>
+
+        <div id="ce-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-bottom:10px;"></div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" class="btn" style="background:#eceef2;color:#1e3a8a;" onclick="document.getElementById('modal-contratar-extra').style.display='none'">Cancelar</button>
+          <button type="submit" id="ce-btn-pagar" class="btn" style="background:#0891b2;color:#fff;">💳 Pagar e Criar</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -2565,6 +2624,47 @@
       window.location.href = '/index.html';
     } catch (err) {
       alert('Erro ao trocar de empresa: ' + err.message);
+    }
+  }
+
+  // ====== MULTI-EMPRESA: contratar empresa extra (R$ 49,90/mês) ======
+  function abrirContratarEmpresaExtra() {
+    document.getElementById('ce-nome').value = '';
+    document.getElementById('ce-cnpj').value = '';
+    document.getElementById('ce-erro').style.display = 'none';
+    document.getElementById('ce-btn-pagar').disabled = false;
+    document.getElementById('ce-btn-pagar').textContent = '💳 Pagar e Criar';
+    document.getElementById('modal-contratar-extra').style.display = 'flex';
+  }
+
+  async function contratarEmpresaExtra() {
+    const nome = document.getElementById('ce-nome').value.trim();
+    const cnpj = document.getElementById('ce-cnpj').value.trim();
+    const erro = document.getElementById('ce-erro');
+    const btn = document.getElementById('ce-btn-pagar');
+    erro.style.display = 'none';
+    if (nome.length < 2) {
+      erro.textContent = 'Informe o nome da nova empresa.';
+      erro.style.display = '';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Gerando link de pagamento...';
+    try {
+      const r = await fetch('/api/assinaturas/contratar-empresa-extra', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ nomeNovaEmpresa: nome, cnpjNovaEmpresa: cnpj || null })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao gerar pagamento');
+      // Redireciona pro PagBank
+      window.location.href = data.linkPagamento;
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = '';
+      btn.disabled = false;
+      btn.textContent = '💳 Pagar e Criar';
     }
   }
   // Auto-refresh: após qualquer ação de escrita (POST/PUT/DELETE), agenda atualização da tela
@@ -8046,6 +8146,38 @@ ${conteudo}
         }
       } else {
         secaoPag.style.display = 'none';
+      }
+
+      // ====== MULTI-EMPRESA: lista empresas do grupo ======
+      // Só carrega se for admin (vendedor não tem essa opção)
+      if (u.papel === 'admin') {
+        try {
+          const minhasEmpresas = await api('GET', '/api/auth/minhas-empresas');
+          const elBadge = document.getElementById('mc-multi-badge');
+          const elLista = document.getElementById('mc-multi-lista');
+          const empresas = minhasEmpresas.empresas || [];
+          if (elBadge) elBadge.textContent = empresas.length;
+          if (elLista) {
+            if (empresas.length === 0) {
+              elLista.innerHTML = '<p style="color:#889;font-style:italic;">Erro ao carregar.</p>';
+            } else {
+              elLista.innerHTML = empresas.map(emp => {
+                const ativa = emp.empresaId === minhasEmpresas.atual;
+                const badge = ativa ? ' <span style="font-size:10px;background:#16a34a;color:#fff;padding:1px 6px;border-radius:4px;font-weight:600;">ATUAL</span>' : '';
+                const pro = emp.moduloFiscalAtivo ? ' 🧾' : '';
+                return `<div style="padding:6px 0;border-bottom:1px solid #f0f2f5;">
+                  ${ativa ? '<strong>' : ''}${escapeHtml(emp.nome)}${ativa ? '</strong>' : ''}${badge}${pro}
+                </div>`;
+              }).join('');
+            }
+          }
+        } catch(err) {
+          console.warn('[multi-empresa]', err.message);
+        }
+      } else {
+        // Esconde card se não for admin
+        const card = document.getElementById('mc-multi-card');
+        if (card) card.style.display = 'none';
       }
     } catch(err) {
       console.warn('Erro ao carregar dados:', err.message);

@@ -13,7 +13,9 @@ const router = express.Router();
 // Configuração dos planos disponíveis
 const PLANOS = {
   mensal: { nome: 'Plano Mensal', valor: 99.90, meses: 1 },
-  anual:  { nome: 'Plano Anual',  valor: 1080.00, meses: 12 }
+  anual:  { nome: 'Plano Anual',  valor: 1080.00, meses: 12 },
+  pro:    { nome: 'Plano Pro',    valor: 249.90, meses: 1, moduloFiscal: true },
+  'empresa-extra': { nome: 'Empresa Adicional', valor: 49.90, meses: 1, ehExtra: true }
 };
 
 // Helper: cria string única para reference_id
@@ -30,7 +32,7 @@ function emailValido(e) {
 // Body: { plano, empresa, cnpj?, telefone?, nomeAdmin, emailAdmin, senhaAdmin }
 // Cria empresa em "aguardando-pagamento" + admin + assinatura + checkout PagBank.
 router.post('/iniciar', async (req, res) => {
-  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, recaptchaToken } = req.body || {};
+  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
 
   // Validações de entrada
   if (!plano || !PLANOS[plano]) {
@@ -40,14 +42,6 @@ router.post('/iniciar', async (req, res) => {
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
   if (!senhaAdmin || senhaAdmin.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
-
-  // Validação reCaptcha
-  const { validarRecaptcha } = require('../services/recaptcha');
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
-  const recap = await validarRecaptcha(recaptchaToken, ip);
-  if (!recap.ok) {
-    return res.status(400).json({ error: recap.motivo || 'Verificação de segurança falhou.' });
-  }
 
   if (!pagbank.tokenConfigurado()) {
     return res.status(503).json({ error: 'Pagamento online temporariamente indisponível. Entre em contato pelo WhatsApp.' });
@@ -143,13 +137,6 @@ router.post('/iniciar', async (req, res) => {
 
 // === GET /api/assinaturas/:ref ===
 // Consulta o status atual de uma assinatura. Usado pela página de retorno.
-// === GET /api/assinaturas/config === Retorna config pública (chave do reCaptcha)
-router.get('/config', (req, res) => {
-  res.json({
-    recaptchaSiteKey: process.env.RECAPTCHA_SITE_KEY || null
-  });
-});
-
 router.get('/:ref', async (req, res) => {
   try {
     const r = await db.query(
@@ -209,20 +196,11 @@ router.get('/:ref', async (req, res) => {
 
 // === POST /api/assinaturas/trial === Cria empresa com 7 dias grátis (sem pagamento)
 router.post('/trial', async (req, res) => {
-  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, recaptchaToken } = req.body || {};
+  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
   if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
   if (!senhaAdmin || senhaAdmin.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
-
-  // Validação reCaptcha
-  const { validarRecaptcha } = require('../services/recaptcha');
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || null;
-  const recap = await validarRecaptcha(recaptchaToken, ip);
-  if (!recap.ok) {
-    return res.status(400).json({ error: recap.motivo || 'Verificação de segurança falhou.' });
-  }
-
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -459,6 +437,83 @@ async function processarPagamento(referencia, dadosPedido) {
     const chargeRecusada = charges.find(c => c.status === 'DECLINED' || c.status === 'CANCELED');
 
     if (chargePaga) {
+      // === CASO ESPECIAL: PAGAMENTO DE EMPRESA EXTRA (multi-empresa) ===
+      if (assin.plano === 'empresa-extra') {
+        const crypto = require('crypto');
+        // Extrai metadata da assinatura (passamos o nome da nova empresa no ultimo_retorno inicial)
+        let meta = {};
+        try {
+          if (assin.metadata) meta = typeof assin.metadata === 'string' ? JSON.parse(assin.metadata) : assin.metadata;
+        } catch(_) {}
+        const nomeNovaEmpresa = meta.nomeNovaEmpresa || 'Nova Empresa';
+        const cnpjNovaEmpresa = meta.cnpjNovaEmpresa || null;
+
+        // Busca o admin da empresa origem
+        const adminQ = await client.query(
+          `SELECT id, nome, email, senha_hash, grupo_id
+           FROM usuarios
+           WHERE empresa_id = $1 AND papel = 'admin'
+           ORDER BY id ASC LIMIT 1`,
+          [assin.empresa_id]
+        );
+        if (adminQ.rows.length === 0) {
+          console.error('[webhook] empresa-extra: admin origem não encontrado');
+          await client.query('UPDATE assinaturas SET status=$1, ultimo_retorno=$2 WHERE id=$3',
+            ['erro', JSON.stringify({ erro: 'admin origem não encontrado', ...dadosPedido }), assin.id]);
+          await client.query('COMMIT');
+          return;
+        }
+        const adminOrigem = adminQ.rows[0];
+
+        // Gera ou reaproveita grupo_id
+        let grupoId = adminOrigem.grupo_id;
+        if (!grupoId) {
+          grupoId = 'grp_' + crypto.randomBytes(8).toString('hex');
+          await client.query('UPDATE usuarios SET grupo_id = $1 WHERE id = $2',
+            [grupoId, adminOrigem.id]);
+        }
+
+        // Cria nova empresa ATIVA (já paga) por 1 mês
+        const novaVenc = new Date();
+        novaVenc.setMonth(novaVenc.getMonth() + 1);
+        const novaEmpresaQ = await client.query(
+          `INSERT INTO empresas (nome, cnpj, status, plano, data_vencimento, valor_mensalidade, origem)
+           VALUES ($1, $2, 'ativa', 'mensal', $3, 49.90, 'auto-assinatura-extra')
+           RETURNING id, nome`,
+          [nomeNovaEmpresa.trim(), cnpjNovaEmpresa, novaVenc.toISOString().slice(0,10)]
+        );
+        const novaEmpresa = novaEmpresaQ.rows[0];
+
+        // Clona o admin na nova empresa
+        await client.query(
+          `INSERT INTO usuarios (empresa_id, email, nome, senha_hash, papel, grupo_id)
+           VALUES ($1, $2, $3, $4, 'admin', $5)`,
+          [novaEmpresa.id, adminOrigem.email, adminOrigem.nome, adminOrigem.senha_hash, grupoId]
+        );
+
+        // Marca a assinatura como paga
+        const forma = chargePaga.payment_method?.type || dadosPedido.payment_method?.type || null;
+        await client.query(
+          `UPDATE assinaturas SET status='paga', forma_pagamento=$1, data_pagamento=NOW(),
+             pedido_id=$2, ultimo_retorno=$3, atualizado_em=NOW() WHERE id=$4`,
+          [forma, dadosPedido.id || null, JSON.stringify({ ...dadosPedido, novaEmpresaId: novaEmpresa.id }), assin.id]
+        );
+
+        // Registra pagamento da empresa extra (vincula à NOVA empresa pro histórico)
+        await client.query(
+          `INSERT INTO pagamentos (empresa_id, valor, data_pagamento, plano_aplicado,
+                                   meses_adicionados, novo_vencimento, forma_pagamento, observacao)
+           VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6,$7)`,
+          [novaEmpresa.id, assin.valor, 'mensal', 1, novaVenc.toISOString().slice(0,10),
+           forma || 'PagBank', `Auto-assinatura empresa-extra ${referencia}`]
+        );
+
+        console.log(`[webhook] ✓ Empresa extra criada: ID ${novaEmpresa.id} (${novaEmpresa.nome}) no grupo ${grupoId}`);
+        await client.query('COMMIT');
+        return;
+      }
+
+      // === FLUXO NORMAL: ASSINATURA OU RENOVAÇÃO ===
       // Paga: ativa empresa
       const meses = assin.plano === 'anual' ? 12 : 1;
       // Pega vencimento atual da empresa (pode ser passado ou futuro)
@@ -490,10 +545,24 @@ async function processarPagamento(referencia, dadosPedido) {
       );
 
       // Ativa empresa
-      await client.query(
-        `UPDATE empresas SET status='ativa', plano=$1, data_vencimento=$2 WHERE id=$3`,
-        [assin.plano, vencIso, assin.empresa_id]
-      );
+      // Se for plano Pro, também ativa o módulo fiscal
+      const planoConfigAtivacao = PLANOS[assin.plano] || {};
+      const ativaModuloFiscal = !!planoConfigAtivacao.moduloFiscal;
+      if (ativaModuloFiscal) {
+        await client.query(
+          `UPDATE empresas SET
+             status='ativa', plano=$1, data_vencimento=$2,
+             modulo_fiscal_ativo=TRUE,
+             modulo_fiscal_ativado_em=CASE WHEN modulo_fiscal_ativo=FALSE THEN NOW() ELSE modulo_fiscal_ativado_em END
+           WHERE id=$3`,
+          [assin.plano, vencIso, assin.empresa_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE empresas SET status='ativa', plano=$1, data_vencimento=$2 WHERE id=$3`,
+          [assin.plano, vencIso, assin.empresa_id]
+        );
+      }
 
       // Registra pagamento na tabela pagamentos (mesma usada pelo Master)
       await client.query(
@@ -610,6 +679,83 @@ router.post('/renovar', autenticar, async (req, res) => {
   } catch (err) {
     console.error('[assinaturas/renovar]', err);
     res.status(500).json({ error: 'Erro ao iniciar renovação. Tente novamente.' });
+  }
+});
+
+// === POST /api/assinaturas/contratar-empresa-extra ===
+// Body: { nomeNovaEmpresa, cnpjNovaEmpresa? }
+// Cliente logado (admin) contrata uma empresa EXTRA por R$ 49,90/mês
+// Gera checkout no PagBank → quando pagar, webhook cria a nova empresa + clona admin
+router.post('/contratar-empresa-extra', autenticar, async (req, res) => {
+  const { nomeNovaEmpresa, cnpjNovaEmpresa } = req.body || {};
+  if (!nomeNovaEmpresa || nomeNovaEmpresa.trim().length < 2) {
+    return res.status(400).json({ error: 'Informe o nome da nova empresa.' });
+  }
+  // Só admin pode contratar empresa extra
+  if (req.user.papel !== 'admin') {
+    return res.status(403).json({ error: 'Apenas administradores podem contratar empresas adicionais.' });
+  }
+  const planoConfig = PLANOS['empresa-extra'];
+  try {
+    // Busca dados da empresa origem e admin
+    const r = await db.query(
+      `SELECT e.id AS empresa_id, e.nome AS empresa_nome, e.cnpj, e.telefone,
+              u.email, u.nome AS usuario_nome
+       FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
+       WHERE u.id = $1 LIMIT 1`,
+      [req.user.userId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const dados = r.rows[0];
+
+    // Cria assinatura com plano empresa-extra (guarda nome da nova empresa em metadata)
+    const referencia = gerarReferencia();
+    const metadata = {
+      nomeNovaEmpresa: nomeNovaEmpresa.trim(),
+      cnpjNovaEmpresa: cnpjNovaEmpresa || null,
+      empresaOrigemId: dados.empresa_id,
+      empresaOrigemNome: dados.empresa_nome
+    };
+    await db.query(
+      `INSERT INTO assinaturas (empresa_id, referencia, plano, valor, status, email_contato, metadata)
+       VALUES ($1, $2, 'empresa-extra', $3, 'pendente', $4, $5)`,
+      [dados.empresa_id, referencia, planoConfig.valor, dados.email, JSON.stringify(metadata)]
+    );
+
+    // Cria checkout no PagBank
+    const checkout = await pagbank.criarCheckout({
+      referencia,
+      plano: {
+        nome: `${planoConfig.nome}: ${nomeNovaEmpresa.trim()}`,
+        valor: planoConfig.valor,
+        meses: 1
+      },
+      cliente: {
+        nome: dados.usuario_nome,
+        email: dados.email,
+        telefone: dados.telefone,
+        cnpj: dados.cnpj
+      }
+    });
+    if (!checkout || !checkout.linkPagamento) {
+      return res.status(502).json({ error: 'Erro ao gerar link de pagamento. Tente novamente.' });
+    }
+    if (checkout.checkoutId) {
+      await db.query(
+        `UPDATE assinaturas SET pagbank_checkout_id = $1 WHERE referencia = $2`,
+        [checkout.checkoutId, referencia]
+      );
+    }
+    res.json({
+      ok: true,
+      referencia,
+      linkPagamento: checkout.linkPagamento,
+      valor: planoConfig.valor,
+      nomeNovaEmpresa: nomeNovaEmpresa.trim()
+    });
+  } catch (err) {
+    console.error('[assinaturas/contratar-empresa-extra]', err);
+    res.status(500).json({ error: 'Erro ao contratar empresa extra. Tente novamente.' });
   }
 });
 
