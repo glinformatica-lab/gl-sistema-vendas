@@ -463,6 +463,7 @@
         <div style="color:#25D366;font-weight:700;">(62) 99234-7572</div>
       </div>
     </a>
+    <button id="btn-trocar-empresa" class="menu-btn" style="display:none;font-size:13px;color:var(--azul);padding:12px 24px;background:#dbeafe;" onclick="abrirTrocarEmpresa()" title="Trocar entre suas empresas">&#128257; Trocar Empresa</button>
     <button class="menu-btn" style="font-size:13px;color:var(--vermelho);padding:12px 24px;" onclick="logout()" title="Encerrar sessão">&#128274; Sair</button>
   </nav>
   <div id="conteudo">
@@ -1519,17 +1520,15 @@
     </div>
   </div>
 
-  <!-- Modal: Detalhes do Cancelamento -->
-  <div id="modal-detalhes-cancelamento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
-    <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:92%;max-height:90vh;overflow-y:auto;">
+  <!-- Modal: Trocar Empresa (multi-empresa) -->
+  <div id="modal-trocar-empresa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:480px;width:92%;max-height:90vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2 style="color:#dc2626;margin:0;font-size:20px;">❌ Detalhes do Cancelamento</h2>
-        <button onclick="document.getElementById('modal-detalhes-cancelamento').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+        <h2 style="color:var(--azul);margin:0;font-size:20px;">&#128257; Trocar Empresa</h2>
+        <button onclick="document.getElementById('modal-trocar-empresa').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
       </div>
-      <div id="detalhes-cancelamento-conteudo"></div>
-      <div style="margin-top:18px;text-align:right;">
-        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="document.getElementById('modal-detalhes-cancelamento').style.display='none'">Fechar</button>
-      </div>
+      <p style="color:#557;font-size:13px;margin:0 0 14px;">Escolha qual empresa deseja acessar:</p>
+      <div id="lista-empresas-trocar" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
   </div>
 
@@ -2511,7 +2510,62 @@
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
     localStorage.removeItem('empresa');
+    localStorage.removeItem('multiEmpresa');
     window.location.href = '/login.html';
+  }
+
+  // ====== MULTI-EMPRESA: trocar entre empresas do mesmo cliente ======
+  async function abrirTrocarEmpresa() {
+    const div = document.getElementById('lista-empresas-trocar');
+    div.innerHTML = '<p style="text-align:center;color:#889;padding:20px;">Carregando...</p>';
+    document.getElementById('modal-trocar-empresa').style.display = 'flex';
+    try {
+      const r = await fetch('/api/auth/minhas-empresas', {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao listar empresas');
+      if (!data.empresas || data.empresas.length === 0) {
+        div.innerHTML = '<p style="text-align:center;color:#889;padding:20px;">Nenhuma empresa adicional encontrada.</p>';
+        return;
+      }
+      div.innerHTML = data.empresas.map(e => {
+        const ativa = e.empresaId === data.atual;
+        const bg = ativa ? '#dcfce7' : '#f8f9fc';
+        const border = ativa ? '#16a34a' : '#e2e6ee';
+        const label = ativa ? ' <span style="font-size:11px;background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;margin-left:6px;">ATUAL</span>' : '';
+        const proLabel = e.moduloFiscalAtivo ? ' <span style="font-size:10px;background:#ede9fe;color:#6d28d9;padding:2px 6px;border-radius:6px;font-weight:700;">PRO</span>' : '';
+        const onclick = ativa ? '' : `onclick="trocarEmpresa(${e.empresaId})"`;
+        const cursor = ativa ? 'default' : 'pointer';
+        return `
+          <div ${onclick} style="background:${bg};border:2px solid ${border};border-radius:10px;padding:14px;cursor:${cursor};transition:all 0.2s;${ativa ? '' : 'hover:transform:translateY(-1px);'}">
+            <div style="font-size:15px;font-weight:700;color:#1e3a8a;margin-bottom:4px;">${escapeHtml(e.nome)}${label}${proLabel}</div>
+            <div style="font-size:12px;color:#667;text-transform:uppercase;letter-spacing:0.4px;">${escapeHtml(e.plano)} · ${e.papel}</div>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      div.innerHTML = '<p style="color:#dc2626;text-align:center;padding:20px;">Erro: ' + (err.message || err) + '</p>';
+    }
+  }
+
+  async function trocarEmpresa(empresaId) {
+    try {
+      const r = await fetch('/api/auth/trocar-empresa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ empresaId })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao trocar de empresa');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      if (data.temMultiEmpresa) localStorage.setItem('multiEmpresa', '1');
+      // Recarrega a página pra atualizar todos os dados
+      window.location.href = '/index.html';
+    } catch (err) {
+      alert('Erro ao trocar de empresa: ' + err.message);
+    }
   }
   // Auto-refresh: após qualquer ação de escrita (POST/PUT/DELETE), agenda atualização da tela
   // Usa debounce de 250ms pra agrupar múltiplas chamadas seguidas em uma única atualização
@@ -2720,6 +2774,11 @@
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
+      // Mostra botão "Trocar Empresa" se cliente tem multi-empresa
+      if (localStorage.getItem('multiEmpresa') === '1') {
+        const btnTrocar = document.getElementById('btn-trocar-empresa');
+        if (btnTrocar) btnTrocar.style.display = '';
+      }
       // Banner de licença (trial / vencimento próximo / expirado)
       try {
         const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -4579,7 +4638,7 @@
         : '';
       // Badge "CANCELADA" ao lado do nome do cliente
       const badgeCancelada = cancelada
-        ? `<button onclick="verDetalhesCancelamento(${v.id})" style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;border:none;cursor:pointer;" title="Clique pra ver detalhes do cancelamento">❌ CANCELADA</button>`
+        ? `<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;" title="${escapeAttr(v.motivoCancelamento || '')}\nPor: ${escapeAttr(v.canceladaPorNome || '')}\nEm: ${v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : ''}">❌ CANCELADA</span>`
         : '';
       // Botões: venda cancelada só pode imprimir; venda ativa tem todas opções
       const acoes = cancelada
@@ -5289,46 +5348,6 @@
   // Cancela uma venda e reabre o orçamento vinculado pra edição
   // Cancela venda finalizada (precisa senha de admin + motivo)
   let _vendaCancelandoId = null;
-
-  // Mostra modal com detalhes completos do cancelamento de uma venda
-  function verDetalhesCancelamento(vendaId) {
-    const v = dbVendas.find(x => x.id === vendaId);
-    if (!v) { alert('Venda não encontrada.'); return; }
-    const div = document.getElementById('detalhes-cancelamento-conteudo');
-    const dataCanc = v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : '—';
-    const itensTxt = (v.itens && v.itens.length)
-      ? v.itens.map(it => `<li>${escapeHtml(it.produto)} — ${it.qtd} × ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></li>`).join('')
-      : '<li><em>Sem itens registrados</em></li>';
-    div.innerHTML = `
-      <div style="background:#fee2e2;border-left:4px solid #dc2626;padding:14px;border-radius:6px;margin-bottom:16px;">
-        <div style="font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Motivo do Cancelamento</div>
-        <div style="font-size:15px;color:#7f1d1d;line-height:1.4;">${escapeHtml(v.motivoCancelamento || '(motivo não informado)')}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <div style="background:#f1f5f9;padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Cancelada Por</div>
-          <div style="font-size:14px;color:#1e293b;font-weight:700;margin-top:2px;">${escapeHtml(v.canceladaPorNome || '—')}</div>
-        </div>
-        <div style="background:#f1f5f9;padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Data/Hora</div>
-          <div style="font-size:14px;color:#1e293b;font-weight:700;margin-top:2px;">${dataCanc}</div>
-        </div>
-      </div>
-      <div style="border-top:1px solid #e2e8f0;padding-top:14px;">
-        <h3 style="font-size:14px;color:var(--azul);margin:0 0 10px;">📋 Dados da Venda Original</h3>
-        <div style="font-size:13px;color:#445;line-height:1.7;">
-          <strong>Venda:</strong> #${v.id} (${formatarDataBR(v.data)})<br>
-          <strong>Cliente:</strong> ${escapeHtml(v.cliente || '—')}<br>
-          <strong>Pagamento:</strong> ${escapeHtml(v.pagamento || '—')}${v.parcelas && v.parcelas.length > 1 ? ` (${v.parcelas.length}x)` : ''}<br>
-          <strong>Total:</strong> ${formatarBRL(v.total)}
-        </div>
-        <h4 style="font-size:13px;color:var(--azul);margin:12px 0 6px;">Itens:</h4>
-        <ul style="margin:0;padding-left:20px;font-size:13px;color:#445;">${itensTxt}</ul>
-      </div>
-    `;
-    document.getElementById('modal-detalhes-cancelamento').style.display = 'flex';
-  }
-
   function abrirCancelarVenda(vendaId) {
     _vendaCancelandoId = vendaId;
     document.getElementById('cv-motivo').value = '';

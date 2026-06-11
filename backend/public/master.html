@@ -271,6 +271,37 @@
   </div>
 </div>
 
+<!-- Modal: Criar Empresa Extra (multi-empresa) -->
+<div class="modal" id="modal-empresa-extra">
+  <div class="modal-content" style="max-width:500px;">
+    <h2 id="me-extra-titulo" style="margin-bottom:8px;">Criar Empresa Extra</h2>
+    <p style="font-size:13px;color:#557;margin-bottom:16px;">
+      Cria uma <strong>nova empresa</strong> para o mesmo cliente, usando o e-mail/senha do admin atual.
+      O cliente vai ver as 2 empresas no login e poderá trocar entre elas.
+    </p>
+    <div id="me-extra-grupo-info" style="display:none;background:#dbeafe;color:#1e40af;padding:10px;border-radius:8px;font-size:12px;margin-bottom:14px;"></div>
+    <form id="form-empresa-extra" onsubmit="event.preventDefault(); criarEmpresaExtra();">
+      <label>Nome da nova empresa</label>
+      <input type="text" id="me-extra-nome" required placeholder="Ex: Loja Filial Goiânia" autocomplete="off">
+
+      <label>CNPJ da nova empresa (opcional)</label>
+      <input type="text" id="me-extra-cnpj" placeholder="00.000.000/0001-00" autocomplete="off">
+
+      <p style="font-size:11px;color:#778;margin:4px 0 16px;">
+        ⚠️ <strong>Lembrete de cobrança:</strong> esse cliente paga R$ 49,90 a mais por empresa adicional.
+        Ajuste o valor da mensalidade da nova empresa depois (no botão Editar).
+      </p>
+
+      <div class="erro" id="me-extra-erro" style="display:none;"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn-action" onclick="document.getElementById('modal-empresa-extra').classList.remove('show');">Cancelar</button>
+        <button type="submit" class="btn-action" style="background:#0891b2;color:#fff;border-color:#0891b2;">Criar Empresa</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   const API = '';
   function getToken() { return localStorage.getItem('master-token'); }
@@ -422,6 +453,7 @@
               <button class="btn-action" onclick="acessarEmpresa(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#7c3aed;border-color:#7c3aed;">🔓 Acessar</button>
               <button class="btn-action" onclick="abrirEditar(${e.id})">Editar</button>
               <button class="btn-action" onclick="abrirPagamento(${e.id})" style="color:var(--verde);border-color:var(--verde);">+Pgto</button>
+              <button class="btn-action" onclick="abrirCriarEmpresaExtra(${e.id}, '${(e.nome || '').replace(/'/g, "\\'")}')" style="color:#0891b2;border-color:#0891b2;" title="Criar empresa adicional pro mesmo cliente">+Empresa</button>
               ${e.status === 'bloqueada'
                 ? `<button class="btn-action" onclick="desbloquearEmpresa(${e.id})">Desbloquear</button>`
                 : `<button class="btn-action danger" onclick="bloquearEmpresa(${e.id})">Bloquear</button>`}
@@ -488,6 +520,69 @@
 
   // Pagamento
   let _empresaPagamentoId = null;
+  // ====== MULTI-EMPRESA: criar empresa extra pro mesmo cliente ======
+  let _empresaExtraOrigemId = null;
+
+  async function abrirCriarEmpresaExtra(empresaId, empresaNome) {
+    _empresaExtraOrigemId = empresaId;
+    document.getElementById('me-extra-titulo').textContent = `Empresa Extra de: ${empresaNome}`;
+    document.getElementById('me-extra-nome').value = '';
+    document.getElementById('me-extra-cnpj').value = '';
+    document.getElementById('me-extra-erro').style.display = 'none';
+
+    // Mostra info do grupo (se já tem outras empresas)
+    const infoDiv = document.getElementById('me-extra-grupo-info');
+    infoDiv.style.display = 'none';
+    try {
+      const r = await fetch(`/api/master/empresas/${empresaId}/grupo`, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+      });
+      const data = await r.json();
+      if (r.ok && data.empresas && data.empresas.length > 1) {
+        infoDiv.innerHTML = `📋 <strong>${data.email}</strong> já tem acesso a <strong>${data.empresas.length}</strong> empresas: ${data.empresas.map(e => e.nome).join(', ')}.`;
+        infoDiv.style.display = '';
+      } else if (r.ok && data.email) {
+        infoDiv.innerHTML = `📧 E-mail do admin: <strong>${data.email}</strong> (será o mesmo login pra nova empresa).`;
+        infoDiv.style.display = '';
+      }
+    } catch (e) {}
+
+    document.getElementById('modal-empresa-extra').classList.add('show');
+  }
+
+  async function criarEmpresaExtra() {
+    const nome = document.getElementById('me-extra-nome').value.trim();
+    const cnpj = document.getElementById('me-extra-cnpj').value.trim();
+    const erro = document.getElementById('me-extra-erro');
+    erro.style.display = 'none';
+    if (nome.length < 2) {
+      erro.textContent = 'Informe o nome da empresa.';
+      erro.style.display = '';
+      return;
+    }
+    try {
+      const r = await fetch(`/api/master/empresas/${_empresaExtraOrigemId}/criar-empresa-extra`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ nomeNovaEmpresa: nome, cnpj: cnpj || null })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao criar empresa');
+      document.getElementById('modal-empresa-extra').classList.remove('show');
+      let msg = `✅ Empresa criada com sucesso!\n\n`;
+      msg += `Nome: ${data.empresaNova.nome}\n`;
+      msg += `ID: ${data.empresaNova.id}\n`;
+      msg += `Login: ${data.emailDoAdmin}\n\n`;
+      msg += `O cliente agora tem ${data.empresasNoGrupo.length} empresas no login.\n`;
+      msg += `Lembre de ajustar a mensalidade no botão Editar.`;
+      alert(msg);
+      await Promise.all([carregarDashboard(), carregarEmpresas()]);
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = '';
+    }
+  }
+
   function abrirPagamento(id) {
     const e = _empresasCache.find(x => x.id === id);
     if (!e) return;

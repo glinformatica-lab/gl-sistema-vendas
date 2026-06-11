@@ -1,0 +1,36 @@
+{
+  "name": "sistema-vendas-backend",
+  "version": "1.0.0",
+  "description": "Sistema de Vendas multi-tenant com autenticação",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "init-db": "node db/init.js",
+    "migrate-v2": "node db/migrate-v2.js",
+    "migrate-v3": "node db/migrate-v3.js",
+    "migrate-v4": "node db/migrate-v4.js",
+    "migrate-v5": "node db/migrate-v5.js",
+    "migrate-v6": "node db/migrate-v6.js",
+    "migrate-v7": "node db/migrate-v7.js",
+    "migrate-v8": "node db/migrate-v8.js",
+    "migrate-v9": "node db/migrate-v9.js",
+    "migrate-v10": "node db/migrate-v10.js",
+    "migrate-v11": "node db/migrate-v11.js",
+    "migrate-v12": "node db/migrate-v12.js",
+    "migrate-v13": "node db/migrate-v13.js",
+    "migrate-v14": "node db/migrate-v14.js",
+    "init-master": "node db/init-master.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.0"
+  }
+}

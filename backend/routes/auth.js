@@ -100,24 +100,58 @@ router.post('/registrar-empresa', async (req, res) => {
 
 // Login (empresa)
 router.post('/login', async (req, res) => {
-  const { email, senha } = req.body || {};
+  const { email, senha, empresaId } = req.body || {};
   if (!email || !senha) return res.status(400).json({ error: 'Informe e-mail e senha.' });
   try {
-    const result = await db.query(
+    // Busca TODOS os usuarios com esse e-mail (pode ser multi-empresa via grupo_id)
+    const resultTodos = await db.query(
       `SELECT u.*, e.id AS emp_id, e.nome AS empresa_nome, e.status AS empresa_status,
               e.plano, e.data_vencimento,
               COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
        FROM usuarios u
        JOIN empresas e ON e.id = u.empresa_id
-       WHERE u.email = $1 LIMIT 1`,
+       WHERE LOWER(u.email) = $1
+       ORDER BY u.id ASC`,
       [email.toLowerCase().trim()]
     );
-    const usuario = result.rows[0];
-    if (!usuario) return res.status(401).json({ error: 'Credenciais inválidas.' });
-    const ok = await bcrypt.compare(senha, usuario.senha_hash);
+
+    if (resultTodos.rows.length === 0) return res.status(401).json({ error: 'Credenciais inválidas.' });
+
+    // Confere senha contra o primeiro usuário (todos têm a mesma senha quando estão no mesmo grupo)
+    const primeiro = resultTodos.rows[0];
+    const ok = await bcrypt.compare(senha, primeiro.senha_hash);
     if (!ok) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
-    // Verifica licença
+    // Se múltiplas empresas E cliente não escolheu ainda → retorna lista pra escolher
+    const empresasAtivas = resultTodos.rows.filter(u => {
+      // Só lista empresas em situação saudável (não bloqueada/cancelada)
+      return u.empresa_status !== 'cancelada' && u.empresa_status !== 'bloqueada';
+    });
+
+    if (empresasAtivas.length > 1 && !empresaId) {
+      return res.json({
+        precisaEscolherEmpresa: true,
+        empresas: empresasAtivas.map(u => ({
+          id: u.empresa_id,
+          nome: u.empresa_nome,
+          plano: u.plano,
+          status: u.empresa_status,
+          moduloFiscalAtivo: !!u.modulo_fiscal_ativo
+        }))
+      });
+    }
+
+    // Se cliente escolheu uma empresa específica, valida que ela está no grupo
+    let usuario;
+    if (empresaId) {
+      usuario = resultTodos.rows.find(u => u.empresa_id === parseInt(empresaId));
+      if (!usuario) return res.status(403).json({ error: 'Você não tem acesso a essa empresa.' });
+    } else {
+      // 1 empresa só → usa o primeiro mesmo
+      usuario = primeiro;
+    }
+
+    // Verifica licença da empresa escolhida
     const lic = await verificarLicenca({
       id: usuario.empresa_id, status: usuario.empresa_status,
       plano: usuario.plano, data_vencimento: usuario.data_vencimento
@@ -138,7 +172,9 @@ router.post('/login', async (req, res) => {
         status: usuario.empresa_status, plano: usuario.plano,
         dataVencimento: venc,
         moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo
-      }
+      },
+      // Informa se o cliente tem outras empresas (pra mostrar botão "Trocar Empresa")
+      temMultiEmpresa: empresasAtivas.length > 1
     });
   } catch (err) {
     console.error('[auth/login]', err);
@@ -226,6 +262,97 @@ router.put('/me/senha', autenticar, async (req, res) => {
   } catch (err) {
     console.error('[auth/me/senha]', err);
     res.status(500).json({ error: 'Erro ao trocar a senha.' });
+  }
+});
+
+// Lista as empresas do grupo do usuário (pra trocar de empresa)
+router.get('/minhas-empresas', autenticar, async (req, res) => {
+  try {
+    // Pega o email do usuário atual
+    const meQ = await db.query('SELECT email FROM usuarios WHERE id = $1', [req.user.userId]);
+    if (meQ.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const email = meQ.rows[0].email;
+
+    // Lista todas as empresas onde o cliente tem usuário ativo
+    const result = await db.query(
+      `SELECT u.id AS usuario_id, u.papel,
+              e.id AS empresa_id, e.nome AS empresa_nome,
+              e.status AS empresa_status, e.plano,
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+       FROM usuarios u
+       JOIN empresas e ON e.id = u.empresa_id
+       WHERE LOWER(u.email) = LOWER($1)
+         AND e.status NOT IN ('cancelada', 'bloqueada')
+       ORDER BY e.nome ASC`,
+      [email]
+    );
+    res.json({
+      atual: req.user.empresaId,
+      empresas: result.rows.map(r => ({
+        empresaId: r.empresa_id,
+        nome: r.empresa_nome,
+        plano: r.plano,
+        status: r.empresa_status,
+        papel: r.papel,
+        moduloFiscalAtivo: !!r.modulo_fiscal_ativo
+      }))
+    });
+  } catch (err) {
+    console.error('[auth/minhas-empresas]', err);
+    res.status(500).json({ error: 'Erro ao listar empresas.' });
+  }
+});
+
+// Troca pra outra empresa do mesmo cliente (gera novo JWT)
+router.post('/trocar-empresa', autenticar, async (req, res) => {
+  const { empresaId } = req.body || {};
+  if (!empresaId) return res.status(400).json({ error: 'Empresa não informada.' });
+  try {
+    // Pega o email atual
+    const meQ = await db.query('SELECT email FROM usuarios WHERE id = $1', [req.user.userId]);
+    if (meQ.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const email = meQ.rows[0].email;
+
+    // Busca o usuário equivalente na empresa destino
+    const r = await db.query(
+      `SELECT u.*, e.id AS emp_id, e.nome AS empresa_nome, e.status AS empresa_status,
+              e.plano, e.data_vencimento,
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+       FROM usuarios u
+       JOIN empresas e ON e.id = u.empresa_id
+       WHERE LOWER(u.email) = LOWER($1) AND u.empresa_id = $2 LIMIT 1`,
+      [email, parseInt(empresaId)]
+    );
+    if (r.rows.length === 0) return res.status(403).json({ error: 'Você não tem acesso a essa empresa.' });
+    const usuario = r.rows[0];
+
+    // Valida licença da empresa destino
+    const lic = await verificarLicenca({
+      id: usuario.empresa_id, status: usuario.empresa_status,
+      plano: usuario.plano, data_vencimento: usuario.data_vencimento
+    });
+    if (!lic.ok) return res.status(403).json({ error: lic.error });
+
+    const token = gerarToken(usuario);
+    const venc = usuario.data_vencimento
+      ? (usuario.data_vencimento instanceof Date
+          ? usuario.data_vencimento.toISOString().slice(0,10)
+          : String(usuario.data_vencimento).slice(0,10))
+      : null;
+    res.json({
+      token,
+      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel },
+      empresa: {
+        id: usuario.empresa_id, nome: usuario.empresa_nome,
+        status: usuario.empresa_status, plano: usuario.plano,
+        dataVencimento: venc,
+        moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo
+      },
+      temMultiEmpresa: true
+    });
+  } catch (err) {
+    console.error('[auth/trocar-empresa]', err);
+    res.status(500).json({ error: 'Erro ao trocar de empresa.' });
   }
 });
 

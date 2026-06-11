@@ -2,6 +2,7 @@
 // Todas exigem token Master (autenticarMaster aplicado no server.js).
 const express = require('express');
 const db = require('../db');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -364,6 +365,128 @@ router.get('/empresas/:id/historico-acessos', async (req, res) => {
   } catch (err) {
     console.error('[master/historico-acessos]', err);
     res.status(500).json({ error: 'Erro ao buscar histórico.' });
+  }
+});
+
+// Cria uma EMPRESA EXTRA pra um usuário existente (multi-empresa)
+// Pega o usuário admin de uma empresa origem e cria uma cópia dele numa nova empresa
+router.post('/empresas/:id/criar-empresa-extra', async (req, res) => {
+  const empresaOrigemId = parseInt(req.params.id);
+  const { nomeNovaEmpresa, cnpj } = req.body || {};
+  if (!nomeNovaEmpresa || nomeNovaEmpresa.trim().length < 2) {
+    return res.status(400).json({ error: 'Informe o nome da nova empresa.' });
+  }
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) Busca o admin da empresa origem (pra clonar)
+    const adminQ = await client.query(
+      `SELECT id, nome, email, senha_hash, grupo_id
+       FROM usuarios
+       WHERE empresa_id = $1 AND papel = 'admin'
+       ORDER BY id ASC LIMIT 1`,
+      [empresaOrigemId]
+    );
+    if (adminQ.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Empresa origem não tem admin.' });
+    }
+    const adminOrigem = adminQ.rows[0];
+
+    // 2) Gera ou reaproveita grupo_id
+    let grupoId = adminOrigem.grupo_id;
+    if (!grupoId) {
+      grupoId = 'grp_' + crypto.randomBytes(8).toString('hex');
+      // Atualiza o admin origem com o grupo_id
+      await client.query(
+        'UPDATE usuarios SET grupo_id = $1 WHERE id = $2',
+        [grupoId, adminOrigem.id]
+      );
+    }
+
+    // 3) Verifica se já existe outro usuário com mesmo email em outra empresa (evita duplicata)
+    const jaTemQ = await client.query(
+      `SELECT u.empresa_id, e.nome AS empresa_nome
+       FROM usuarios u
+       JOIN empresas e ON e.id = u.empresa_id
+       WHERE LOWER(u.email) = LOWER($1) AND u.empresa_id != $2`,
+      [adminOrigem.email, empresaOrigemId]
+    );
+    const empresasExistentes = jaTemQ.rows.map(r => r.empresa_nome);
+
+    // 4) Cria a nova empresa (status trial por padrão; master pode ajustar depois)
+    const dataVenc = new Date();
+    dataVenc.setDate(dataVenc.getDate() + 7);
+    const novaEmpresaQ = await client.query(
+      `INSERT INTO empresas (nome, cnpj, status, plano, data_vencimento, valor_mensalidade, origem)
+       VALUES ($1, $2, 'trial', 'trial', $3, 0, 'master-multi-empresa')
+       RETURNING *`,
+      [nomeNovaEmpresa.trim(), cnpj || null, dataVenc.toISOString().slice(0, 10)]
+    );
+    const novaEmpresa = novaEmpresaQ.rows[0];
+
+    // 5) Clona o admin pra nova empresa (mesma senha, mesmo grupo_id)
+    await client.query(
+      `INSERT INTO usuarios (empresa_id, email, nome, senha_hash, papel, grupo_id)
+       VALUES ($1, $2, $3, $4, 'admin', $5)`,
+      [novaEmpresa.id, adminOrigem.email, adminOrigem.nome, adminOrigem.senha_hash, grupoId]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      empresaNova: {
+        id: novaEmpresa.id,
+        nome: novaEmpresa.nome,
+        status: novaEmpresa.status
+      },
+      grupoId,
+      emailDoAdmin: adminOrigem.email,
+      empresasNoGrupo: [empresaOrigemId, ...jaTemQ.rows.map(r => r.empresa_id), novaEmpresa.id],
+      avisoEmpresasExistentes: empresasExistentes.length > 0
+        ? `Atenção: este e-mail já tem acesso a: ${empresasExistentes.join(', ')}. Agora também terá a ${nomeNovaEmpresa}.`
+        : null
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[master/criar-empresa-extra]', err);
+    res.status(500).json({ error: 'Erro ao criar empresa extra: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Lista empresas do grupo de um usuário (pra ver multi-empresa no master)
+router.get('/empresas/:id/grupo', async (req, res) => {
+  const empresaId = parseInt(req.params.id);
+  try {
+    // Pega o email do admin desta empresa
+    const adminQ = await db.query(
+      `SELECT email, grupo_id FROM usuarios
+       WHERE empresa_id = $1 AND papel = 'admin' LIMIT 1`,
+      [empresaId]
+    );
+    if (adminQ.rows.length === 0) return res.json({ empresas: [] });
+    const email = adminQ.rows[0].email;
+
+    // Lista todas as empresas onde esse email tem acesso
+    const r = await db.query(
+      `SELECT e.id, e.nome, e.status, e.plano, e.valor_mensalidade,
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+       FROM usuarios u
+       JOIN empresas e ON e.id = u.empresa_id
+       WHERE LOWER(u.email) = LOWER($1)
+       ORDER BY e.nome ASC`,
+      [email]
+    );
+    res.json({
+      email,
+      empresas: r.rows.map(camelizar)
+    });
+  } catch (err) {
+    console.error('[master/grupo]', err);
+    res.status(500).json({ error: 'Erro ao listar grupo.' });
   }
 });
 
