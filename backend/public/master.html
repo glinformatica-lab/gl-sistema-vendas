@@ -273,9 +273,9 @@
 
 <!-- Modal: Criar Empresa Extra (multi-empresa) -->
 <div class="modal" id="modal-empresa-extra">
-  <div class="modal-content" style="max-width:500px;">
-    <h2 id="me-extra-titulo" style="margin-bottom:8px;">Criar Empresa Extra</h2>
-    <p style="font-size:13px;color:#557;margin-bottom:16px;">
+  <div class="modal-card" style="max-width:520px;">
+    <h2 id="me-extra-titulo" style="margin-bottom:8px;color:var(--azul);">Criar Empresa Extra</h2>
+    <p style="font-size:13px;color:#557;margin-bottom:16px;line-height:1.5;">
       Cria uma <strong>nova empresa</strong> para o mesmo cliente, usando o e-mail/senha do admin atual.
       O cliente vai ver as 2 empresas no login e poderá trocar entre elas.
     </p>
@@ -287,16 +287,16 @@
       <label>CNPJ da nova empresa (opcional)</label>
       <input type="text" id="me-extra-cnpj" placeholder="00.000.000/0001-00" autocomplete="off">
 
-      <p style="font-size:11px;color:#778;margin:4px 0 16px;">
+      <p style="font-size:12px;color:#5a6473;background:#fef3c7;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;margin:14px 0;">
         ⚠️ <strong>Lembrete de cobrança:</strong> esse cliente paga R$ 49,90 a mais por empresa adicional.
-        Ajuste o valor da mensalidade da nova empresa depois (no botão Editar).
+        Ajuste o valor da mensalidade da nova empresa depois (no botão <strong>Editar</strong>).
       </p>
 
-      <div class="erro" id="me-extra-erro" style="display:none;"></div>
+      <div class="erro" id="me-extra-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-bottom:10px;"></div>
 
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button type="button" class="btn-action" onclick="document.getElementById('modal-empresa-extra').classList.remove('show');">Cancelar</button>
-        <button type="submit" class="btn-action" style="background:#0891b2;color:#fff;border-color:#0891b2;">Criar Empresa</button>
+      <div class="actions">
+        <button type="button" class="btn" style="background:#eceef2;color:#1e3a8a;" onclick="document.getElementById('modal-empresa-extra').classList.remove('show');">Cancelar</button>
+        <button type="submit" class="btn" style="background:#0891b2;color:#fff;">Criar Empresa</button>
       </div>
     </form>
   </div>
