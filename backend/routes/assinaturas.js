@@ -664,7 +664,7 @@ router.post('/renovar', autenticar, async (req, res) => {
     // Atualiza referência do PagBank
     if (checkout.checkoutId) {
       await db.query(
-        `UPDATE assinaturas SET pagbank_checkout_id = $1 WHERE referencia = $2`,
+        `UPDATE assinaturas SET checkout_id = $1 WHERE referencia = $2`,
         [checkout.checkoutId, referencia]
       );
     }
@@ -736,7 +736,7 @@ router.post('/contratar-empresa-extra', autenticar, async (req, res) => {
     }
     if (checkout.checkoutId) {
       await db.query(
-        `UPDATE assinaturas SET pagbank_checkout_id = $1 WHERE referencia = $2`,
+        `UPDATE assinaturas SET checkout_id = $1 WHERE referencia = $2`,
         [checkout.checkoutId, referencia]
       );
     }
