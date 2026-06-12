@@ -7313,6 +7313,108 @@ ${conteudo}
     const totalRecebido = crRecebidas.reduce((s,c) => s + (c.valor||0), 0);
     const totalAReceber = crPendentes.reduce((s,c) => s + (c.valor||0), 0);
 
+    // ===== 4) INDICADORES ADICIONAIS =====
+
+    // Ticket médio
+    const ticketMedio = vendas.length > 0 ? totalVendas / vendas.length : 0;
+
+    // TOP 10 Produtos mais vendidos (por quantidade e por receita)
+    const mapaProd = {};
+    for (const v of vendas) {
+      for (const it of (v.itens || [])) {
+        const nome = it.produto || it.nome || '—';
+        if (!mapaProd[nome]) mapaProd[nome] = { nome, qtd: 0, receita: 0 };
+        const qtd = Number(it.qtd) || 0;
+        const preco = Number(it.preco) || 0;
+        mapaProd[nome].qtd += qtd;
+        mapaProd[nome].receita += qtd * preco;
+      }
+    }
+    const top10Produtos = Object.values(mapaProd)
+      .sort((a, b) => b.receita - a.receita)
+      .slice(0, 10);
+    const linhasTopProd = top10Produtos.length
+      ? top10Produtos.map((p, i) => `<tr>
+          <td style="text-align:center;font-weight:700;color:#1e3a8a;">${i + 1}º</td>
+          <td>${escapeHtml(p.nome)}</td>
+          <td style="text-align:center;">${p.qtd.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
+          <td style="text-align:right;font-weight:700;">${formatarBRL(p.receita)}</td>
+          <td style="text-align:right;color:#16a34a;">${totalVendas > 0 ? ((p.receita / totalVendas) * 100).toFixed(1) + '%' : '—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;font-style:italic;">Sem dados de produtos.</td></tr>';
+
+    // TOP 10 Clientes
+    const mapaCli = {};
+    for (const v of vendas) {
+      const cli = v.cliente || '— Sem cliente —';
+      if (!mapaCli[cli]) mapaCli[cli] = { nome: cli, qtd: 0, total: 0 };
+      mapaCli[cli].qtd += 1;
+      mapaCli[cli].total += (v.total || 0);
+    }
+    const top10Clientes = Object.values(mapaCli)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    const linhasTopCli = top10Clientes.length
+      ? top10Clientes.map((c, i) => `<tr>
+          <td style="text-align:center;font-weight:700;color:#1e3a8a;">${i + 1}º</td>
+          <td>${escapeHtml(c.nome)}</td>
+          <td style="text-align:center;">${c.qtd}</td>
+          <td style="text-align:right;font-weight:700;">${formatarBRL(c.total)}</td>
+          <td style="text-align:right;">${formatarBRL(c.total / c.qtd)}</td>
+          <td style="text-align:right;color:#16a34a;">${totalVendas > 0 ? ((c.total / totalVendas) * 100).toFixed(1) + '%' : '—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;font-style:italic;">Sem clientes neste mês.</td></tr>';
+
+    // Faturamento por dia do mês (gráfico de barras textual)
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    const porDia = new Array(ultimoDia + 1).fill(0);
+    for (const v of vendas) {
+      if (!v.data) continue;
+      const d = new Date(v.data);
+      if (!isNaN(d) && d.getMonth() === mes && d.getFullYear() === ano) {
+        porDia[d.getDate()] += (v.total || 0);
+      }
+    }
+    const maxDia = Math.max(...porDia, 1);
+    const linhasGrafico = [];
+    for (let d = 1; d <= ultimoDia; d++) {
+      const val = porDia[d];
+      const pct = (val / maxDia) * 100;
+      const barColor = val > 0 ? (val >= maxDia * 0.6 ? '#16a34a' : val >= maxDia * 0.3 ? '#0891b2' : '#94a3b8') : '#f1f5f9';
+      linhasGrafico.push(`<tr>
+        <td style="text-align:center;font-size:11px;color:#64748b;width:40px;">${String(d).padStart(2,'0')}</td>
+        <td style="padding:2px 6px;">
+          <div style="position:relative;height:18px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+            <div style="position:absolute;top:0;left:0;height:100%;width:${pct}%;background:${barColor};border-radius:3px;"></div>
+          </div>
+        </td>
+        <td style="text-align:right;font-size:11px;font-weight:${val > 0 ? '700' : '400'};color:${val > 0 ? '#0f172a' : '#94a3b8'};width:100px;">${val > 0 ? formatarBRL(val) : '—'}</td>
+      </tr>`);
+    }
+    const tabelaGrafico = `<table style="width:100%;border-collapse:separate;border-spacing:0 2px;font-size:11px;">
+      <tbody>${linhasGrafico.join('')}</tbody>
+    </table>`;
+
+    // DRE simplificado
+    const lucroBruto = totalVendas - totalCompras;
+    const margemPct = totalVendas > 0 ? (lucroBruto / totalVendas) * 100 : 0;
+
+    // Inadimplência (vencidas e não pagas)
+    const hoje = new Date();
+    const inadimplencia = dbContasReceber.filter(c =>
+      c.status !== 'Recebida' &&
+      c.vencimento &&
+      new Date(c.vencimento) < hoje
+    );
+    const totalInadimplencia = inadimplencia.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
+    // Taxa de cobrança (% recebido sobre o total esperado no mês)
+    const totalEsperado = totalRecebido + totalAReceber;
+    const taxaCobranca = totalEsperado > 0 ? (totalRecebido / totalEsperado) * 100 : 100;
+
+    // Vendas sem cliente (balcão)
+    const vendasSemCliente = vendas.filter(v => !v.cliente || v.cliente.trim() === '').length;
+
     // Monta o documento completo
     const w = window.open('', '_blank', 'width=1100,height=800');
     if (!w) { alert('Não foi possível abrir a janela. Verifique se o navegador está bloqueando pop-ups.'); return; }
@@ -7362,20 +7464,45 @@ ${conteudo}
     <div class="card"><div class="card-title">Descontos</div><div class="card-value red">${formatarBRL(descVendas)}</div></div>
     <div class="card"><div class="card-title">Faturamento Líquido</div><div class="card-value green">${formatarBRL(totalVendas)}</div></div>
   </div>
+  <div class="cards">
+    <div class="card"><div class="card-title">Ticket Médio</div><div class="card-value blue">${formatarBRL(ticketMedio)}</div></div>
+    <div class="card"><div class="card-title">Vendas no Balcão</div><div class="card-value">${vendasSemCliente}<span style="font-size:11px;color:#889;font-weight:normal;"> sem cliente</span></div></div>
+    <div class="card"><div class="card-title">Vendas Identificadas</div><div class="card-value">${vendas.length - vendasSemCliente}<span style="font-size:11px;color:#889;font-weight:normal;"> com cliente</span></div></div>
+  </div>
   ${linhasPagamento ? `
   <h3 style="font-size:13px;color:#475569;margin:14px 0 6px;">Faturamento por forma de pagamento</h3>
   <table style="max-width:400px;">
     <thead><tr><th>Forma de Pagamento</th><th style="text-align:right;">Total</th></tr></thead>
     <tbody>${linhasPagamento}</tbody>
   </table>` : ''}
+
+  <h3 style="font-size:13px;color:#475569;margin:18px 0 6px;">Faturamento dia a dia</h3>
+  ${tabelaGrafico}
+
   <h3 style="font-size:13px;color:#475569;margin:18px 0 6px;">Detalhamento das vendas</h3>
   <table>
     <thead><tr><th>Data</th><th>Nº</th><th>Cliente</th><th style="text-align:center;">Itens</th><th style="text-align:right;">Subtotal</th><th style="text-align:right;">Desc.</th><th style="text-align:right;">Total</th><th>Pagto</th></tr></thead>
     <tbody>${linhasVendas}</tbody>
   </table>
 
+  <!-- 1.1 TOP PRODUTOS -->
+  <h2 class="secao quebra">2. Top 10 Produtos Mais Vendidos</h2>
+  <p style="font-size:12px;color:#64748b;margin:6px 0 10px;">Ranking por faturamento (receita gerada pelo produto)</p>
+  <table>
+    <thead><tr><th style="text-align:center;width:40px;">Pos.</th><th>Produto</th><th style="text-align:center;">Qtd Vendida</th><th style="text-align:right;">Receita</th><th style="text-align:right;">% do Total</th></tr></thead>
+    <tbody>${linhasTopProd}</tbody>
+  </table>
+
+  <!-- 1.2 TOP CLIENTES -->
+  <h2 class="secao">3. Top 10 Clientes do Mês</h2>
+  <p style="font-size:12px;color:#64748b;margin:6px 0 10px;">Ranking por valor total comprado</p>
+  <table>
+    <thead><tr><th style="text-align:center;width:40px;">Pos.</th><th>Cliente</th><th style="text-align:center;">Qtd Compras</th><th style="text-align:right;">Total</th><th style="text-align:right;">Ticket Médio</th><th style="text-align:right;">% do Total</th></tr></thead>
+    <tbody>${linhasTopCli}</tbody>
+  </table>
+
   <!-- 2. COMPRAS -->
-  <h2 class="secao quebra">2. Relatório de Compras (Entradas de Mercadoria)</h2>
+  <h2 class="secao quebra">4. Relatório de Compras (Entradas de Mercadoria)</h2>
   <div class="cards">
     <div class="card"><div class="card-title">Qtd de Entradas</div><div class="card-value blue">${compras.length}</div></div>
     <div class="card"><div class="card-title">Total em Compras</div><div class="card-value red">${formatarBRL(totalCompras)}</div></div>
@@ -7385,8 +7512,68 @@ ${conteudo}
     <tbody>${linhasCompras}</tbody>
   </table>
 
-  <!-- 3. RESUMO FINANCEIRO -->
-  <h2 class="secao quebra">3. Resumo Financeiro</h2>
+  <!-- 5. DRE SIMPLIFICADO -->
+  <h2 class="secao">5. DRE Simplificado</h2>
+  <p style="font-size:12px;color:#64748b;margin:6px 0 10px;">Demonstrativo do Resultado do Exercício — versão simplificada</p>
+  <table style="max-width:600px;">
+    <tbody>
+      <tr>
+        <td style="font-weight:600;">(+) Receita Bruta de Vendas</td>
+        <td style="text-align:right;font-weight:700;color:#16a34a;">${formatarBRL(subtotalVendas)}</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px;color:#64748b;">(−) Descontos Concedidos</td>
+        <td style="text-align:right;color:#dc2626;">${formatarBRL(descVendas)}</td>
+      </tr>
+      <tr style="border-top:2px solid #cbd5e1;">
+        <td style="font-weight:700;">(=) Receita Líquida</td>
+        <td style="text-align:right;font-weight:700;">${formatarBRL(totalVendas)}</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px;color:#64748b;">(−) Compras de Mercadorias</td>
+        <td style="text-align:right;color:#dc2626;">${formatarBRL(totalCompras)}</td>
+      </tr>
+      <tr style="border-top:2px solid #cbd5e1;">
+        <td style="font-weight:700;color:#1e3a8a;">(=) Resultado Bruto</td>
+        <td style="text-align:right;font-weight:900;font-size:15px;color:${lucroBruto >= 0 ? '#16a34a' : '#dc2626'};">${formatarBRL(lucroBruto)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;color:#64748b;">Margem Bruta</td>
+        <td style="text-align:right;font-weight:700;color:${margemPct >= 30 ? '#16a34a' : margemPct >= 15 ? '#0891b2' : '#dc2626'};">${margemPct.toFixed(1)}%</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;">
+    ⚠️ Este DRE NÃO inclui custos com pessoal, aluguel, impostos e outras despesas operacionais.
+    Apenas margem bruta sobre compras/vendas. Não substitui escrituração contábil oficial.
+  </p>
+
+  <!-- 6. INADIMPLÊNCIA -->
+  <h2 class="secao">6. Análise de Cobrança</h2>
+  <div class="cards">
+    <div class="card"><div class="card-title">Taxa de Recebimento</div><div class="card-value ${taxaCobranca >= 90 ? 'green' : taxaCobranca >= 70 ? 'blue' : 'red'}">${taxaCobranca.toFixed(0)}%</div></div>
+    <div class="card"><div class="card-title">Inadimplência (vencidas)</div><div class="card-value red">${formatarBRL(totalInadimplencia)}</div></div>
+    <div class="card"><div class="card-title">Qtd Vencidas</div><div class="card-value red">${inadimplencia.length}</div></div>
+  </div>
+  ${inadimplencia.length > 0 ? `
+    <h3 style="font-size:13px;color:#dc2626;margin:14px 0 6px;">Contas vencidas e não recebidas</h3>
+    <table>
+      <thead><tr><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th style="text-align:right;">Valor</th><th style="text-align:center;">Dias em atraso</th></tr></thead>
+      <tbody>${inadimplencia.slice(0, 15).map(c => {
+        const dias = Math.floor((hoje - new Date(c.vencimento)) / (1000 * 60 * 60 * 24));
+        return `<tr>
+          <td>${escapeHtml(c.cliente || '—')}</td>
+          <td>${escapeHtml(c.descricao || '—')}</td>
+          <td>${formatarDataBR(c.vencimento)}</td>
+          <td style="text-align:right;font-weight:700;color:#dc2626;">${formatarBRL(c.valor)}</td>
+          <td style="text-align:center;color:#dc2626;font-weight:700;">${dias}d</td>
+        </tr>`;
+      }).join('')}${inadimplencia.length > 15 ? `<tr><td colspan="5" style="text-align:center;color:#64748b;padding:8px;font-style:italic;">... mais ${inadimplencia.length - 15} pendência(s). Veja em Contas a Receber.</td></tr>` : ''}</tbody>
+    </table>
+  ` : '<p style="color:#16a34a;font-weight:600;margin:10px 0;">✅ Não há contas vencidas! Cobrança em dia.</p>'}
+
+  <!-- 7. RESUMO FINANCEIRO -->
+  <h2 class="secao quebra">7. Resumo Financeiro do Mês</h2>
   <div class="cards">
     <div class="card"><div class="card-title">Recebido no mês</div><div class="card-value green">${formatarBRL(totalRecebido)}</div></div>
     <div class="card"><div class="card-title">Pago no mês</div><div class="card-value red">${formatarBRL(totalPago)}</div></div>
