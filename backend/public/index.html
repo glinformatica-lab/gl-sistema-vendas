@@ -1320,6 +1320,26 @@
           </button>
         </div>
 
+        <!-- Card Backup/Exportação Total - apenas admin -->
+        <div id="mc-backup-card" class="admin-only" style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">📦 Backup Completo <span style="font-size:11px;padding:2px 10px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;vertical-align:middle;margin-left:8px;">EXPORTAR</span></h3>
+          <div style="font-size:13px;color:#445;line-height:1.5;margin-bottom:12px;">
+            Baixe um arquivo ZIP com <strong>todos os dados</strong> da sua empresa:
+            <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:#557;">
+              <li>Clientes, fornecedores, produtos e serviços</li>
+              <li>Vendas, orçamentos, contas a pagar/receber</li>
+              <li>Em Excel (.xlsx) E em JSON pra backup técnico</li>
+            </ul>
+          </div>
+          <p style="font-size:11px;color:#668;margin:0 0 12px;line-height:1.5;background:#f0f9ff;padding:8px 10px;border-radius:6px;border-left:3px solid #0891b2;">
+            🛡️ <strong>Seus dados sempre seus.</strong> Sem aprisionamento — exporte sempre que quiser.
+          </p>
+          <div id="mc-backup-status" style="display:none;font-size:12px;padding:8px;border-radius:6px;margin-bottom:10px;"></div>
+          <button id="mc-btn-backup" class="btn" onclick="gerarBackupCompleto()" style="background:#0891b2;color:#fff;font-size:13px;padding:10px 14px;width:100%;">
+            📥 Baixar Backup Completo
+          </button>
+        </div>
+
         <!-- Modal: Pré-qualificação Plano Pro -->
         <div id="modal-interesse-pro" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;padding:20px;">
           <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">
@@ -2623,6 +2643,7 @@
 <!-- Chart.js para o gráfico (dashboard) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   // ====== AUTH GUARD: redireciona pro login se não tiver token ======
   (function() {
@@ -2971,6 +2992,305 @@
   }
 
   // ====== MULTI-EMPRESA: contratar empresa extra (R$ 79,90/mês) ======
+  // ====== BACKUP/EXPORTAÇÃO COMPLETA (ZIP com Excel + JSON) ======
+  async function gerarBackupCompleto() {
+    const btn = document.getElementById('mc-btn-backup');
+    const status = document.getElementById('mc-backup-status');
+
+    // Verifica se JSZip está disponível
+    if (typeof JSZip === 'undefined') {
+      alert('Erro: biblioteca de compactação não foi carregada. Atualize a página (Ctrl+F5) e tente de novo.');
+      return;
+    }
+
+    // Verifica se XLSX está disponível
+    if (typeof XLSX === 'undefined') {
+      alert('Erro: biblioteca de planilhas não foi carregada. Atualize a página (Ctrl+F5) e tente de novo.');
+      return;
+    }
+
+    const mostrarStatus = (msg, cor) => {
+      status.style.display = 'block';
+      status.style.background = cor === 'erro' ? '#fef2f2' : cor === 'ok' ? '#dcfce7' : '#f0f9ff';
+      status.style.color = cor === 'erro' ? '#991b1b' : cor === 'ok' ? '#166534' : '#0c4a6e';
+      status.style.border = '1px solid ' + (cor === 'erro' ? '#fca5a5' : cor === 'ok' ? '#86efac' : '#93c5fd');
+      status.textContent = msg;
+    };
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Gerando backup...';
+    mostrarStatus('Preparando dados…', 'info');
+
+    try {
+      const zip = new JSZip();
+      const hoje = new Date().toISOString().slice(0, 10);
+
+      // Pega dados da empresa pro nome do arquivo
+      let nomeEmpresa = 'empresa';
+      try {
+        const empJson = localStorage.getItem('empresa');
+        if (empJson) {
+          const emp = JSON.parse(empJson);
+          if (emp.nome) {
+            nomeEmpresa = emp.nome
+              .toLowerCase()
+              .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 30);
+          }
+        }
+      } catch(_) {}
+
+      // === Helpers ===
+      const addPlanilha = (nomeArquivo, dados, nomeAba) => {
+        if (!dados || dados.length === 0) return; // Não cria planilha vazia
+        const ws = XLSX.utils.json_to_sheet(dados);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, nomeAba || 'Dados');
+        const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+        zip.file(nomeArquivo, buffer);
+      };
+
+      // === 1) CLIENTES ===
+      mostrarStatus('Exportando clientes…', 'info');
+      const clientesParaExportar = (dbClientes || []).map(c => ({
+        Nome: c.nome || '',
+        Documento: c.doc || '',
+        Telefone: c.telefone || '',
+        Email: c.email || '',
+        Endereco: c.endereco || '',
+        Bairro: c.bairro || '',
+        Cidade: c.cidade || '',
+        UF: c.uf || '',
+        CEP: c.cep || ''
+      }));
+      addPlanilha('clientes.xlsx', clientesParaExportar, 'Clientes');
+
+      // === 2) FORNECEDORES ===
+      mostrarStatus('Exportando fornecedores…', 'info');
+      const fornecedoresExport = (dbFornecedores || []).map(f => ({
+        Nome: f.nome || '',
+        CNPJ: f.cnpj || '',
+        Telefone: f.telefone || '',
+        Email: f.email || '',
+        Endereco: f.endereco || '',
+        Cidade: f.cidade || '',
+        UF: f.uf || ''
+      }));
+      addPlanilha('fornecedores.xlsx', fornecedoresExport, 'Fornecedores');
+
+      // === 3) PRODUTOS ===
+      mostrarStatus('Exportando produtos…', 'info');
+      const produtosExport = (dbProdutos || []).map(p => ({
+        Codigo: p.codigo || '',
+        CodigoBarras: p.codigoBarras || '',
+        Nome: p.nome || '',
+        Categoria: p.categoria || '',
+        Fornecedor: p.fornecedor || '',
+        Estoque: Number(p.estoque) || 0,
+        PrecoCusto: Number(p.precoCusto) || 0,
+        PrecoVenda: Number(p.precoVenda) || 0,
+        Margem: p.precoCusto && p.precoVenda ? ((p.precoVenda / p.precoCusto - 1) * 100).toFixed(2) + '%' : '',
+        NCM: p.ncm || '',
+        CFOP: p.cfop || '',
+        Unidade: p.un || ''
+      }));
+      addPlanilha('produtos.xlsx', produtosExport, 'Produtos');
+
+      // === 4) SERVIÇOS ===
+      mostrarStatus('Exportando serviços…', 'info');
+      const servicosExport = (typeof _servicosCache !== 'undefined' && Array.isArray(_servicosCache) ? _servicosCache : []).map(s => ({
+        Nome: s.nome || '',
+        Descricao: s.descricao || '',
+        Valor: Number(s.valor) || 0
+      }));
+      addPlanilha('servicos.xlsx', servicosExport, 'Servicos');
+
+      // === 5) VENDAS ===
+      mostrarStatus('Exportando vendas…', 'info');
+      // Tabela "resumo" das vendas
+      const vendasResumo = (dbVendas || []).map(v => ({
+        ID: v.id,
+        Data: v.data || '',
+        Cliente: v.cliente || '',
+        Itens: (v.itens || []).length,
+        Subtotal: Number(v.subtotal) || 0,
+        Desconto: Number(v.desconto) || 0,
+        Total: Number(v.total) || 0,
+        FormaPagamento: v.pagamento || '',
+        Parcelas: (v.parcelas || []).length,
+        Observacoes: v.obs || '',
+        Status: v.status || 'ativa',
+        MotivoCancelamento: v.motivoCancelamento || '',
+        CanceladaEm: v.canceladaEm || '',
+        CanceladaPor: v.canceladaPorNome || ''
+      }));
+      addPlanilha('vendas.xlsx', vendasResumo, 'Vendas');
+
+      // Tabela detalhada com itens (uma linha por item de cada venda)
+      const itensDetalhados = [];
+      for (const v of (dbVendas || [])) {
+        if (v.status === 'cancelada') continue; // Pula canceladas no detalhado
+        for (const it of (v.itens || [])) {
+          itensDetalhados.push({
+            VendaID: v.id,
+            Data: v.data || '',
+            Cliente: v.cliente || '',
+            Produto: it.produto || it.nome || '',
+            Quantidade: Number(it.qtd) || 0,
+            PrecoUnitario: Number(it.preco) || 0,
+            Subtotal: (Number(it.qtd) || 0) * (Number(it.preco) || 0)
+          });
+        }
+      }
+      addPlanilha('vendas-itens-detalhado.xlsx', itensDetalhados, 'Itens');
+
+      // === 6) ORÇAMENTOS ===
+      mostrarStatus('Exportando orçamentos…', 'info');
+      const orcamentosExport = (typeof _orcamentosCache !== 'undefined' && Array.isArray(_orcamentosCache) ? _orcamentosCache : []).map(o => ({
+        ID: o.id,
+        Data: o.data || '',
+        Cliente: o.cliente || '',
+        Total: Number(o.total) || 0,
+        Status: o.status || 'pendente',
+        VendaConvertida: o.vendaIdConvertida || '',
+        Validade: o.validade || '',
+        Observacoes: o.obs || ''
+      }));
+      addPlanilha('orcamentos.xlsx', orcamentosExport, 'Orcamentos');
+
+      // === 7) CONTAS A RECEBER ===
+      mostrarStatus('Exportando contas a receber…', 'info');
+      const cReceberExport = (dbContasReceber || []).map(c => ({
+        Cliente: c.cliente || '',
+        Descricao: c.descricao || '',
+        Valor: Number(c.valor) || 0,
+        Vencimento: c.vencimento || '',
+        DataPagamento: c.dataPagamento || '',
+        Status: c.status || 'Pendente',
+        VendaID: c.vendaId || '',
+        FormaPagamento: c.formaPagamento || ''
+      }));
+      addPlanilha('contas-receber.xlsx', cReceberExport, 'ContasReceber');
+
+      // === 8) CONTAS A PAGAR ===
+      mostrarStatus('Exportando contas a pagar…', 'info');
+      const cPagarExport = (dbContasPagar || []).map(c => ({
+        Fornecedor: c.fornecedor || '',
+        Descricao: c.descricao || '',
+        Valor: Number(c.valor) || 0,
+        Vencimento: c.vencimento || '',
+        DataPagamento: c.dataPagamento || '',
+        Status: c.status || 'Pendente',
+        Categoria: c.categoria || ''
+      }));
+      addPlanilha('contas-pagar.xlsx', cPagarExport, 'ContasPagar');
+
+      // === 9) BACKUP COMPLETO EM JSON (pra restauração técnica) ===
+      mostrarStatus('Gerando backup técnico (JSON)…', 'info');
+      let empresaDados = {};
+      let usuarioDados = {};
+      try { empresaDados = JSON.parse(localStorage.getItem('empresa') || '{}'); } catch(_) {}
+      try { usuarioDados = JSON.parse(localStorage.getItem('usuario') || '{}'); } catch(_) {}
+      // Remove dados sensíveis do usuário antes de exportar
+      delete usuarioDados.senha;
+      delete usuarioDados.senhaHash;
+      const backupJson = {
+        versao: '1.0',
+        geradoEm: new Date().toISOString(),
+        empresa: {
+          nome: empresaDados.nome,
+          cnpj: empresaDados.cnpj,
+          telefone: empresaDados.telefone,
+          email: empresaDados.email,
+          endereco: empresaDados.endereco,
+          plano: empresaDados.plano
+        },
+        usuario: {
+          nome: usuarioDados.nome,
+          email: usuarioDados.email,
+          papel: usuarioDados.papel
+        },
+        dados: {
+          clientes: dbClientes || [],
+          fornecedores: dbFornecedores || [],
+          produtos: dbProdutos || [],
+          servicos: (typeof _servicosCache !== 'undefined' ? _servicosCache : []),
+          vendas: dbVendas || [],
+          orcamentos: (typeof _orcamentosCache !== 'undefined' ? _orcamentosCache : []),
+          contasReceber: dbContasReceber || [],
+          contasPagar: dbContasPagar || []
+        },
+        contadores: {
+          clientes: (dbClientes || []).length,
+          produtos: (dbProdutos || []).length,
+          vendas: (dbVendas || []).length,
+          vendasAtivas: (dbVendas || []).filter(v => v.status !== 'cancelada').length,
+          contasReceber: (dbContasReceber || []).length,
+          contasPagar: (dbContasPagar || []).length
+        }
+      };
+      zip.file('backup-completo.json', JSON.stringify(backupJson, null, 2));
+
+      // === 10) ARQUIVO README ===
+      const readme = `BACKUP COMPLETO - ${empresaDados.nome || 'GL Sistema de Vendas'}
+Gerado em: ${new Date().toLocaleString('pt-BR')}
+
+ARQUIVOS NESTE BACKUP:
+- clientes.xlsx           — Lista de clientes
+- fornecedores.xlsx       — Lista de fornecedores
+- produtos.xlsx           — Catálogo de produtos
+- servicos.xlsx           — Catálogo de serviços
+- vendas.xlsx             — Resumo de todas as vendas
+- vendas-itens-detalhado.xlsx — Cada item de cada venda
+- orcamentos.xlsx         — Orçamentos
+- contas-receber.xlsx     — Contas a receber
+- contas-pagar.xlsx       — Contas a pagar
+- backup-completo.json    — Backup técnico (dados brutos)
+
+COMO USAR:
+- Abra os arquivos .xlsx no Excel, Google Sheets ou LibreOffice
+- O arquivo .json é o backup técnico (pode ser usado pra restauração futura)
+
+TOTAIS:
+- Clientes:        ${(dbClientes || []).length}
+- Produtos:        ${(dbProdutos || []).length}
+- Vendas:          ${(dbVendas || []).length}
+- Contas a Pagar:  ${(dbContasPagar || []).length}
+- Contas a Rec.:   ${(dbContasReceber || []).length}
+
+GL Sistema de Vendas
+https://sistema.glinformatica.com.br
+`;
+      zip.file('LEIA-ME.txt', readme);
+
+      // === GERA E BAIXA O ZIP ===
+      mostrarStatus('Compactando arquivos…', 'info');
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+      const nomeArquivo = `backup-${nomeEmpresa}-${hoje}.zip`;
+      // Cria link de download e simula clique
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Libera memória
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      mostrarStatus(`✅ Backup gerado: ${nomeArquivo} (${(blob.size / 1024).toFixed(1)} KB)`, 'ok');
+      setTimeout(() => { status.style.display = 'none'; }, 8000);
+    } catch (err) {
+      console.error('[backup]', err);
+      mostrarStatus('❌ Erro ao gerar backup: ' + err.message, 'erro');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📥 Baixar Backup Completo';
+    }
+  }
+
   function abrirContratarEmpresaExtra() {
     document.getElementById('ce-nome').value = '';
     document.getElementById('ce-cnpj').value = '';
