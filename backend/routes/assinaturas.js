@@ -15,7 +15,7 @@ const PLANOS = {
   mensal: { nome: 'Plano Mensal', valor: 99.90, meses: 1 },
   anual:  { nome: 'Plano Anual',  valor: 1080.00, meses: 12 },
   pro:    { nome: 'Plano Pro',    valor: 249.90, meses: 1, moduloFiscal: true },
-  'empresa-extra': { nome: 'Empresa Adicional', valor: 49.90, meses: 1, ehExtra: true }
+  'empresa-extra': { nome: 'Empresa Adicional', valor: 79.90, meses: 1, ehExtra: true }
 };
 
 // Helper: cria string única para reference_id
@@ -478,7 +478,7 @@ async function processarPagamento(referencia, dadosPedido) {
         novaVenc.setMonth(novaVenc.getMonth() + 1);
         const novaEmpresaQ = await client.query(
           `INSERT INTO empresas (nome, cnpj, status, plano, data_vencimento, valor_mensalidade, origem)
-           VALUES ($1, $2, 'ativa', 'mensal', $3, 49.90, 'auto-assinatura-extra')
+           VALUES ($1, $2, 'ativa', 'mensal', $3, 79.90, 'auto-assinatura-extra')
            RETURNING id, nome`,
           [nomeNovaEmpresa.trim(), cnpjNovaEmpresa, novaVenc.toISOString().slice(0,10)]
         );
@@ -683,7 +683,7 @@ router.post('/renovar', autenticar, async (req, res) => {
 
 // === POST /api/assinaturas/contratar-empresa-extra ===
 // Body: { nomeNovaEmpresa, cnpjNovaEmpresa? }
-// Cliente logado (admin) contrata uma empresa EXTRA por R$ 49,90/mês
+// Cliente logado (admin) contrata uma empresa EXTRA por R$ 79,90/mês
 // Gera checkout no PagBank → quando pagar, webhook cria a nova empresa + clona admin
 router.post('/contratar-empresa-extra', autenticar, async (req, res) => {
   const { nomeNovaEmpresa, cnpjNovaEmpresa } = req.body || {};
