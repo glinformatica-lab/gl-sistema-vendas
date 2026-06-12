@@ -5128,6 +5128,7 @@
       const acoes = cancelada
         ? `<button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>`
         : `<button class="btn-link" onclick="editarVenda(${v.id})">Editar</button> |
+           <button class="btn-link" style="color:#059669;font-weight:600;" onclick="repetirVenda(${v.id})" title="Criar nova venda copiando os itens desta">🔁 Repetir</button> |
            <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>${v.orcamentoIdVinculado ? ` | <button class="btn-link" style="color:#d97706;font-weight:600;" onclick="cancelarVendaEReabrirOrcamento(${v.id}, ${v.orcamentoIdVinculado}, ${v.orcamentoNumeroVinculado})" title="Cancela esta venda e reabre o orçamento Nº ${v.orcamentoNumeroVinculado} para edição">⏪ Voltar pra Orç. Nº ${v.orcamentoNumeroVinculado}</button>` : ''} |
            <button class="btn-link admin-only" style="color:#dc2626;font-weight:600;" onclick="abrirCancelarVenda(${v.id})" title="Cancelar venda (precisa senha de admin)">❌ Cancelar</button>`;
       return `
@@ -5803,6 +5804,67 @@
     atualizarTotaisVenda();
     document.querySelector('#form-nova-venda h2').textContent = 'Editar Venda';
     document.querySelector('#form-nova-venda button[type="submit"]').textContent = 'Salvar Alterações';
+  }
+
+  // ====== REPETIR VENDA ======
+  // Abre o modal de Nova Venda PRÉ-PREENCHIDO com os mesmos itens, cliente e forma de pagamento.
+  // Não cria a venda automaticamente — usuário ainda precisa clicar "Registrar Venda".
+  // Útil pra clientes recorrentes (mensalidades, distribuidoras, planos).
+  function repetirVenda(id) {
+    const v = dbVendas.find(x => x.id === id);
+    if (!v) { alert('Venda não encontrada.'); return; }
+    if (v.status === 'cancelada') {
+      alert('Não é possível repetir uma venda cancelada.');
+      return;
+    }
+    // Reseta modo de edição (importante: vamos criar VENDA NOVA, não editar)
+    _vendaEditandoId = null;
+    openNovaVenda();
+    // Preenche cliente e forma de pagamento
+    document.getElementById('nv-cliente').value = v.cliente || '';
+    // Data sempre como HOJE (não a data da venda original)
+    document.getElementById('nv-data').value = new Date().toISOString().slice(0, 10);
+    // Desconto: replica o mesmo (em valor já calculado)
+    document.getElementById('nv-desconto').value = (v.desconto || 0).toFixed(2);
+    document.getElementById('nv-tipo-desconto').value = 'valor';
+    // Forma de pagamento
+    document.getElementById('nv-pagamento').value = v.pagamento || 'A Vista';
+    // Observações: não copia (cada venda pode ter contexto próprio)
+    document.getElementById('nv-obs').value = '';
+    // Limpa tabela de itens e adiciona os mesmos itens da venda original
+    document.getElementById('tbody-itens-venda').innerHTML = '';
+    if (v.itens && v.itens.length > 0) {
+      // Pra cada item, verifica se ainda existe no cadastro e usa o PREÇO ATUAL do produto
+      // (caso o preço tenha sido atualizado desde a venda anterior)
+      v.itens.forEach(it => {
+        const prodAtual = getProduto(it.produto || it.nome || '');
+        const preco = (prodAtual && prodAtual.precoVenda != null)
+          ? Number(prodAtual.precoVenda)
+          : Number(it.preco || 0);
+        adicionarItemVenda({
+          produto: it.produto || it.nome,
+          qtd: Number(it.qtd) || 1,
+          preco: preco
+        });
+      });
+    } else {
+      adicionarItemVenda();
+    }
+    // Parcelas: NÃO copia (cada venda nova precisa decidir parcelamento atual)
+    toggleParcelasVenda();
+    atualizarTotaisVenda();
+    // Avisa o usuário que é uma cópia
+    document.querySelector('#form-nova-venda h2').textContent = `Nova Venda (repetindo Venda #${v.id})`;
+    document.querySelector('#form-nova-venda button[type="submit"]').textContent = 'Registrar Venda';
+    // Avisa se algum item da venda original NÃO está mais cadastrado
+    const itensSemCadastro = (v.itens || []).filter(it => !getProduto(it.produto || it.nome || ''));
+    if (itensSemCadastro.length > 0) {
+      setTimeout(() => {
+        alert('⚠️ Aviso: ' + itensSemCadastro.length + ' item(s) da venda original não estão mais cadastrados:\n\n' +
+          itensSemCadastro.map(i => '• ' + (i.produto || i.nome || '?')).join('\n') +
+          '\n\nRevise os preços/quantidades antes de registrar.');
+      }, 200);
+    }
   }
 
   // Monta o cabeçalho dos recibos com dados da empresa (logo + identificação)
