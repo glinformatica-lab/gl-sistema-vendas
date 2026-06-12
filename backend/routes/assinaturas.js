@@ -651,13 +651,12 @@ router.post('/renovar', autenticar, async (req, res) => {
     // Cria checkout no PagBank
     const checkout = await pagbank.criarCheckout({
       referencia,
-      plano: planoConfig,
-      cliente: {
-        nome: dados.usuario_nome,
-        email: dados.email,
-        telefone: dados.telefone,
-        cnpj: dados.cnpj
-      }
+      valor: planoConfig.valor,
+      descricao: `${planoConfig.nome} — GL Sistema de Vendas (Renovação)`,
+      email: dados.email,
+      nome: dados.usuario_nome,
+      formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
+      maxParcelas: plano === 'anual' ? 12 : 1
     });
     if (!checkout || !checkout.linkPagamento) {
       return res.status(502).json({ error: 'Erro ao gerar link de pagamento. Tente novamente.' });
@@ -725,17 +724,12 @@ router.post('/contratar-empresa-extra', autenticar, async (req, res) => {
     // Cria checkout no PagBank
     const checkout = await pagbank.criarCheckout({
       referencia,
-      plano: {
-        nome: `${planoConfig.nome}: ${nomeNovaEmpresa.trim()}`,
-        valor: planoConfig.valor,
-        meses: 1
-      },
-      cliente: {
-        nome: dados.usuario_nome,
-        email: dados.email,
-        telefone: dados.telefone,
-        cnpj: dados.cnpj
-      }
+      valor: planoConfig.valor,
+      descricao: `Empresa Adicional: ${nomeNovaEmpresa.trim()} — GL Sistema de Vendas`,
+      email: dados.email,
+      nome: dados.usuario_nome,
+      formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
+      maxParcelas: 1
     });
     if (!checkout || !checkout.linkPagamento) {
       return res.status(502).json({ error: 'Erro ao gerar link de pagamento. Tente novamente.' });
