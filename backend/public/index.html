@@ -3781,15 +3781,27 @@
     const dl = document.getElementById('lista-produtos');
     // Inclui produtos cadastrados + serviços cadastrados (ambos podem ser vendidos)
     // Mostra estoque ao lado do nome no autocomplete
-    const prodOpts = dbProdutos.map(p => {
+    // ESTRATÉGIA: cria 1 option pelo NOME e options adicionais com prefixo "código - nome"
+    // pra permitir busca por código também (o datalist HTML não busca em label)
+    const prodOpts = [];
+    for (const p of dbProdutos) {
       const est = Number(p.estoque) || 0;
       let status;
       if (est === 0) status = 'SEM ESTOQUE';
       else if (est < 10) status = `estoque baixo: ${est}`;
       else status = `${est} em estoque`;
-      return `<option value="${p.nome}" label="📦 ${p.nome} — ${status}">`;
-    });
-    const servOpts = (_servicosCache || []).map(s => `<option value="${s.nome}" label="🔧 ${s.nome} (serviço)">`);
+      // Option principal: o usuário digita o nome
+      prodOpts.push(`<option value="${escapeAttr(p.nome)}" label="📦 ${escapeAttr(p.nome)} — ${status}">`);
+      // Option auxiliar: se o produto tem código interno, permite busca por ele
+      if (p.codigo) {
+        prodOpts.push(`<option value="${escapeAttr(p.codigo + ' - ' + p.nome)}" label="🔢 Cód ${escapeAttr(p.codigo)} → ${escapeAttr(p.nome)} (${status})">`);
+      }
+      // Option auxiliar: se o produto tem código de barras, permite busca por ele também
+      if (p.codigoBarras) {
+        prodOpts.push(`<option value="${escapeAttr(p.codigoBarras + ' - ' + p.nome)}" label="📷 EAN ${escapeAttr(p.codigoBarras)} → ${escapeAttr(p.nome)} (${status})">`);
+      }
+    }
+    const servOpts = (_servicosCache || []).map(s => `<option value="${escapeAttr(s.nome)}" label="🔧 ${escapeAttr(s.nome)} (serviço)">`);
     dl.innerHTML = [...prodOpts, ...servOpts].join('');
   }
   function gerarCodigoProduto() {
@@ -3935,12 +3947,36 @@
     `).join('');
   }
   function getProduto(nome) {
-    const n = (nome||'').toLowerCase().trim();
-    // Busca primeiro em produtos cadastrados
-    const p = dbProdutos.find(p => p.nome.toLowerCase() === n);
+    const valor = (nome || '').trim();
+    if (!valor) return null;
+    const n = valor.toLowerCase();
+    // 1) Busca exato por nome
+    let p = dbProdutos.find(p => (p.nome || '').toLowerCase() === n);
     if (p) return p;
-    // Se não achou, busca em serviços e devolve no mesmo formato
-    const s = (_servicosCache || []).find(s => s.nome.toLowerCase() === n);
+    // 2) Busca exato por código interno
+    p = dbProdutos.find(p => (p.codigo || '').toLowerCase() === n);
+    if (p) return p;
+    // 3) Busca exato por código de barras
+    p = dbProdutos.find(p => (p.codigoBarras || '').toLowerCase() === n);
+    if (p) return p;
+    // 4) Se o valor for "código - nome" (formato gerado pelo autocomplete com código),
+    //    separa pela primeira ocorrência de " - " e tenta achar pelo código OU nome
+    const sep = valor.indexOf(' - ');
+    if (sep > 0) {
+      const codigo = valor.slice(0, sep).trim().toLowerCase();
+      const nomeAposSep = valor.slice(sep + 3).trim().toLowerCase();
+      // Tenta pelo código (interno OU barras)
+      p = dbProdutos.find(x =>
+        (x.codigo || '').toLowerCase() === codigo ||
+        (x.codigoBarras || '').toLowerCase() === codigo
+      );
+      if (p) return p;
+      // Tenta pelo nome após o separador
+      p = dbProdutos.find(x => (x.nome || '').toLowerCase() === nomeAposSep);
+      if (p) return p;
+    }
+    // 5) Se não achou produto, busca em serviços
+    const s = (_servicosCache || []).find(s => (s.nome || '').toLowerCase() === n);
     if (s) return { nome: s.nome, precoVenda: parseFloat(s.valor) || 0, estoque: 999999, _isServico: true };
     return null;
   }
@@ -4228,9 +4264,14 @@
     tr.querySelector('.item-valor').addEventListener('input', () => recalcularLinha(tr));
     // Ao selecionar/digitar produto: preencher preço de venda se produto já existe
     tr.querySelector('.item-produto').addEventListener('change', () => {
-      const p = getProduto(tr.querySelector('.item-produto').value);
-      if(p && p.precoVenda != null) {
-        tr.querySelector('.item-preco-venda').value = p.precoVenda.toFixed(2);
+      const inputProd = tr.querySelector('.item-produto');
+      const p = getProduto(inputProd.value);
+      if(p) {
+        // Normaliza valor pro nome do produto (caso tenha vindo como "código - nome")
+        if (inputProd.value !== p.nome) inputProd.value = p.nome;
+        if(p.precoVenda != null) {
+          tr.querySelector('.item-preco-venda').value = p.precoVenda.toFixed(2);
+        }
       }
     });
     recalcularLinha(tr);
@@ -5487,10 +5528,16 @@
     tr.querySelector('.nv-item-qtd').addEventListener('input', () => recalcularLinhaVenda(tr));
     tr.querySelector('.nv-item-preco').addEventListener('input', () => recalcularLinhaVenda(tr));
     tr.querySelector('.nv-item-produto').addEventListener('change', () => {
-      const p = getProduto(tr.querySelector('.nv-item-produto').value);
-      if(p && p.precoVenda != null && !tr.querySelector('.nv-item-preco').value) {
-        tr.querySelector('.nv-item-preco').value = p.precoVenda.toFixed(2);
-        recalcularLinhaVenda(tr);
+      const inputProd = tr.querySelector('.nv-item-produto');
+      const p = getProduto(inputProd.value);
+      if (p) {
+        // Se o valor digitado/selecionado NÃO é exatamente o nome (ex: vem como "código - nome"),
+        // normaliza pro nome real do produto
+        if (inputProd.value !== p.nome) inputProd.value = p.nome;
+        if (p.precoVenda != null && !tr.querySelector('.nv-item-preco').value) {
+          tr.querySelector('.nv-item-preco').value = p.precoVenda.toFixed(2);
+          recalcularLinhaVenda(tr);
+        }
       }
       atualizarEstoqueLinha(tr);
     });
@@ -7681,7 +7728,8 @@ ${conteudo}
     if (t) {
       resultados = _produtosCacheLocal.filter(p =>
         (p.nome || '').toLowerCase().includes(t) ||
-        (p.codigo || '').toLowerCase().includes(t)
+        (p.codigo || '').toLowerCase().includes(t) ||
+        (p.codigoBarras || '').toLowerCase().includes(t)
       );
     }
     if (resultados.length === 0) {
@@ -7697,7 +7745,7 @@ ${conteudo}
         <div onclick="selecionarProduto(${p.id})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;${semEstoque ? 'opacity:0.6;' : ''}" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='#fff'">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.nome)}</div>
-            <div style="font-size:11px;color:#888;">${p.codigo ? 'Cód: ' + escapeHtml(p.codigo) + ' · ' : ''}Estoque: <strong style="color:${semEstoque ? '#dc2626' : '#16a34a'};">${estoque}</strong></div>
+            <div style="font-size:11px;color:#888;">${p.codigo ? 'Cód: ' + escapeHtml(p.codigo) + ' · ' : ''}${p.codigoBarras ? 'EAN: ' + escapeHtml(p.codigoBarras) + ' · ' : ''}Estoque: <strong style="color:${semEstoque ? '#dc2626' : '#16a34a'};">${estoque}</strong></div>
           </div>
           <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:10px;">${formatarBRL(preco)}</div>
         </div>
