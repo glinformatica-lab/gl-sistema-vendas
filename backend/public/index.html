@@ -3495,6 +3495,91 @@ https://sistema.glinformatica.com.br
   // Detecta ao carregar
   document.addEventListener('DOMContentLoaded', detectarModoSuporte);
 
+  // ====== UPPERCASE AUTOMÁTICO EM CAMPOS DE TEXTO ======
+  // Converte conteúdo de inputs/textareas pra MAIÚSCULA quando o usuário sai do campo.
+  // Aplica em TODA a tela automaticamente - inclui campos adicionados dinamicamente.
+  //
+  // EXCEÇÕES (NUNCA convertidas):
+  // - type="email" / type="password" / type="url" (HTML nativo)
+  // - inputs com class="no-upper" (ex: senha custom, URLs)
+  // - inputs cujo id contém: email, senha, password, url, foto, link, codigo
+  // - textareas em campos de senha
+  // - campos numéricos (não tem letra)
+  function devePularUpper(el) {
+    if (!el) return true;
+    const tag = (el.tagName || '').toUpperCase();
+    // Só processa input/textarea
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return true;
+    // Pula por tipo HTML
+    const tipo = (el.type || '').toLowerCase();
+    if (['email', 'password', 'url', 'number', 'date', 'time', 'datetime-local',
+         'tel', 'file', 'checkbox', 'radio', 'color', 'range', 'hidden', 'submit', 'button'].includes(tipo)) {
+      return true;
+    }
+    // Pula por classe
+    if (el.classList && el.classList.contains('no-upper')) return true;
+    // Pula por ID que sugere campo sensível
+    const id = (el.id || '').toLowerCase();
+    if (/(email|senha|password|url|foto|link|cnpj-busca|importar|paste|xml)/.test(id)) return true;
+    // Pula por name que sugere
+    const name = (el.name || '').toLowerCase();
+    if (/(email|senha|password|url)/.test(name)) return true;
+    // Pula se autocomplete sugere senha
+    const autocomplete = (el.getAttribute('autocomplete') || '').toLowerCase();
+    if (/password|current-password|new-password/.test(autocomplete)) return true;
+    // Pula readonly/disabled
+    if (el.readOnly || el.disabled) return true;
+    return false;
+  }
+  function aplicarUpperNoCampo(el) {
+    if (devePularUpper(el)) return;
+    const valor = el.value;
+    if (!valor) return;
+    const novoValor = valor.toUpperCase();
+    if (valor !== novoValor) {
+      el.value = novoValor;
+      // Dispara evento input pra outros listeners reagirem (ex: filtros em tempo real)
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  // Listener global pra 'blur' (perda de foco) - delega no document
+  document.addEventListener('blur', function(e) {
+    aplicarUpperNoCampo(e.target);
+  }, true); // useCapture=true pra pegar TODOS os blurs
+  // CSS visual: mostra MAIÚSCULA enquanto digita (feedback imediato)
+  // (não converte o value real até o blur)
+  (function injetarCssUpper() {
+    const style = document.createElement('style');
+    style.textContent = `
+      input[type="text"]:not(.no-upper),
+      input:not([type]):not(.no-upper),
+      textarea:not(.no-upper) {
+        text-transform: uppercase;
+      }
+      input[type="email"],
+      input[type="password"],
+      input[type="url"],
+      input[type="number"],
+      input[type="date"],
+      input[type="tel"],
+      input[type="file"],
+      input.no-upper,
+      textarea.no-upper {
+        text-transform: none !important;
+      }
+      /* Inputs cujo id sugere campo especial NÃO devem aparecer em uppercase */
+      input[id*="email" i],
+      input[id*="senha" i],
+      input[id*="password" i],
+      input[id*="url" i],
+      input[id*="foto" i],
+      input[id*="cnpj-busca" i] {
+        text-transform: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  })();
+
   // ====== Menu Mobile (hamburguer) ======
   function toggleMenu() {
     const menu = document.getElementById('menu');
