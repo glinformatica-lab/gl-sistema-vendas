@@ -4203,8 +4203,7 @@ https://sistema.glinformatica.com.br
     const dl = document.getElementById('lista-produtos');
     // Inclui produtos cadastrados + serviços cadastrados (ambos podem ser vendidos)
     // Mostra estoque ao lado do nome no autocomplete
-    // ESTRATÉGIA: cria 1 option pelo NOME e options adicionais com prefixo "código - nome"
-    // pra permitir busca por código também (o datalist HTML não busca em label)
+    // Busca por código funciona via getProduto() inteligente que aceita nome, código interno OU código de barras
     const prodOpts = [];
     for (const p of dbProdutos) {
       const est = Number(p.estoque) || 0;
@@ -4212,16 +4211,9 @@ https://sistema.glinformatica.com.br
       if (est === 0) status = 'SEM ESTOQUE';
       else if (est < 10) status = `estoque baixo: ${est}`;
       else status = `${est} em estoque`;
-      // Option principal: o usuário digita o nome
-      prodOpts.push(`<option value="${escapeAttr(p.nome)}" label="📦 ${escapeAttr(p.nome)} — ${status}">`);
-      // Option auxiliar: se o produto tem código interno, permite busca por ele
-      if (p.codigo) {
-        prodOpts.push(`<option value="${escapeAttr(p.codigo + ' - ' + p.nome)}" label="🔢 Cód ${escapeAttr(p.codigo)} → ${escapeAttr(p.nome)} (${status})">`);
-      }
-      // Option auxiliar: se o produto tem código de barras, permite busca por ele também
-      if (p.codigoBarras) {
-        prodOpts.push(`<option value="${escapeAttr(p.codigoBarras + ' - ' + p.nome)}" label="📷 EAN ${escapeAttr(p.codigoBarras)} → ${escapeAttr(p.nome)} (${status})">`);
-      }
+      // UMA única option por produto - o label mostra código pra ajudar a identificar
+      const codigoLabel = p.codigo ? ` [cód ${p.codigo}]` : '';
+      prodOpts.push(`<option value="${escapeAttr(p.nome)}" label="📦 ${escapeAttr(p.nome)}${codigoLabel} — ${status}">`);
     }
     const servOpts = (_servicosCache || []).map(s => `<option value="${escapeAttr(s.nome)}" label="🔧 ${escapeAttr(s.nome)} (serviço)">`);
     dl.innerHTML = [...prodOpts, ...servOpts].join('');
