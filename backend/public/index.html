@@ -2413,6 +2413,23 @@
         <input type="number" id="npr-estoque" min="0" step="1" value="0" style="max-width:150px;">
       </div>
 
+      <!-- Foto do Produto (Cloudinary) -->
+      <div class="form-field" style="margin-top:16px;">
+        <label>📷 Foto do Produto <span style="color:#778;font-weight:normal;font-size:11px;">(opcional, máx 2MB)</span></label>
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div id="npr-foto-preview" style="width:100px;height:100px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f8fafc;flex-shrink:0;overflow:hidden;position:relative;">
+            <span id="npr-foto-placeholder" style="color:#94a3b8;font-size:30px;">📷</span>
+            <img id="npr-foto-img" style="display:none;width:100%;height:100%;object-fit:contain;" alt="">
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+            <input type="hidden" id="npr-foto-url">
+            <input type="file" id="npr-foto-input" accept="image/jpeg,image/png,image/webp,image/jpg" onchange="uploadFotoProduto(this)" style="font-size:12px;">
+            <div id="npr-foto-status" style="font-size:11px;color:#64748b;"></div>
+            <button type="button" id="npr-foto-remover" onclick="removerFotoProduto()" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;width:fit-content;">🗑️ Remover foto</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Dados Fiscais (só Pro) - colapsável -->
       <div id="npr-fiscal-section" class="fiscal-only" style="display:none;margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;">
         <div onclick="toggleFiscalProduto()" style="background:#f6f8fc;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-radius:8px 8px 0 0;">
@@ -4163,10 +4180,13 @@ https://sistema.glinformatica.com.br
     }
     tbody.innerHTML = lista.map(p => {
       const idxOriginal = dbProdutos.indexOf(p);
+      const iconeFoto = p.fotoUrl
+        ? `<span onclick="event.stopPropagation(); abrirFotoLightbox('${escapeAttr(p.fotoUrl)}', '${escapeAttr(p.nome)}')" style="cursor:pointer;margin-left:6px;color:#0891b2;" title="Ver foto">📷</span>`
+        : '';
       return `
       <tr>
         <td>${p.codigo || '-'}</td>
-        <td>${p.nome}</td>
+        <td>${escapeHtml(p.nome)}${iconeFoto}</td>
         <td>${p.categoria || '-'}</td>
         <td>${p.fornecedor || '-'}</td>
         <td>${p.estoque || 0}</td>
@@ -4199,6 +4219,8 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-preco-custo').value = (p.precoCusto || 0).toFixed(2);
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
+    // Preenche a foto se houver
+    preencherFotoEdicao(p.fotoUrl || '');
     // Preenche campos fiscais (só relevante pra Pro, mas preenche sempre)
     const setVal = (id, val) => { const el=document.getElementById(id); if(el) el.value = val || ''; };
     setVal('npr-ncm',      p.ncm);
@@ -4738,6 +4760,156 @@ https://sistema.glinformatica.com.br
     if(e.target === this) closeNovoFornecedorRapido();
   });
 
+  // ====== LIGHTBOX (visualizar foto em tela cheia) ======
+  function abrirFotoLightbox(url, titulo) {
+    if (!url) return;
+    // Remove lightbox existente se houver
+    const antigo = document.getElementById('foto-lightbox');
+    if (antigo) antigo.remove();
+    const div = document.createElement('div');
+    div.id = 'foto-lightbox';
+    div.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;cursor:zoom-out;';
+    div.onclick = () => div.remove();
+    div.innerHTML = `
+      <div style="position:absolute;top:20px;right:30px;color:#fff;font-size:30px;cursor:pointer;background:rgba(0,0,0,0.5);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">&times;</div>
+      ${titulo ? `<div style="color:#fff;font-size:16px;margin-bottom:14px;text-align:center;max-width:90%;">${escapeHtml(titulo)}</div>` : ''}
+      <img src="${escapeAttr(url)}" style="max-width:90%;max-height:80%;object-fit:contain;border-radius:8px;background:#fff;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+    `;
+    document.body.appendChild(div);
+    // ESC fecha
+    const onEsc = (e) => {
+      if (e.key === 'Escape') {
+        div.remove();
+        document.removeEventListener('keydown', onEsc);
+      }
+    };
+    document.addEventListener('keydown', onEsc);
+  }
+
+  // ====== UPLOAD DE FOTO PRA CLOUDINARY ======
+  // Cloud Name: dazuxozjs / Preset: gl-sistema-produtos (Unsigned)
+  const CLOUDINARY_CLOUD_NAME = 'dazuxozjs';
+  const CLOUDINARY_PRESET = 'gl-sistema-produtos';
+  const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+  async function uploadFotoProduto(inputEl) {
+    const arquivo = inputEl.files && inputEl.files[0];
+    if (!arquivo) return;
+    const status = document.getElementById('npr-foto-status');
+    const placeholder = document.getElementById('npr-foto-placeholder');
+    const img = document.getElementById('npr-foto-img');
+    const btnRemover = document.getElementById('npr-foto-remover');
+    const inputUrl = document.getElementById('npr-foto-url');
+
+    // Validação de tamanho (2MB)
+    const MAX_MB = 2;
+    if (arquivo.size > MAX_MB * 1024 * 1024) {
+      status.textContent = `❌ Arquivo muito grande (${(arquivo.size / 1024 / 1024).toFixed(2)}MB). Máximo: ${MAX_MB}MB.`;
+      status.style.color = '#dc2626';
+      inputEl.value = '';
+      return;
+    }
+
+    // Validação de formato
+    if (!['image/jpeg','image/png','image/webp','image/jpg'].includes(arquivo.type)) {
+      status.textContent = '❌ Formato inválido. Use JPG, PNG ou WebP.';
+      status.style.color = '#dc2626';
+      inputEl.value = '';
+      return;
+    }
+
+    // Preview imediato (antes mesmo do upload)
+    const previewLocal = URL.createObjectURL(arquivo);
+    placeholder.style.display = 'none';
+    img.src = previewLocal;
+    img.style.display = '';
+
+    status.textContent = '⏳ Enviando foto…';
+    status.style.color = '#0891b2';
+    inputEl.disabled = true;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', arquivo);
+      formData.append('upload_preset', CLOUDINARY_PRESET);
+
+      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        let detalhes = '';
+        try {
+          const errJson = await response.json();
+          detalhes = errJson?.error?.message || '';
+        } catch(_) {}
+        throw new Error(`HTTP ${response.status}${detalhes ? ' - ' + detalhes : ''}`);
+      }
+
+      const data = await response.json();
+      if (!data.secure_url) throw new Error('Resposta do Cloudinary sem URL');
+
+      // Substitui o preview local pela URL definitiva
+      img.src = data.secure_url;
+      inputUrl.value = data.secure_url;
+      btnRemover.style.display = '';
+      status.textContent = `✅ Foto enviada (${(arquivo.size / 1024).toFixed(0)} KB)`;
+      status.style.color = '#16a34a';
+      URL.revokeObjectURL(previewLocal);
+    } catch (err) {
+      console.error('[cloudinary]', err);
+      status.textContent = '❌ Erro ao enviar: ' + err.message;
+      status.style.color = '#dc2626';
+      // Reset visual
+      placeholder.style.display = '';
+      img.style.display = 'none';
+      img.src = '';
+      inputUrl.value = '';
+      URL.revokeObjectURL(previewLocal);
+    } finally {
+      inputEl.disabled = false;
+    }
+  }
+
+  function removerFotoProduto() {
+    if (!confirm('Remover a foto deste produto?')) return;
+    document.getElementById('npr-foto-url').value = '';
+    document.getElementById('npr-foto-input').value = '';
+    document.getElementById('npr-foto-img').src = '';
+    document.getElementById('npr-foto-img').style.display = 'none';
+    document.getElementById('npr-foto-placeholder').style.display = '';
+    document.getElementById('npr-foto-remover').style.display = 'none';
+    document.getElementById('npr-foto-status').textContent = 'Foto removida (clique em Salvar Alterações pra confirmar)';
+    document.getElementById('npr-foto-status').style.color = '#dc2626';
+  }
+
+  // Helper: preenche o preview da foto ao editar produto ou resetar ao abrir
+  function preencherFotoEdicao(url) {
+    const img = document.getElementById('npr-foto-img');
+    const placeholder = document.getElementById('npr-foto-placeholder');
+    const btnRemover = document.getElementById('npr-foto-remover');
+    const inputUrl = document.getElementById('npr-foto-url');
+    const inputFile = document.getElementById('npr-foto-input');
+    const status = document.getElementById('npr-foto-status');
+    if (!img) return; // elementos podem não existir se modal não carregou
+    if (url) {
+      img.src = url;
+      img.style.display = '';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+      inputUrl.value = url;
+    } else {
+      img.src = '';
+      img.style.display = 'none';
+      placeholder.style.display = '';
+      btnRemover.style.display = 'none';
+      inputUrl.value = '';
+    }
+    if (inputFile) inputFile.value = '';
+    if (status) status.textContent = '';
+  }
+
   // ====== CADASTRO RÁPIDO: PRODUTO ======
   let _origemNovoProduto = 'snf'; // 'snf' ou 'cnf'
   function openNovoProdutoRapido(origem) {
@@ -4766,6 +4938,8 @@ https://sistema.glinformatica.com.br
     const _arrow = document.getElementById('npr-fiscal-arrow');
     if (_sec) _sec.style.display = 'none';
     if (_arrow) _arrow.textContent = '▼';
+    // Reset da foto
+    preencherFotoEdicao('');
   }
   // Toggle da seção colapsável de Dados Fiscais
   function toggleFiscalProduto() {
@@ -4817,11 +4991,15 @@ https://sistema.glinformatica.com.br
         unidadeTributavel: document.getElementById('npr-und-trib')?.value.trim() || null
       } : {};
 
+      // Pega URL da foto (vazio se removeu ou não tem)
+      const fotoUrl = document.getElementById('npr-foto-url')?.value.trim() || null;
+
       // ===== MODO EDIÇÃO =====
       if(_produtoEditandoIdx !== null) {
         const p = dbProdutos[_produtoEditandoIdx];
         const atualizado = await api('PUT', `/api/produtos/${p.id}`, {
           nome, categoria, fornecedor, precoCusto, precoVenda,
+          fotoUrl,
           ...camposFiscais
         });
         dbProdutos[_produtoEditandoIdx] = atualizado;
@@ -4834,6 +5012,7 @@ https://sistema.glinformatica.com.br
       // ===== MODO CADASTRO =====
       const novo = await api('POST', '/api/produtos', {
         codigo: codigoInput, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
+        fotoUrl,
         ...camposFiscais
       });
       dbProdutos.push(novo);

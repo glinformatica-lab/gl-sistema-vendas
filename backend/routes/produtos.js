@@ -36,7 +36,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     codigo, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
-    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel
+    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
+    fotoUrl
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -44,6 +45,10 @@ router.post('/', async (req, res) => {
   // Valida NCM se foi enviado (8 dígitos)
   if (ncm && !/^\d{8}$/.test(String(ncm).replace(/\D/g, ''))) {
     return res.status(400).json({ error: 'NCM deve ter 8 dígitos numéricos.' });
+  }
+  // Valida URL da foto (precisa ser https do Cloudinary, evita injeção de URLs maliciosas)
+  if (fotoUrl && !/^https:\/\/res\.cloudinary\.com\//.test(fotoUrl)) {
+    return res.status(400).json({ error: 'URL de foto inválida.' });
   }
   try {
     let codigoFinal = (codigo || '').trim();
@@ -64,8 +69,8 @@ router.post('/', async (req, res) => {
     const ins = await db.query(
       `INSERT INTO produtos (
          empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda,
-         ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+         ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, fornecedor.trim(),
        Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
@@ -74,7 +79,8 @@ router.post('/', async (req, res) => {
        origemMercadoria || null,
        csosn || null,
        cst || null,
-       unidadeTributavel || null]
+       unidadeTributavel || null,
+       fotoUrl || null]
     );
     const p = ins.rows[0];
     if (Number(estoque) > 0) {
@@ -101,7 +107,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const {
     nome, categoria, fornecedor, precoCusto, precoVenda,
-    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel
+    ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
+    fotoUrl
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -109,13 +116,17 @@ router.put('/:id', async (req, res) => {
   if (ncm && !/^\d{8}$/.test(String(ncm).replace(/\D/g, ''))) {
     return res.status(400).json({ error: 'NCM deve ter 8 dígitos numéricos.' });
   }
+  // Valida URL da foto (precisa ser https do Cloudinary)
+  if (fotoUrl && !/^https:\/\/res\.cloudinary\.com\//.test(fotoUrl)) {
+    return res.status(400).json({ error: 'URL de foto inválida.' });
+  }
   try {
     const r = await db.query(
       `UPDATE produtos SET
          nome=$1, categoria=$2, fornecedor=$3, preco_custo=$4, preco_venda=$5,
          ncm=$6, cest=$7, cfop_padrao=$8, origem_mercadoria=$9,
-         csosn=$10, cst=$11, unidade_tributavel=$12
-       WHERE id=$13 AND empresa_id=$14 RETURNING *`,
+         csosn=$10, cst=$11, unidade_tributavel=$12, foto_url=$13
+       WHERE id=$14 AND empresa_id=$15 RETURNING *`,
       [nome.trim(), categoria || null, fornecedor.trim(), Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
        cest ? String(cest).replace(/\D/g, '') : null,
@@ -124,6 +135,7 @@ router.put('/:id', async (req, res) => {
        csosn || null,
        cst || null,
        unidadeTributavel || null,
+       fotoUrl || null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
