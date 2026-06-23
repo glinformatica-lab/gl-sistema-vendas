@@ -1007,6 +1007,7 @@
         <button type="button" class="chip" data-rel="estoque" onclick="setRelatorio('estoque')">Estoque Atual</button>
         <button type="button" class="chip" data-rel="movimentacao" onclick="setRelatorio('movimentacao')">Movimentação de Estoque</button>
         <button type="button" class="chip" data-rel="dre" onclick="setRelatorio('dre')">DRE Simplificado</button>
+        <button type="button" class="chip" data-rel="rfm" onclick="setRelatorio('rfm')">📊 Análise de Clientes</button>
       </div>
       <div class="filtros-chips" id="chips-relatorio-periodo">
         <span class="chips-label">Período:</span>
@@ -7211,7 +7212,7 @@ https://sistema.glinformatica.com.br
     return map[p] || p;
   }
   function rotuloRelatorio(t) {
-    const map = { 'vendas':'Vendas por Período', 'produtos-vendidos':'Produtos Mais Vendidos', 'estoque':'Estoque Atual', 'movimentacao':'Movimentação de Estoque', 'dre':'DRE Simplificado' };
+    const map = { 'vendas':'Vendas por Período', 'produtos-vendidos':'Produtos Mais Vendidos', 'estoque':'Estoque Atual', 'movimentacao':'Movimentação de Estoque', 'dre':'DRE Simplificado', 'rfm':'Análise de Clientes' };
     return map[t] || t;
   }
   function renderRelatorio() {
@@ -7222,6 +7223,7 @@ https://sistema.glinformatica.com.br
     else if(_relatorioTipo === 'estoque')     c.innerHTML = relEstoque();
     else if(_relatorioTipo === 'movimentacao') c.innerHTML = relMovimentacao();
     else if(_relatorioTipo === 'dre')          c.innerHTML = relDre();
+    else if(_relatorioTipo === 'rfm')          c.innerHTML = relRFM();
   }
   function vazio(msg) {
     return `<div style="text-align:center;color:#889;padding:40px;font-style:italic;background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;">${msg || 'Nenhum dado encontrado para este período.'}</div>`;
@@ -7443,6 +7445,307 @@ https://sistema.glinformatica.com.br
       ${despesasFornecedor > 0 ? `<p style="font-size:13px;color:#668;margin-top:14px;"><em>Nota: ${formatarBRL(despesasFornecedor)} em pagamentos a fornecedores não estão classificados como Despesas Operacionais — entram no CMV via custo dos produtos vendidos.</em></p>` : ''}
     `;
   }
+
+  // === Análise de Clientes (com paginação + ordenação) ===
+  let _rfmPagina = 1;
+  let _rfmOrdem = 'valor'; // valor | freq | recente | ticket
+  const RFM_POR_PAGINA = 25;
+
+  function relRFMSetOrdem(ordem) {
+    _rfmOrdem = ordem;
+    _rfmPagina = 1;
+    renderRelatorio();
+  }
+  function relRFMPagina(delta) {
+    _rfmPagina = Math.max(1, _rfmPagina + delta);
+    renderRelatorio();
+  }
+  function relRFMIrPagina(p) {
+    _rfmPagina = Math.max(1, parseInt(p) || 1);
+    renderRelatorio();
+  }
+
+  function relRFM() {
+    const [ini, fim] = getIntervaloRelatorio(_relatorioPeriodo);
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim));
+    if (vendas.length === 0) return vazio('Nenhuma venda neste período. Selecione um período maior.');
+
+    // Agrupa vendas por cliente
+    const mapaClientes = {};
+    for (const v of vendas) {
+      const cli = (v.cliente || '').trim();
+      if (!cli) continue; // ignora vendas balcão (sem cliente)
+      if (!mapaClientes[cli]) {
+        mapaClientes[cli] = {
+          nome: cli,
+          totalGasto: 0,
+          numCompras: 0,
+          ultimaCompra: null,
+          primeiraCompra: null
+        };
+      }
+      const c = mapaClientes[cli];
+      c.totalGasto += Number(v.total) || 0;
+      c.numCompras += 1;
+      const dataV = v.data || '';
+      if (!c.ultimaCompra || dataV > c.ultimaCompra) c.ultimaCompra = dataV;
+      if (!c.primeiraCompra || dataV < c.primeiraCompra) c.primeiraCompra = dataV;
+    }
+    const todosClientes = Object.values(mapaClientes);
+
+    if (todosClientes.length === 0) {
+      return vazio('Não há vendas identificadas (com cliente cadastrado) neste período. Vendas de balcão sem cliente não entram nessa análise.');
+    }
+
+    // Calcula KPIs gerais
+    const totalGeral = todosClientes.reduce((s, c) => s + c.totalGasto, 0);
+    const totalCompras = todosClientes.reduce((s, c) => s + c.numCompras, 0);
+    const ticketMedioGeral = totalCompras > 0 ? totalGeral / totalCompras : 0;
+
+    // Calcula ticket médio por cliente
+    for (const c of todosClientes) {
+      c.ticketMedio = c.numCompras > 0 ? c.totalGasto / c.numCompras : 0;
+      // Dias desde última compra
+      if (c.ultimaCompra) {
+        const dataUlt = new Date(c.ultimaCompra);
+        const hojeMs = Date.now();
+        c.diasDesdeUltima = Math.floor((hojeMs - dataUlt.getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        c.diasDesdeUltima = null;
+      }
+      c.percentualFat = totalGeral > 0 ? (c.totalGasto / totalGeral) * 100 : 0;
+    }
+
+    // Princípio de Pareto (80/20)
+    const ordenadoPorValor = [...todosClientes].sort((a, b) => b.totalGasto - a.totalGasto);
+    const top20pct = Math.max(1, Math.ceil(todosClientes.length * 0.2));
+    const fatTop20 = ordenadoPorValor.slice(0, top20pct).reduce((s, c) => s + c.totalGasto, 0);
+    const pctTop20 = totalGeral > 0 ? (fatTop20 / totalGeral) * 100 : 0;
+
+    // Tempo médio entre compras (em dias)
+    const clientesRecorrentes = todosClientes.filter(c => c.numCompras > 1);
+    let tempoMedioEntreCompras = null;
+    if (clientesRecorrentes.length > 0) {
+      let somaDias = 0;
+      let qtd = 0;
+      for (const c of clientesRecorrentes) {
+        if (c.primeiraCompra && c.ultimaCompra && c.numCompras > 1) {
+          const diasTotal = Math.floor((new Date(c.ultimaCompra) - new Date(c.primeiraCompra)) / (1000 * 60 * 60 * 24));
+          if (diasTotal > 0) {
+            somaDias += diasTotal / (c.numCompras - 1);
+            qtd++;
+          }
+        }
+      }
+      tempoMedioEntreCompras = qtd > 0 ? Math.round(somaDias / qtd) : null;
+    }
+
+    // Ordenação selecionada
+    let clientesOrdenados;
+    if (_rfmOrdem === 'valor') {
+      clientesOrdenados = ordenadoPorValor;
+    } else if (_rfmOrdem === 'freq') {
+      clientesOrdenados = [...todosClientes].sort((a, b) => b.numCompras - a.numCompras || b.totalGasto - a.totalGasto);
+    } else if (_rfmOrdem === 'recente') {
+      clientesOrdenados = [...todosClientes].sort((a, b) => {
+        const da = a.diasDesdeUltima == null ? Infinity : a.diasDesdeUltima;
+        const db = b.diasDesdeUltima == null ? Infinity : b.diasDesdeUltima;
+        return da - db;
+      });
+    } else if (_rfmOrdem === 'ticket') {
+      clientesOrdenados = [...todosClientes].sort((a, b) => b.ticketMedio - a.ticketMedio);
+    }
+
+    // Paginação
+    const totalPaginas = Math.max(1, Math.ceil(clientesOrdenados.length / RFM_POR_PAGINA));
+    if (_rfmPagina > totalPaginas) _rfmPagina = totalPaginas;
+    const inicio = (_rfmPagina - 1) * RFM_POR_PAGINA;
+    const fimPag = inicio + RFM_POR_PAGINA;
+    const paginaAtual = clientesOrdenados.slice(inicio, fimPag);
+
+    // Maior valor pra calcular barra de progresso visual
+    const maiorValor = clientesOrdenados[0]?.totalGasto || 1;
+
+    // Helper: cor discreta pela recência da última compra
+    const corRecencia = (dias) => {
+      if (dias == null) return { fundo: '#f1f5f9', texto: '#64748b' };
+      if (dias <= 30)  return { fundo: '#dcfce7', texto: '#166534' }; // verde
+      if (dias <= 90)  return { fundo: '#f1f5f9', texto: '#475569' }; // cinza neutro
+      if (dias <= 180) return { fundo: '#fef3c7', texto: '#92400e' }; // amarelo discreto
+      return { fundo: '#fee2e2', texto: '#991b1b' };                  // vermelho discreto
+    };
+    const labelRecencia = (dias) => {
+      if (dias == null) return '—';
+      if (dias === 0) return 'Hoje';
+      if (dias === 1) return 'Ontem';
+      if (dias < 30) return `${dias} dias`;
+      if (dias < 365) return `${Math.floor(dias / 30)} ${Math.floor(dias / 30) === 1 ? 'mês' : 'meses'}`;
+      return `${Math.floor(dias / 365)} ${Math.floor(dias / 365) === 1 ? 'ano' : 'anos'}`;
+    };
+
+    // Render linhas da página atual
+    const linhas = paginaAtual.map((c, i) => {
+      const pos = inicio + i + 1;
+      const pctBarra = (c.totalGasto / maiorValor) * 100;
+      const rec = corRecencia(c.diasDesdeUltima);
+      const dataUltFmt = c.ultimaCompra ? formatarDataBR(c.ultimaCompra) : '—';
+      // Posição: medalhas só pra top 3
+      let posBadge;
+      if (pos === 1) posBadge = `<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:#fbbf24;color:#fff;font-weight:700;border-radius:50%;">${pos}º</span>`;
+      else if (pos === 2) posBadge = `<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:#94a3b8;color:#fff;font-weight:700;border-radius:50%;">${pos}º</span>`;
+      else if (pos === 3) posBadge = `<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:#d97706;color:#fff;font-weight:700;border-radius:50%;">${pos}º</span>`;
+      else posBadge = `<span style="color:#64748b;font-weight:600;">${pos}º</span>`;
+      return `<tr>
+        <td style="text-align:center;width:50px;">${posBadge}</td>
+        <td><strong>${escapeHtml(c.nome)}</strong></td>
+        <td style="min-width:200px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${pctBarra}%;background:linear-gradient(90deg,#3960f9,#16a34a);border-radius:4px;"></div>
+            </div>
+            <span style="font-weight:700;color:#1e3a8a;font-size:13px;white-space:nowrap;">${formatarBRL(c.totalGasto)}</span>
+          </div>
+        </td>
+        <td style="text-align:center;font-weight:600;">${c.numCompras}</td>
+        <td style="text-align:right;">${formatarBRL(c.ticketMedio)}</td>
+        <td style="text-align:center;">
+          <div style="display:inline-block;background:${rec.fundo};color:${rec.texto};padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">
+            ${labelRecencia(c.diasDesdeUltima)}
+          </div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${dataUltFmt}</div>
+        </td>
+        <td style="text-align:right;color:#475569;font-size:13px;">${c.percentualFat.toFixed(1)}%</td>
+      </tr>`;
+    }).join('');
+
+    // Paginação
+    let paginacaoHtml = '';
+    if (totalPaginas > 1) {
+      paginacaoHtml = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:10px 4px;font-size:13px;">
+          <div style="color:#64748b;">
+            Mostrando <strong>${inicio + 1}</strong>–<strong>${Math.min(fimPag, clientesOrdenados.length)}</strong> de <strong>${clientesOrdenados.length}</strong> clientes
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button type="button" onclick="relRFMPagina(-1)" ${_rfmPagina <= 1 ? 'disabled' : ''} style="padding:6px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:13px;${_rfmPagina <= 1 ? 'opacity:0.5;cursor:not-allowed;' : ''}">‹ Anterior</button>
+            <span style="padding:0 8px;color:#475569;">Página <strong>${_rfmPagina}</strong> de <strong>${totalPaginas}</strong></span>
+            <button type="button" onclick="relRFMPagina(1)" ${_rfmPagina >= totalPaginas ? 'disabled' : ''} style="padding:6px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:13px;${_rfmPagina >= totalPaginas ? 'opacity:0.5;cursor:not-allowed;' : ''}">Próxima ›</button>
+          </div>
+        </div>`;
+    }
+
+    // Aviso pra vendas sem cliente
+    const vendasBalcao = vendas.length - totalCompras;
+    const avisoBalcao = vendasBalcao > 0
+      ? `<div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;color:#7c2d12;">
+           ⚠️ ${vendasBalcao} venda(s) de balcão (sem cliente identificado) não entram nessa análise.
+         </div>`
+      : '';
+
+    // Botão de exportar Excel
+    const btnExportar = `
+      <div style="margin-bottom:14px;">
+        <button type="button" class="btn" onclick="exportarRFMExcel()" style="background:#16a34a;color:#fff;">📊 Exportar pra Excel</button>
+      </div>`;
+
+    return `
+      ${avisoBalcao}
+
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;">
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:4px;">Total de Clientes</div>
+          <div style="font-size:24px;font-weight:700;color:#1e3a8a;">${todosClientes.length}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">com vendas no período</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:4px;">Faturamento Total</div>
+          <div style="font-size:22px;font-weight:700;color:#16a34a;">${formatarBRL(totalGeral)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">${totalCompras} compra(s)</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:4px;">Ticket Médio</div>
+          <div style="font-size:22px;font-weight:700;color:#3960f9;">${formatarBRL(ticketMedioGeral)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">por venda</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:4px;">Princípio 80/20</div>
+          <div style="font-size:22px;font-weight:700;color:${pctTop20 >= 70 ? '#dc2626' : '#0891b2'};">${pctTop20.toFixed(0)}%</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">do faturamento vem dos top 20% clientes</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:4px;">Intervalo Médio</div>
+          <div style="font-size:22px;font-weight:700;color:#1e3a8a;">${tempoMedioEntreCompras != null ? tempoMedioEntreCompras + ' dias' : '—'}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">entre compras (clientes recorrentes)</div>
+        </div>
+      </div>
+
+      ${btnExportar}
+
+      <!-- Ordenação -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;font-size:13px;">
+        <span style="color:#64748b;font-weight:600;margin-right:4px;">Ordenar por:</span>
+        <button type="button" onclick="relRFMSetOrdem('valor')" style="padding:6px 14px;border:1px solid ${_rfmOrdem === 'valor' ? '#3960f9' : '#cbd5e1'};background:${_rfmOrdem === 'valor' ? '#3960f9' : '#fff'};color:${_rfmOrdem === 'valor' ? '#fff' : '#475569'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:${_rfmOrdem === 'valor' ? '600' : '400'};">Valor Total</button>
+        <button type="button" onclick="relRFMSetOrdem('freq')" style="padding:6px 14px;border:1px solid ${_rfmOrdem === 'freq' ? '#3960f9' : '#cbd5e1'};background:${_rfmOrdem === 'freq' ? '#3960f9' : '#fff'};color:${_rfmOrdem === 'freq' ? '#fff' : '#475569'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:${_rfmOrdem === 'freq' ? '600' : '400'};">Frequência</button>
+        <button type="button" onclick="relRFMSetOrdem('recente')" style="padding:6px 14px;border:1px solid ${_rfmOrdem === 'recente' ? '#3960f9' : '#cbd5e1'};background:${_rfmOrdem === 'recente' ? '#3960f9' : '#fff'};color:${_rfmOrdem === 'recente' ? '#fff' : '#475569'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:${_rfmOrdem === 'recente' ? '600' : '400'};">Recência</button>
+        <button type="button" onclick="relRFMSetOrdem('ticket')" style="padding:6px 14px;border:1px solid ${_rfmOrdem === 'ticket' ? '#3960f9' : '#cbd5e1'};background:${_rfmOrdem === 'ticket' ? '#3960f9' : '#fff'};color:${_rfmOrdem === 'ticket' ? '#fff' : '#475569'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:${_rfmOrdem === 'ticket' ? '600' : '400'};">Ticket Médio</button>
+      </div>
+
+      <!-- Tabela -->
+      <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">#</th>
+              <th style="padding:10px;text-align:left;font-size:12px;color:#475569;">Cliente</th>
+              <th style="padding:10px;text-align:left;font-size:12px;color:#475569;">Valor Total Gasto</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">Compras</th>
+              <th style="padding:10px;text-align:right;font-size:12px;color:#475569;">Ticket Médio</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">Última Compra</th>
+              <th style="padding:10px;text-align:right;font-size:12px;color:#475569;">% Fat.</th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        ${paginacaoHtml}
+      </div>
+    `;
+  }
+
+  // Exporta a análise pra Excel
+  function exportarRFMExcel() {
+    if (typeof XLSX === 'undefined') { alert('Biblioteca de planilhas não carregada. Recarregue a página (Ctrl+F5).'); return; }
+    const [ini, fim] = getIntervaloRelatorio(_relatorioPeriodo);
+    const vendas = vendasAtivas().filter(v => dataNoIntervalo(v.data, ini, fim));
+    const mapa = {};
+    for (const v of vendas) {
+      const cli = (v.cliente || '').trim();
+      if (!cli) continue;
+      if (!mapa[cli]) mapa[cli] = { nome: cli, totalGasto: 0, numCompras: 0, ultimaCompra: null };
+      mapa[cli].totalGasto += Number(v.total) || 0;
+      mapa[cli].numCompras += 1;
+      if (!mapa[cli].ultimaCompra || (v.data || '') > mapa[cli].ultimaCompra) mapa[cli].ultimaCompra = v.data;
+    }
+    const lista = Object.values(mapa).sort((a, b) => b.totalGasto - a.totalGasto);
+    const dados = lista.map((c, i) => {
+      const dias = c.ultimaCompra ? Math.floor((Date.now() - new Date(c.ultimaCompra)) / (1000 * 60 * 60 * 24)) : null;
+      return {
+        'Posição': i + 1,
+        'Cliente': c.nome,
+        'Valor Total Gasto': Number(c.totalGasto.toFixed(2)),
+        'Nº de Compras': c.numCompras,
+        'Ticket Médio': Number((c.totalGasto / c.numCompras).toFixed(2)),
+        'Última Compra': c.ultimaCompra ? formatarDataBR(c.ultimaCompra) : '',
+        'Dias desde Última Compra': dias != null ? dias : ''
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Análise de Clientes');
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `analise-clientes-${hoje}.xlsx`);
+  }
+
   // Imprimir relatório
   function imprimirRelatorio() {
     const conteudo = document.getElementById('relatorio-conteudo').innerHTML;
