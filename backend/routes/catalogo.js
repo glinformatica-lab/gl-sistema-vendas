@@ -38,7 +38,7 @@ router.get('/config', autenticar, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   try {
     const emp = await db.query(
-      `SELECT id, nome, cnpj, telefone, email, endereco, bairro, cidade, uf, cep, logo_url, catalogo_slug
+      `SELECT id, nome, cnpj, telefone, email, endereco, bairro, cidade, uf, cep, logo, catalogo_slug
        FROM empresas WHERE id = $1`,
       [req.user.empresaId]
     );
@@ -75,7 +75,7 @@ router.get('/config', autenticar, async (req, res) => {
       empresa: {
         id: empresa.id, nome: empresa.nome, cnpj: empresa.cnpj, telefone: empresa.telefone,
         email: empresa.email, endereco: empresa.endereco, bairro: empresa.bairro,
-        cidade: empresa.cidade, uf: empresa.uf, cep: empresa.cep, logoUrl: empresa.logo_url
+        cidade: empresa.cidade, uf: empresa.uf, cep: empresa.cep, logoUrl: empresa.logo
       },
       slug: empresa.catalogo_slug,
       slugSugerido,
@@ -278,7 +278,7 @@ router.get('/publico/:slug', async (req, res) => {
   }
   try {
     const emp = await db.query(
-      `SELECT e.id, e.nome, e.cnpj, e.telefone, e.email, e.endereco, e.bairro, e.cidade, e.uf, e.cep, e.logo_url
+      `SELECT e.id, e.nome, e.cnpj, e.telefone, e.email, e.endereco, e.bairro, e.cidade, e.uf, e.cep, e.logo
        FROM empresas e WHERE e.catalogo_slug = $1 LIMIT 1`,
       [slug]
     );
@@ -322,7 +322,7 @@ router.get('/publico/:slug', async (req, res) => {
       empresa: {
         nome: empresa.nome, cnpj: empresa.cnpj, telefone: empresa.telefone,
         email: empresa.email, endereco: empresa.endereco, bairro: empresa.bairro,
-        cidade: empresa.cidade, uf: empresa.uf, cep: empresa.cep, logoUrl: empresa.logo_url
+        cidade: empresa.cidade, uf: empresa.uf, cep: empresa.cep, logoUrl: empresa.logo
       },
       config: { mensagemTopo: c.mensagem_topo, whatsapp: c.whatsapp },
       categorias,
