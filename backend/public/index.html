@@ -475,6 +475,7 @@
     <button class="menu-btn" onclick="showPage('clientes')">&#128100; Clientes</button>
     <button class="menu-btn" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
     <button class="menu-btn" onclick="showPage('produtos')">&#128230; Produtos</button>
+    <button class="menu-btn admin-only" onclick="showPage('catalogo')">&#128206; Catálogo Público</button>
     <button class="menu-btn" onclick="showPage('servicos')">&#128295; Serviços</button>
     <button class="menu-btn" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
     <button class="menu-btn" onclick="showPage('vendas')">&#128722; Vendas</button>
@@ -995,6 +996,113 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
+    </div>
+
+    <!-- Catálogo Público (admin) -->
+    <div id="page-catalogo" style="display:none;">
+      <div class="page-title">📋 Catálogo Público</div>
+      <div id="cat-loading" style="text-align:center;padding:40px;color:#64748b;">⏳ Carregando…</div>
+      <div id="cat-conteudo" style="display:none;">
+
+        <!-- Configurações Gerais -->
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:20px;margin-bottom:18px;">
+          <h3 style="color:#1e3a8a;margin-bottom:14px;font-size:16px;">⚙️ Configurações</h3>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:14px;">
+            <div>
+              <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Link do catálogo (slug)</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span style="font-size:13px;color:#64748b;white-space:nowrap;">sistema.glinformatica.com.br/catalogo/</span>
+                <input type="text" id="cat-slug" placeholder="meu-catalogo" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" class="no-upper">
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Apenas letras minúsculas, números e hífens (2-60 caracteres)</div>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">📱 WhatsApp (botão de contato)</label>
+              <input type="text" id="cat-whatsapp" placeholder="(62) 99999-9999" maxlength="20" class="no-upper" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Aparece como botão flutuante no catálogo</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">📝 Mensagem do topo (opcional)</label>
+            <input type="text" id="cat-mensagem" placeholder="Ex: Frete grátis acima de R$ 200,00" maxlength="500" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Aparece em destaque no topo da página pública (máx 500 caracteres)</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px;background:#f0f9ff;border-radius:8px;border-left:4px solid #0891b2;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1e3a8a;">
+              <input type="checkbox" id="cat-ativo" style="width:18px;height:18px;cursor:pointer;">
+              Catálogo público ativado
+            </label>
+            <div style="font-size:12px;color:#64748b;">Quando desativado, o link retorna "Catálogo não disponível"</div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" onclick="catSalvarConfig()" style="background:#16a34a;">💾 Salvar Configurações</button>
+            <button class="btn" onclick="catCopiarLink()" style="background:#0891b2;">🔗 Copiar Link</button>
+            <button class="btn" onclick="catAbrirCatalogo()" style="background:#3960f9;">👁️ Ver Catálogo</button>
+            <button class="btn" onclick="catGerarQR()" style="background:#7c3aed;">📱 QR Code</button>
+          </div>
+          <div id="cat-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:6px;font-size:13px;"></div>
+        </div>
+
+        <!-- Lista de produtos curados -->
+        <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <h3 style="color:#1e3a8a;margin:0;font-size:16px;">📦 Produtos no Catálogo <span id="cat-contador" style="font-size:13px;color:#64748b;font-weight:normal;">(0)</span></h3>
+            <button class="btn" onclick="catAbrirModalAdicionar()" style="background:#3960f9;">+ Adicionar Produtos</button>
+          </div>
+
+          <div id="cat-itens-lista" style="min-height:200px;">
+            <div style="text-align:center;padding:40px;color:#94a3b8;font-style:italic;">
+              <div style="font-size:40px;margin-bottom:10px;opacity:0.4;">📦</div>
+              Nenhum produto no catálogo ainda.<br>
+              Clique em "+ Adicionar Produtos" pra começar.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal QR Code -->
+      <div id="modal-qr" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#fff;padding:24px;border-radius:14px;max-width:340px;width:92%;text-align:center;">
+          <h2 style="color:#1e3a8a;margin:0 0 14px;font-size:18px;">📱 QR Code do Catálogo</h2>
+          <div id="qr-container" style="margin:14px 0;display:flex;justify-content:center;"></div>
+          <div id="qr-link" style="font-size:11px;color:#64748b;word-break:break-all;margin-bottom:14px;"></div>
+          <p style="font-size:12px;color:#64748b;margin-bottom:14px;">Escaneie ou imprima pra compartilhar com clientes</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn" onclick="document.getElementById('modal-qr').style.display='none'" style="background:#eceef2;color:#1e3a8a;">Fechar</button>
+            <button class="btn" onclick="catImprimirQR()" style="background:#3960f9;">🖨️ Imprimir</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Adicionar Produtos -->
+      <div id="modal-cat-add" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#fff;border-radius:14px;max-width:700px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
+          <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="color:#1e3a8a;margin:0;font-size:18px;">+ Adicionar Produtos ao Catálogo</h2>
+            <button onclick="document.getElementById('modal-cat-add').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;">&times;</button>
+          </div>
+          <div style="padding:14px 20px;border-bottom:1px solid #e2e8f0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="cat-add-busca" placeholder="🔍 Buscar produto..." oninput="catFiltrarAdd()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
+              <input type="checkbox" id="cat-add-todos" onchange="catMarcarTodos(this.checked)">
+              Marcar todos
+            </label>
+          </div>
+          <div id="cat-add-lista" style="flex:1;overflow-y:auto;padding:10px 20px;"></div>
+          <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="font-size:13px;color:#64748b;"><span id="cat-add-contador">0</span> selecionado(s)</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" onclick="document.getElementById('modal-cat-add').style.display='none'" style="background:#eceef2;color:#1e3a8a;">Cancelar</button>
+              <button class="btn" onclick="catAdicionarSelecionados()" style="background:#16a34a;">✓ Adicionar Selecionados</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Relatórios -->
@@ -3309,6 +3417,311 @@ https://sistema.glinformatica.com.br
     }
   }
 
+  // ====== CATÁLOGO PÚBLICO ======
+  let _catDados = null;        // dados retornados pela API
+  let _catSelecaoAdd = new Set(); // produtos selecionados no modal de adicionar
+
+  async function catCarregar() {
+    const loading = document.getElementById('cat-loading');
+    const conteudo = document.getElementById('cat-conteudo');
+    loading.style.display = '';
+    conteudo.style.display = 'none';
+    try {
+      _catDados = await api('GET', '/api/catalogo/config');
+      // Preenche configurações
+      document.getElementById('cat-slug').value = _catDados.slug || _catDados.slugSugerido || '';
+      document.getElementById('cat-whatsapp').value = _catDados.config.whatsapp || '';
+      document.getElementById('cat-mensagem').value = _catDados.config.mensagemTopo || '';
+      document.getElementById('cat-ativo').checked = !!_catDados.config.ativo;
+      // Lista de itens
+      catRenderItens();
+      loading.style.display = 'none';
+      conteudo.style.display = '';
+    } catch (err) {
+      loading.innerHTML = `<div style="color:#dc2626;">❌ Erro ao carregar: ${escapeHtml(err.message || err)}</div>`;
+    }
+  }
+
+  function catRenderItens() {
+    const div = document.getElementById('cat-itens-lista');
+    const contador = document.getElementById('cat-contador');
+    const itens = _catDados.itens || [];
+    contador.textContent = `(${itens.length})`;
+    if (itens.length === 0) {
+      div.innerHTML = `
+        <div style="text-align:center;padding:40px;color:#94a3b8;font-style:italic;">
+          <div style="font-size:40px;margin-bottom:10px;opacity:0.4;">📦</div>
+          Nenhum produto no catálogo ainda.<br>
+          Clique em "+ Adicionar Produtos" pra começar.
+        </div>`;
+      return;
+    }
+    div.innerHTML = `
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px;font-style:italic;">💡 Arraste pelos itens (≡) para reordenar. Use os checkboxes pra controlar o que aparece no catálogo.</div>
+      <div id="cat-itens-sortable">
+        ${itens.map(i => catRenderItemLinha(i)).join('')}
+      </div>`;
+    catAtivarDragDrop();
+  }
+
+  function catRenderItemLinha(i) {
+    const fotoHtml = i.fotoUrl
+      ? `<img src="${escapeAttr(i.fotoUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;">`
+      : `<div style="width:48px;height:48px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;opacity:0.4;">📦</div>`;
+    return `
+      <div class="cat-item-row" data-id="${i.id}" draggable="true" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:grab;">
+        <div style="color:#94a3b8;font-size:18px;user-select:none;" title="Arraste para reordenar">≡</div>
+        ${fotoHtml}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:#0f172a;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(i.produtoNome)}</div>
+          <div style="font-size:11px;color:#64748b;">${i.codigo ? 'Cód ' + escapeHtml(i.codigo) + ' · ' : ''}${i.precoVenda ? formatarBRL(i.precoVenda) : 'Sem preço'} · Estoque: ${i.estoque}</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;white-space:nowrap;" title="Mostrar preço no catálogo">
+          <input type="checkbox" ${i.mostrarPreco ? 'checked' : ''} onchange="catToggleItem(${i.id}, 'mostrarPreco', this.checked)">
+          R$
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;white-space:nowrap;" title="Mostrar estoque no catálogo">
+          <input type="checkbox" ${i.mostrarEstoque ? 'checked' : ''} onchange="catToggleItem(${i.id}, 'mostrarEstoque', this.checked)">
+          Estoque
+        </label>
+        <button onclick="catRemoverItem(${i.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;" title="Remover do catálogo">🗑️</button>
+      </div>`;
+  }
+
+  async function catToggleItem(id, campo, valor) {
+    try {
+      const body = {};
+      body[campo] = valor;
+      await api('PUT', '/api/catalogo/itens/' + id, body);
+      // Atualiza local
+      const item = _catDados.itens.find(x => x.id === id);
+      if (item) item[campo] = valor;
+    } catch (err) {
+      alert('Erro ao salvar: ' + (err.message || err));
+      await catCarregar(); // recarrega pra reverter visual
+    }
+  }
+
+  async function catRemoverItem(id) {
+    if (!confirm('Remover esse produto do catálogo? (não exclui o produto, apenas tira dele do catálogo público)')) return;
+    try {
+      await api('DELETE', '/api/catalogo/itens/' + id);
+      _catDados.itens = _catDados.itens.filter(x => x.id !== id);
+      catRenderItens();
+    } catch (err) {
+      alert('Erro ao remover: ' + (err.message || err));
+    }
+  }
+
+  // ===== Drag and Drop =====
+  let _catDraggedEl = null;
+  function catAtivarDragDrop() {
+    const items = document.querySelectorAll('.cat-item-row');
+    items.forEach(el => {
+      el.addEventListener('dragstart', e => {
+        _catDraggedEl = el;
+        el.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', () => {
+        el.style.opacity = '';
+        _catDraggedEl = null;
+      });
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (_catDraggedEl && _catDraggedEl !== el) {
+          const rect = el.getBoundingClientRect();
+          const meio = rect.top + rect.height / 2;
+          if (e.clientY < meio) el.parentNode.insertBefore(_catDraggedEl, el);
+          else el.parentNode.insertBefore(_catDraggedEl, el.nextSibling);
+        }
+      });
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        catSalvarOrdem();
+      });
+    });
+  }
+
+  async function catSalvarOrdem() {
+    const ordem = [...document.querySelectorAll('.cat-item-row')].map(el => parseInt(el.dataset.id));
+    try {
+      await api('PUT', '/api/catalogo/ordem', { ordem });
+      // Atualiza ordem local
+      const novosItens = [];
+      for (const id of ordem) {
+        const it = _catDados.itens.find(x => x.id === id);
+        if (it) novosItens.push(it);
+      }
+      _catDados.itens = novosItens;
+    } catch (err) {
+      alert('Erro ao reordenar: ' + (err.message || err));
+      await catCarregar();
+    }
+  }
+
+  // ===== Salvar configurações =====
+  async function catSalvarConfig() {
+    const slug = document.getElementById('cat-slug').value.trim().toLowerCase();
+    const whatsapp = document.getElementById('cat-whatsapp').value.trim();
+    const mensagemTopo = document.getElementById('cat-mensagem').value.trim();
+    const ativo = document.getElementById('cat-ativo').checked;
+    const status = document.getElementById('cat-status');
+    if (!slug || !/^[a-z0-9-]{2,60}$/.test(slug)) {
+      status.style.display = '';
+      status.style.background = '#fef2f2';
+      status.style.color = '#991b1b';
+      status.textContent = '❌ Slug inválido. Use apenas letras minúsculas, números e hífens (2-60 caracteres).';
+      return;
+    }
+    try {
+      await api('PUT', '/api/catalogo/config', { slug, ativo, mensagemTopo, whatsapp });
+      _catDados.slug = slug;
+      _catDados.config.ativo = ativo;
+      _catDados.config.mensagemTopo = mensagemTopo;
+      _catDados.config.whatsapp = whatsapp;
+      status.style.display = '';
+      status.style.background = '#dcfce7';
+      status.style.color = '#166534';
+      status.textContent = '✅ Configurações salvas!';
+      setTimeout(() => { status.style.display = 'none'; }, 4000);
+    } catch (err) {
+      status.style.display = '';
+      status.style.background = '#fef2f2';
+      status.style.color = '#991b1b';
+      status.textContent = '❌ ' + (err.message || 'Erro ao salvar');
+    }
+  }
+
+  function catGerarLink() {
+    const slug = (document.getElementById('cat-slug').value.trim().toLowerCase()) || _catDados?.slug || '';
+    if (!slug) return '';
+    return `${window.location.origin}/catalogo/${slug}`;
+  }
+  function catCopiarLink() {
+    const url = catGerarLink();
+    if (!url) { alert('Configure e salve o slug primeiro.'); return; }
+    navigator.clipboard.writeText(url).then(() => {
+      const status = document.getElementById('cat-status');
+      status.style.display = '';
+      status.style.background = '#dcfce7';
+      status.style.color = '#166534';
+      status.textContent = '✅ Link copiado: ' + url;
+      setTimeout(() => { status.style.display = 'none'; }, 4000);
+    }).catch(() => alert('Erro ao copiar. Link: ' + url));
+  }
+  function catAbrirCatalogo() {
+    const url = catGerarLink();
+    if (!url) { alert('Configure e salve o slug primeiro.'); return; }
+    if (!_catDados?.config?.ativo) {
+      if (!confirm('O catálogo está DESATIVADO. Você verá uma mensagem de "não disponível". Continuar mesmo assim?')) return;
+    }
+    window.open(url, '_blank');
+  }
+  function catGerarQR() {
+    const url = catGerarLink();
+    if (!url) { alert('Configure e salve o slug primeiro.'); return; }
+    // Usa Google Chart API (sem precisar de lib)
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}`;
+    document.getElementById('qr-container').innerHTML = `<img src="${escapeAttr(qrUrl)}" alt="QR Code" style="border:1px solid #e2e8f0;border-radius:8px;">`;
+    document.getElementById('qr-link').textContent = url;
+    document.getElementById('modal-qr').style.display = 'flex';
+  }
+  function catImprimirQR() {
+    const url = catGerarLink();
+    const empresa = _catDados?.empresa?.nome || 'Catálogo';
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <html><head><title>QR Code - ${escapeHtml(empresa)}</title>
+      <style>body{font-family:sans-serif;text-align:center;padding:30px;}h1{color:#1e3a8a;}p{color:#475569;font-size:14px;}.url{font-size:12px;color:#94a3b8;margin-top:14px;word-break:break-all;}</style>
+      </head><body>
+        <h1>${escapeHtml(empresa)}</h1>
+        <p>Catálogo de Produtos · Escaneie pra ver</p>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}" style="margin:20px 0;">
+        <p class="url">${escapeHtml(url)}</p>
+      </body></html>
+    `);
+    setTimeout(() => { w.print(); }, 500);
+  }
+
+  // ===== Modal: Adicionar Produtos =====
+  function catAbrirModalAdicionar() {
+    _catSelecaoAdd = new Set();
+    document.getElementById('cat-add-busca').value = '';
+    document.getElementById('cat-add-todos').checked = false;
+    catFiltrarAdd();
+    document.getElementById('modal-cat-add').style.display = 'flex';
+  }
+
+  function catFiltrarAdd() {
+    const busca = (document.getElementById('cat-add-busca').value || '').trim().toLowerCase();
+    const idsNoCatalogo = new Set((_catDados.itens || []).map(i => i.produtoId));
+    let lista = (dbProdutos || []).filter(p => !idsNoCatalogo.has(p.id));
+    if (busca) {
+      lista = lista.filter(p =>
+        (p.nome || '').toLowerCase().includes(busca) ||
+        (p.codigo || '').toLowerCase().includes(busca) ||
+        (p.categoria || '').toLowerCase().includes(busca)
+      );
+    }
+    const div = document.getElementById('cat-add-lista');
+    if (lista.length === 0) {
+      div.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;font-style:italic;">${busca ? 'Nenhum produto encontrado.' : 'Todos os produtos já estão no catálogo.'}</div>`;
+      return;
+    }
+    div.innerHTML = lista.map(p => {
+      const checked = _catSelecaoAdd.has(p.id) ? 'checked' : '';
+      return `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f5f9;cursor:pointer;">
+          <input type="checkbox" ${checked} onchange="catTogglePAdd(${p.id}, this.checked)" data-pid="${p.id}">
+          ${p.fotoUrl
+            ? `<img src="${escapeAttr(p.fotoUrl)}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">`
+            : `<div style="width:36px;height:36px;background:#f1f5f9;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.4;">📦</div>`}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.nome)}</div>
+            <div style="font-size:11px;color:#64748b;">${p.codigo ? 'Cód ' + escapeHtml(p.codigo) + ' · ' : ''}${p.categoria || 'Sem categoria'} · ${formatarBRL(p.precoVenda || 0)}</div>
+          </div>
+        </label>`;
+    }).join('');
+    catAtualizarContadorAdd();
+  }
+
+  function catTogglePAdd(pid, marcado) {
+    if (marcado) _catSelecaoAdd.add(pid);
+    else _catSelecaoAdd.delete(pid);
+    catAtualizarContadorAdd();
+  }
+  function catMarcarTodos(marcar) {
+    document.querySelectorAll('#cat-add-lista input[type="checkbox"]').forEach(cb => {
+      const pid = parseInt(cb.dataset.pid);
+      if (marcar) _catSelecaoAdd.add(pid);
+      else _catSelecaoAdd.delete(pid);
+      cb.checked = marcar;
+    });
+    catAtualizarContadorAdd();
+  }
+  function catAtualizarContadorAdd() {
+    document.getElementById('cat-add-contador').textContent = _catSelecaoAdd.size;
+  }
+
+  async function catAdicionarSelecionados() {
+    if (_catSelecaoAdd.size === 0) { alert('Selecione pelo menos 1 produto.'); return; }
+    try {
+      const r = await api('POST', '/api/catalogo/itens', { produtoIds: [..._catSelecaoAdd] });
+      document.getElementById('modal-cat-add').style.display = 'none';
+      await catCarregar();
+      const status = document.getElementById('cat-status');
+      status.style.display = '';
+      status.style.background = '#dcfce7';
+      status.style.color = '#166534';
+      status.textContent = `✅ ${r.inseridos || _catSelecaoAdd.size} produto(s) adicionado(s)!`;
+      setTimeout(() => { status.style.display = 'none'; }, 4000);
+    } catch (err) {
+      alert('Erro ao adicionar: ' + (err.message || err));
+    }
+  }
+
   function abrirContratarEmpresaExtra() {
     document.getElementById('ce-nome').value = '';
     document.getElementById('ce-cnpj').value = '';
@@ -3618,6 +4031,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
     if(pg === 'minha-conta') carregarMinhaConta();
+    if(pg === 'catalogo') catCarregar();
     if(pg === 'caixa') carregarCaixa();
   }
 

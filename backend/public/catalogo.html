@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<title>Catálogo de Produtos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .header { background: linear-gradient(135deg, #1e3a8a, #0891b2); color: #fff; padding: 24px 16px; position: relative; }
+  .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .header-logo { width: 80px; height: 80px; background: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .header-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+  .header-logo-fallback { font-size: 32px; color: #1e3a8a; font-weight: 800; }
+  .header-info h1 { font-size: 24px; margin-bottom: 4px; }
+  .header-info .contato { font-size: 13px; opacity: 0.92; display: flex; gap: 14px; flex-wrap: wrap; }
+  .header-info .contato span::before { content: "•"; margin-right: 6px; opacity: 0.6; }
+  .header-info .contato span:first-child::before { content: ""; margin: 0; }
+  .msg-topo { max-width: 1200px; margin: 16px auto 0; padding: 12px 18px; background: #fef3c7; border-left: 4px solid #f59e0b; color: #7c2d12; font-size: 14px; border-radius: 6px; }
+  .toolbar { max-width: 1200px; margin: 18px auto 0; padding: 0 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .toolbar input[type="text"] { flex: 1; min-width: 240px; padding: 11px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; }
+  .toolbar input[type="text"]:focus { outline: none; border-color: #0891b2; box-shadow: 0 0 0 3px rgba(8,145,178,0.12); }
+  .filtros { max-width: 1200px; margin: 12px auto 0; padding: 0 16px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 6px 14px; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; cursor: pointer; font-size: 13px; color: #475569; transition: all 0.15s; }
+  .chip:hover { border-color: #0891b2; color: #0891b2; }
+  .chip.active { background: #0891b2; color: #fff; border-color: #0891b2; font-weight: 600; }
+  .contador { max-width: 1200px; margin: 14px auto 0; padding: 0 16px; font-size: 13px; color: #64748b; }
+  .grid { max-width: 1200px; margin: 12px auto; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: transform 0.15s, box-shadow 0.15s; cursor: pointer; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.10); }
+  .card-foto { width: 100%; aspect-ratio: 1; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .card-foto img { width: 100%; height: 100%; object-fit: cover; }
+  .card-foto-vazia { font-size: 50px; opacity: 0.3; }
+  .card-corpo { padding: 14px; }
+  .card-categoria { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+  .card-nome { font-size: 15px; font-weight: 600; color: #0f172a; margin-bottom: 8px; line-height: 1.3; }
+  .card-desc { font-size: 12px; color: #475569; margin-bottom: 8px; line-height: 1.4; }
+  .card-preco { font-size: 20px; font-weight: 800; color: #16a34a; margin-bottom: 6px; }
+  .card-preco-sob-consulta { font-size: 13px; color: #64748b; font-style: italic; margin-bottom: 6px; }
+  .card-estoque { font-size: 12px; color: #475569; }
+  .badge-disp { display: inline-block; padding: 2px 8px; background: #dcfce7; color: #166534; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-esg { display: inline-block; padding: 2px 8px; background: #fee2e2; color: #991b1b; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .vazio { max-width: 600px; margin: 60px auto; text-align: center; padding: 30px; color: #64748b; }
+  .vazio-icon { font-size: 60px; opacity: 0.3; margin-bottom: 14px; }
+  .footer { max-width: 1200px; margin: 30px auto; padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; }
+  .footer a { color: #0891b2; text-decoration: none; }
+  .whatsapp-btn { position: fixed; bottom: 24px; right: 24px; background: #25d366; color: #fff; padding: 14px 22px; border-radius: 30px; box-shadow: 0 4px 14px rgba(37,211,102,0.4); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 8px; z-index: 100; font-size: 15px; transition: transform 0.15s; }
+  .whatsapp-btn:hover { transform: scale(1.05); }
+  .whatsapp-btn .icon { font-size: 22px; }
+  .loading { text-align: center; padding: 80px 20px; color: #64748b; font-size: 14px; }
+
+  /* Modal foto */
+  .modal-foto { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 30px; cursor: zoom-out; }
+  .modal-foto.show { display: flex; }
+  .modal-foto img { max-width: 95%; max-height: 90%; object-fit: contain; background: #fff; padding: 8px; border-radius: 8px; }
+  .modal-foto .close { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 30px; background: rgba(0,0,0,0.5); width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  @media (max-width: 640px) {
+    .header { padding: 18px 14px; }
+    .header-info h1 { font-size: 18px; }
+    .header-info .contato { font-size: 12px; gap: 10px; }
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px; }
+    .card-corpo { padding: 10px; }
+    .card-nome { font-size: 13px; }
+    .card-preco { font-size: 17px; }
+    .whatsapp-btn { bottom: 14px; right: 14px; padding: 12px 16px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-logo" id="hdr-logo-box">
+      <div class="header-logo-fallback" id="hdr-logo-fallback">GL</div>
+    </div>
+    <div class="header-info">
+      <h1 id="hdr-nome">Carregando…</h1>
+      <div class="contato" id="hdr-contato"></div>
+    </div>
+  </div>
+</header>
+
+<div id="msg-topo-wrap"></div>
+
+<div class="toolbar">
+  <input type="text" id="busca" placeholder="🔍 Buscar produto..." oninput="renderProdutos()">
+</div>
+<div class="filtros" id="filtros-categoria"></div>
+<div class="contador" id="contador"></div>
+
+<div id="conteudo">
+  <div class="loading">⏳ Carregando catálogo...</div>
+</div>
+
+<footer class="footer">
+  Catálogo digital · GL Sistema de Vendas
+</footer>
+
+<div class="modal-foto" id="modal-foto" onclick="fecharFoto(event)">
+  <div class="close" onclick="fecharFoto(event)">&times;</div>
+  <img id="modal-foto-img" src="" alt="">
+</div>
+
+<script>
+  let _dados = null;
+  let _categoriaSelecionada = null;
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function formatarBRL(v) {
+    return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  // Pega o slug da URL: /catalogo/{slug}
+  function getSlug() {
+    const path = window.location.pathname;
+    const m = path.match(/\/catalogo\/([a-z0-9-]+)/i);
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  async function carregar() {
+    const slug = getSlug();
+    if (!slug) {
+      document.getElementById('conteudo').innerHTML = `
+        <div class="vazio">
+          <div class="vazio-icon">🔍</div>
+          <h2>Link inválido</h2>
+          <p>Não conseguimos identificar o catálogo. Verifique o link.</p>
+        </div>`;
+      return;
+    }
+    try {
+      const r = await fetch('/api/catalogo/publico/' + encodeURIComponent(slug));
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        document.getElementById('conteudo').innerHTML = `
+          <div class="vazio">
+            <div class="vazio-icon">😕</div>
+            <h2>${escapeHtml(e.error || 'Catálogo não encontrado')}</h2>
+            <p>Verifique o link com a empresa.</p>
+          </div>`;
+        document.getElementById('hdr-nome').textContent = 'Não disponível';
+        return;
+      }
+      _dados = await r.json();
+      renderTudo();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('conteudo').innerHTML = `
+        <div class="vazio">
+          <div class="vazio-icon">⚠️</div>
+          <h2>Erro ao carregar</h2>
+          <p>Tente recarregar a página.</p>
+        </div>`;
+    }
+  }
+
+  function renderTudo() {
+    const d = _dados;
+    document.title = `${d.empresa.nome} — Catálogo`;
+    document.getElementById('hdr-nome').textContent = d.empresa.nome || 'Catálogo';
+    // Logo
+    if (d.empresa.logoUrl) {
+      document.getElementById('hdr-logo-box').innerHTML = `<img src="${escapeHtml(d.empresa.logoUrl)}" alt="${escapeHtml(d.empresa.nome)}">`;
+    } else {
+      // Iniciais
+      const iniciais = (d.empresa.nome || 'GL').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      document.getElementById('hdr-logo-fallback').textContent = iniciais;
+    }
+    // Contato
+    const partes = [];
+    if (d.empresa.telefone) partes.push(`<span>📞 ${escapeHtml(d.empresa.telefone)}</span>`);
+    if (d.empresa.endereco) {
+      const enderecoLinha = [d.empresa.endereco, d.empresa.bairro, d.empresa.cidade && d.empresa.uf ? `${d.empresa.cidade}/${d.empresa.uf}` : d.empresa.cidade]
+        .filter(Boolean).join(', ');
+      partes.push(`<span>📍 ${escapeHtml(enderecoLinha)}</span>`);
+    }
+    if (d.empresa.email) partes.push(`<span>✉️ ${escapeHtml(d.empresa.email)}</span>`);
+    document.getElementById('hdr-contato').innerHTML = partes.join('');
+
+    // Mensagem topo
+    if (d.config.mensagemTopo) {
+      document.getElementById('msg-topo-wrap').innerHTML = `<div class="msg-topo">${escapeHtml(d.config.mensagemTopo)}</div>`;
+    }
+
+    // Categorias
+    const filtrosDiv = document.getElementById('filtros-categoria');
+    const todasChip = `<button class="chip active" onclick="filtrarCategoria(null)">Todas (${d.produtos.length})</button>`;
+    const chips = d.categorias.map(cat => {
+      const qtd = d.produtos.filter(p => p.categoria === cat).length;
+      return `<button class="chip" onclick="filtrarCategoria('${escapeHtml(cat).replace(/'/g, "\\'")}')">${escapeHtml(cat)} (${qtd})</button>`;
+    }).join('');
+    filtrosDiv.innerHTML = todasChip + chips;
+
+    // Botão WhatsApp flutuante
+    if (d.config.whatsapp) {
+      const tel = String(d.config.whatsapp).replace(/\D/g, '');
+      const mensagem = encodeURIComponent(`Olá! Vi seu catálogo de produtos e gostaria de mais informações.`);
+      const wbtn = document.createElement('a');
+      wbtn.className = 'whatsapp-btn';
+      wbtn.href = `https://wa.me/55${tel}?text=${mensagem}`;
+      wbtn.target = '_blank';
+      wbtn.rel = 'noopener';
+      wbtn.innerHTML = '<span class="icon">💬</span> WhatsApp';
+      document.body.appendChild(wbtn);
+    }
+
+    renderProdutos();
+  }
+
+  function filtrarCategoria(cat) {
+    _categoriaSelecionada = cat;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    const idx = cat === null ? 0 : Array.from(document.querySelectorAll('.chip')).findIndex(c => c.textContent.startsWith(cat + ' '));
+    if (idx >= 0) document.querySelectorAll('.chip')[idx].classList.add('active');
+    renderProdutos();
+  }
+
+  function renderProdutos() {
+    if (!_dados) return;
+    const busca = (document.getElementById('busca').value || '').trim().toLowerCase();
+    let lista = _dados.produtos;
+    if (_categoriaSelecionada) {
+      lista = lista.filter(p => p.categoria === _categoriaSelecionada);
+    }
+    if (busca) {
+      lista = lista.filter(p =>
+        (p.nome || '').toLowerCase().includes(busca) ||
+        (p.categoria || '').toLowerCase().includes(busca) ||
+        (p.codigo || '').toLowerCase().includes(busca) ||
+        (p.descricao || '').toLowerCase().includes(busca)
+      );
+    }
+
+    document.getElementById('contador').textContent = `Mostrando ${lista.length} produto${lista.length === 1 ? '' : 's'}`;
+
+    if (lista.length === 0) {
+      document.getElementById('conteudo').innerHTML = `
+        <div class="vazio">
+          <div class="vazio-icon">🔍</div>
+          <h2>Nenhum produto encontrado</h2>
+          <p>${busca ? 'Tente outra busca.' : 'Não há produtos nessa categoria.'}</p>
+        </div>`;
+      return;
+    }
+
+    const html = `<div class="grid">${lista.map(p => `
+      <div class="card" ${p.fotoUrl ? `onclick="abrirFoto('${escapeHtml(p.fotoUrl).replace(/'/g, "\\'")}', '${escapeHtml(p.nome).replace(/'/g, "\\'")}')"` : ''}>
+        <div class="card-foto">
+          ${p.fotoUrl
+            ? `<img src="${escapeHtml(p.fotoUrl)}" alt="${escapeHtml(p.nome)}" loading="lazy">`
+            : '<div class="card-foto-vazia">📦</div>'}
+        </div>
+        <div class="card-corpo">
+          ${p.categoria ? `<div class="card-categoria">${escapeHtml(p.categoria)}</div>` : ''}
+          <div class="card-nome">${escapeHtml(p.nome)}</div>
+          ${p.descricao ? `<div class="card-desc">${escapeHtml(p.descricao)}</div>` : ''}
+          ${p.mostrarPreco
+            ? (p.precoVenda
+                ? `<div class="card-preco">${formatarBRL(p.precoVenda)}</div>`
+                : `<div class="card-preco-sob-consulta">Preço sob consulta</div>`)
+            : `<div class="card-preco-sob-consulta">Preço sob consulta</div>`}
+          ${p.mostrarEstoque
+            ? (p.estoque > 0
+                ? `<div class="card-estoque"><span class="badge-disp">✓ ${p.estoque} disponível</span></div>`
+                : `<div class="card-estoque"><span class="badge-esg">Esgotado</span></div>`)
+            : ''}
+        </div>
+      </div>`).join('')}</div>`;
+    document.getElementById('conteudo').innerHTML = html;
+  }
+
+  function abrirFoto(url, alt) {
+    const m = document.getElementById('modal-foto');
+    document.getElementById('modal-foto-img').src = url;
+    document.getElementById('modal-foto-img').alt = alt || '';
+    m.classList.add('show');
+  }
+  function fecharFoto(e) {
+    if (e && e.target.tagName === 'IMG' && e.target.id === 'modal-foto-img') return;
+    document.getElementById('modal-foto').classList.remove('show');
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('modal-foto').classList.remove('show'); });
+
+  carregar();
+</script>
+</body>
+</html>

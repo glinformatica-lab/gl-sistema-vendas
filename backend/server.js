@@ -15,6 +15,9 @@ app.use(express.json({ limit: '5mb' }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/assinaturas', require('./routes/assinaturas'));
 
+// Catálogo público — tem rotas com e sem auth (controle interno na própria rota)
+app.use('/api/catalogo', require('./routes/catalogo'));
+
 // Rotas protegidas (token de empresa)
 app.use('/api/produtos',        autenticar, verificarAcesso, require('./routes/produtos'));
 app.use('/api/servicos',        autenticar, verificarAcesso, require('./routes/servicos'));
@@ -43,6 +46,9 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'log
 app.get('/renovar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'renovar.html')));
 app.get('/reset-senha', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-senha.html')));
 app.get('/master', (req, res) => res.sendFile(path.join(__dirname, 'public', 'master.html')));
+
+// Catálogo público: /catalogo/{slug}  →  serve a página HTML que carrega via API
+app.get('/catalogo/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'catalogo.html')));
 
 // Frontend estático
 app.use(express.static(path.join(__dirname, 'public')));
