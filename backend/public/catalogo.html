@@ -72,8 +72,7 @@
 
 <header class="header">
   <div class="header-inner">
-    <div class="header-logo" id="hdr-logo-box">
-      <div class="header-logo-fallback" id="hdr-logo-fallback">GL</div>
+    <div class="header-logo" id="hdr-logo-box" style="display:none;">
     </div>
     <div class="header-info">
       <h1 id="hdr-nome">Carregando…</h1>
@@ -162,13 +161,13 @@
     const d = _dados;
     document.title = `${d.empresa.nome} — Catálogo`;
     document.getElementById('hdr-nome').textContent = d.empresa.nome || 'Catálogo';
-    // Logo
+    // Logo: só mostra se a empresa tiver. Senão, esconde a caixa (visual mais limpo)
+    const logoBox = document.getElementById('hdr-logo-box');
     if (d.empresa.logoUrl) {
-      document.getElementById('hdr-logo-box').innerHTML = `<img src="${escapeHtml(d.empresa.logoUrl)}" alt="${escapeHtml(d.empresa.nome)}">`;
+      logoBox.innerHTML = `<img src="${escapeHtml(d.empresa.logoUrl)}" alt="${escapeHtml(d.empresa.nome)}">`;
+      logoBox.style.display = '';
     } else {
-      // Iniciais
-      const iniciais = (d.empresa.nome || 'GL').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      document.getElementById('hdr-logo-fallback').textContent = iniciais;
+      logoBox.style.display = 'none';
     }
     // Contato
     const partes = [];
