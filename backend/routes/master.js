@@ -136,7 +136,7 @@ router.put('/empresas/:id', async (req, res) => {
   const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo } = req.body || {};
   // Valida valores
   const statusValidos = ['trial', 'ativa', 'vencida', 'bloqueada'];
-  const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'anual', 'mensal'];
+  const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
   if (status && !statusValidos.includes(status)) return res.status(400).json({ error: 'Status inválido.' });
   if (plano && !planosValidos.includes(plano)) return res.status(400).json({ error: 'Plano inválido.' });
   try {
@@ -217,15 +217,16 @@ router.post('/empresas/:id/pagamentos', async (req, res) => {
   const { valor, dataPagamento, plano, formaPagamento, observacao } = req.body || {};
   if (!valor || valor <= 0) return res.status(400).json({ error: 'Valor inválido.' });
   if (!dataPagamento) return res.status(400).json({ error: 'Data de pagamento é obrigatória.' });
-  const planosPagamentoValidos = ['basico', 'pro', 'pro-fiscal', 'anual', 'mensal'];
+  const planosPagamentoValidos = ['basico', 'pro', 'pro-fiscal', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
   if (!plano || !planosPagamentoValidos.includes(plano)) {
-    return res.status(400).json({ error: 'Plano deve ser básico, pro, pro-fiscal ou anual.' });
+    return res.status(400).json({ error: 'Plano deve ser válido.' });
   }
 
-  // Quantos meses adicionar (anual = 12, demais = 1)
-  const meses = plano === 'anual' ? 12 : 1;
-  // Calcula valor mensal (anual divide por 12, demais usa direto)
-  const valorMensalCalc = plano === 'anual' ? (Number(valor) / 12) : Number(valor);
+  // Quantos meses adicionar (anuais = 12, mensais = 1)
+  const ehAnual = ['anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual'].includes(plano);
+  const meses = ehAnual ? 12 : 1;
+  // Calcula valor mensal (anuais dividem por 12, mensais usam direto)
+  const valorMensalCalc = ehAnual ? (Number(valor) / 12) : Number(valor);
 
   const client = await db.pool.connect();
   try {

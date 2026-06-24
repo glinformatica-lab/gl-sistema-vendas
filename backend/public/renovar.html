@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Renovar — GL Sistema de Vendas</title>
+  <style>
+    :root {
+      --azul: #1e3a8a;
+      --verde: #16a34a;
+      --laranja: #f59e0b;
+      --cinza-borda: #cbd5e1;
+      --txt: #1e293b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 24px;
+      background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+      min-height: 100vh; color: var(--txt);
+    }
+    .header { text-align: center; margin-bottom: 30px; color: white; }
+    .header h1 { margin: 0 0 8px; font-size: 30px; }
+    .header p { margin: 0; opacity: 0.9; font-size: 16px; }
+    .container { max-width: 980px; margin: 0 auto; }
+    .planos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px; }
+    .plano {
+      background: #fff; border: 2px solid var(--cinza-borda); border-radius: 16px;
+      padding: 28px 24px; cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .plano:hover { border-color: #22d3ee; transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.18); }
+    .plano.selecionado { border-color: #22d3ee; background: linear-gradient(135deg, #ecfeff, #fff); box-shadow: 0 6px 24px rgba(34,211,238,0.25); }
+    .plano.popular::before {
+      content: '⭐ MAIS POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: #f59e0b; color: white; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+    .plano h3 { margin: 0 0 8px 0; color: var(--azul); font-size: 20px; }
+    .plano .preco { font-size: 36px; font-weight: 900; color: var(--txt); margin: 14px 0 4px; }
+    .plano .preco .moeda { font-size: 18px; vertical-align: super; }
+    .plano .preco .periodo { font-size: 14px; color: #668; font-weight: 600; }
+    .plano .economia { background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
+    .plano .desc { font-size: 13px; color: #668; margin-top: 8px; }
+    .plano ul { padding: 0 0 0 18px; margin: 14px 0 0; font-size: 14px; line-height: 1.8; color: #444; }
+    .plano ul li { list-style: none; position: relative; padding-left: 22px; }
+    .plano ul li::before { content: '✓'; position: absolute; left: 0; color: var(--verde); font-weight: 900; }
+
+    /* Card Pro Fiscal (lilás) */
+    .plano.pro-fiscal { background: linear-gradient(135deg, #f5f3ff, #fff); border-color: #7c3aed; }
+    .plano.pro-fiscal h3 { color: #6d28d9; }
+    .plano.pro-fiscal.em-desenvolvimento { cursor: default; opacity: 0.85; }
+    .plano.pro-fiscal.em-desenvolvimento:hover { transform: none; border-color: #7c3aed; box-shadow: none; }
+    .info-card {
+      background: white; border-radius: 12px; padding: 20px 24px;
+      margin-bottom: 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    .info-card h2 { color: var(--azul); margin: 0 0 12px; font-size: 17px; }
+    .info-card .linha { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+    .info-card .linha:last-child { border-bottom: none; }
+    .info-card .linha strong { color: #475569; }
+    .acoes { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+    .btn { padding: 14px 32px; font-size: 16px; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; }
+    .btn-primary { background: #22d3ee; color: #0c4a6e; }
+    .btn-primary:hover { background: #06b6d4; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.25); }
+    .erro { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px 16px; border-radius: 10px; margin: 16px 0; display: none; font-size: 14px; }
+    .erro.show { display: block; }
+    .voltar { text-align: center; }
+    .voltar a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 14px; }
+    .voltar a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>♻️ Renovar Assinatura</h1>
+      <p>Continue usando o GL Sistema sem interrupção</p>
+    </div>
+
+    <div class="info-card" id="info-empresa">
+      <h2>📋 Sua conta</h2>
+      <div id="info-content"><span style="color:#888;">Carregando...</span></div>
+    </div>
+
+    <div class="planos">
+      <div class="plano" id="plano-basico" onclick="selecionarPlano('basico')">
+        <h3>📅 Básico</h3>
+        <div class="preco">
+          <span class="moeda">R$</span>99<span class="periodo">,90 / mês</span>
+        </div>
+        <div class="desc">Cobrado mensalmente</div>
+        <ul>
+          <li>Sistema de Vendas, Estoque</li>
+          <li>Financeiro e Relatórios</li>
+          <li>Suporte por WhatsApp</li>
+          <li>+30 dias adicionados ao seu vencimento</li>
+        </ul>
+      </div>
+
+      <div class="plano popular" id="plano-pro" onclick="selecionarPlano('pro')">
+        <h3>⚡ Pro</h3>
+        <div class="economia">🚀 Mais escolhido</div>
+        <div class="preco">
+          <span class="moeda">R$</span>149<span class="periodo">,90 / mês</span>
+        </div>
+        <div class="desc">Para quem quer vender mais</div>
+        <ul>
+          <li><strong>Tudo do plano Básico</strong></li>
+          <li>📋 <strong>Catálogo Público</strong></li>
+          <li>📥 <strong>Pedidos Online</strong></li>
+          <li>+30 dias adicionados ao seu vencimento</li>
+        </ul>
+      </div>
+
+      <div class="plano pro-fiscal em-desenvolvimento" id="plano-pro-fiscal">
+        <h3>🧾 Pro Fiscal</h3>
+        <div class="economia" style="background:#ede9fe;color:#6d28d9;">🔧 Em desenvolvimento</div>
+        <div class="preco">
+          <span class="moeda">R$</span>249<span class="periodo">,90 / mês</span>
+        </div>
+        <div class="desc">Para emitir nota fiscal</div>
+        <ul>
+          <li><strong>Tudo do plano Pro</strong></li>
+          <li>🧾 <strong>Emissão de NF-e</strong></li>
+          <li>🧾 <strong>Emissão de NFC-e</strong></li>
+          <li>Configurações Fiscais</li>
+        </ul>
+        <div style="margin-top:12px;padding:10px;background:#ede9fe;border-radius:8px;font-size:12px;color:#6d28d9;text-align:center;font-weight:600;">
+          🚀 Em breve disponível!
+        </div>
+      </div>
+
+      <div class="plano" id="plano-anual" onclick="toggleAnual()" style="border-color:#16a34a;cursor:pointer;">
+        <h3 style="color:#16a34a;">🌟 Anual</h3>
+        <div class="economia">💰 Economize 10%</div>
+        <div class="preco">
+          <span class="moeda" style="font-size:18px;">a partir de R$</span>1.078<span class="periodo">,92 / ano</span>
+        </div>
+        <div class="desc">Parcele em até 12x sem juros</div>
+        <ul>
+          <li>10% de desconto em qualquer plano</li>
+          <li>Básico, Pro ou Pro Fiscal</li>
+          <li>+365 dias no vencimento</li>
+        </ul>
+        <div style="margin-top:12px;color:#15803d;font-weight:700;font-size:13px;text-align:center;" id="anual-seta-texto">▼ Ver opções anuais</div>
+      </div>
+    </div>
+
+    <!-- Opções expandidas do Anual -->
+    <div id="anual-opcoes-renovar" style="display:none;margin:18px 0;background:#fff;border:2px solid #16a34a;border-radius:12px;padding:18px;">
+      <div style="font-size:13px;color:#475569;margin-bottom:14px;font-weight:600;">Escolha qual plano anual:</div>
+
+      <div id="opt-basico-anual" onclick="selecionarPlano('basico-anual')" style="border:2px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-bottom:8px;cursor:pointer;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-weight:700;color:#1e3a8a;font-size:14px;">📅 Básico Anual</div>
+          <div style="font-size:12px;color:#475569;">Vendas, Estoque, Financeiro</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:18px;font-weight:900;color:#1e3a8a;">R$ 1.078,92</div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 1.198,80</div>
+        </div>
+      </div>
+
+      <div id="opt-pro-anual" onclick="selecionarPlano('pro-anual')" style="border:3px solid #0891b2;border-radius:10px;padding:12px 16px;margin-bottom:8px;cursor:pointer;background:#f0f9ff;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;position:relative;">
+        <span style="position:absolute;top:-9px;right:12px;background:#0891b2;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;">⭐ MAIS ESCOLHIDO</span>
+        <div style="flex:1;min-width:160px;">
+          <div style="font-weight:700;color:#0891b2;font-size:14px;">⚡ Pro Anual</div>
+          <div style="font-size:12px;color:#475569;">+ Catálogo Online + Pedidos WhatsApp</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:18px;font-weight:900;color:#0891b2;">R$ 1.618,92</div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 1.798,80</div>
+        </div>
+      </div>
+
+      <div id="opt-pro-fiscal-anual" style="border:2px solid #7c3aed;border-radius:10px;padding:12px 16px;background:linear-gradient(135deg,#f5f3ff,#fff);opacity:0.85;cursor:not-allowed;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;position:relative;">
+        <span style="position:absolute;top:-9px;right:12px;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;">🔧 EM BREVE</span>
+        <div style="flex:1;min-width:160px;">
+          <div style="font-weight:700;color:#6d28d9;font-size:14px;">🧾 Pro Fiscal Anual</div>
+          <div style="font-size:12px;color:#475569;">+ NF-e / NFC-e</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:18px;font-weight:900;color:#6d28d9;">R$ 2.698,92</div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 2.998,80</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="erro" id="erro"></div>
+
+    <div class="acoes">
+      <button class="btn btn-primary" id="btn-pagar" onclick="pagar()" disabled>
+        Selecione um plano acima ↑
+      </button>
+    </div>
+
+    <div class="voltar" style="margin-top: 24px;">
+      <a href="/index.html">← Voltar ao sistema</a>
+    </div>
+  </div>
+
+<script>
+let _planoSelecionado = null;
+const token = localStorage.getItem('token');
+
+async function carregarDados() {
+  if (!token) {
+    window.location.href = '/login';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+      throw new Error('Erro ao carregar dados.');
+    }
+    const data = await resp.json();
+    const e = data.empresa || {};
+    const u = data.usuario || {};
+    const planoLabel = {
+      'mensal': 'Mensal (legado)',
+      'basico': 'Básico',
+      'pro': 'Pro',
+      'pro-fiscal': 'Pro Fiscal',
+      'basico-anual': 'Básico Anual',
+      'pro-anual': 'Pro Anual',
+      'pro-fiscal-anual': 'Pro Fiscal Anual',
+      'anual': 'Anual',
+      'trial': 'Teste grátis (7 dias)'
+    };
+    const statusLabel = { 'ativa':'✅ Ativa', 'trial':'🟡 Trial', 'trial-expirado':'❌ Trial expirado', 'aguardando-pagamento':'⏳ Aguardando pagamento', 'vencida':'❌ Vencida', 'bloqueada':'🚫 Bloqueada' };
+    let vencFmt = '—';
+    if (e.dataVencimento) {
+      const venc = new Date(String(e.dataVencimento).slice(0,10) + 'T00:00:00');
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      const dias = Math.round((venc - hoje) / 86400000);
+      vencFmt = String(e.dataVencimento).slice(0,10).split('-').reverse().join('/');
+      if (dias > 0) vencFmt += ` (em ${dias} dia${dias>1?'s':''})`;
+      else if (dias === 0) vencFmt += ` (hoje)`;
+      else vencFmt += ` (vencido há ${-dias} dia${-dias>1?'s':''})`;
+    }
+    document.getElementById('info-content').innerHTML = `
+      <div class="linha"><strong>Empresa:</strong><span>${e.nome || '—'}</span></div>
+      <div class="linha"><strong>Plano atual:</strong><span>${planoLabel[e.plano] || e.plano || '—'}</span></div>
+      <div class="linha"><strong>Status:</strong><span>${statusLabel[e.status] || e.status || '—'}</span></div>
+      <div class="linha"><strong>Vencimento:</strong><span>${vencFmt}</span></div>
+    `;
+  } catch (err) {
+    document.getElementById('info-content').innerHTML = `<span style="color:#dc2626;">Erro: ${err.message}</span>`;
+  }
+}
+
+function toggleAnual() {
+  const opcoes = document.getElementById('anual-opcoes-renovar');
+  const setaTexto = document.getElementById('anual-seta-texto');
+  if (opcoes.style.display === 'none' || !opcoes.style.display) {
+    opcoes.style.display = 'block';
+    if (setaTexto) setaTexto.textContent = '▲ Ocultar opções';
+  } else {
+    opcoes.style.display = 'none';
+    if (setaTexto) setaTexto.textContent = '▼ Ver opções anuais';
+  }
+}
+
+function selecionarPlano(p) {
+  _planoSelecionado = p;
+  // Limpa seleção dos cards
+  document.querySelectorAll('.plano').forEach(el => el.classList.remove('selecionado'));
+  // Limpa seleção das opções anuais
+  ['opt-basico-anual', 'opt-pro-anual'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'opt-pro-anual') {
+      el.style.borderColor = '#0891b2';
+      el.style.borderWidth = '3px';
+      el.style.background = '#f0f9ff';
+    } else {
+      el.style.borderColor = '#e2e8f0';
+      el.style.borderWidth = '2px';
+      el.style.background = '#fff';
+    }
+  });
+
+  // Marca selecionado
+  const cardPrincipal = document.getElementById('plano-' + p);
+  if (cardPrincipal) {
+    cardPrincipal.classList.add('selecionado');
+  } else {
+    const optEl = document.getElementById('opt-' + p);
+    if (optEl) {
+      optEl.style.borderColor = '#16a34a';
+      optEl.style.borderWidth = '3px';
+      optEl.style.background = 'linear-gradient(135deg,#dcfce7,#fff)';
+    }
+  }
+
+  const btn = document.getElementById('btn-pagar');
+  btn.disabled = false;
+  const textos = {
+    'basico': '💳 Pagar R$ 99,90 e renovar →',
+    'pro': '💳 Pagar R$ 149,90 e renovar →',
+    'pro-fiscal': '💳 Pagar R$ 249,90 e renovar →',
+    'basico-anual': '💳 Pagar R$ 1.078,92 e renovar (12x) →',
+    'pro-anual': '💳 Pagar R$ 1.618,92 e renovar (12x) →',
+    'anual': '💳 Pagar R$ 1.080,00 e renovar (12x sem juros) →',
+    'mensal': '💳 Pagar R$ 99,90 e renovar →'
+  };
+  btn.textContent = textos[p] || '💳 Continuar →';
+}
+
+async function pagar() {
+  if (!_planoSelecionado) return;
+  const btn = document.getElementById('btn-pagar');
+  const erro = document.getElementById('erro');
+  erro.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = 'Processando...';
+  try {
+    const resp = await fetch('/api/assinaturas/renovar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ plano: _planoSelecionado })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Erro ao gerar link de pagamento.');
+    btn.textContent = 'Redirecionando para o PagBank...';
+    window.location.href = data.linkPagamento;
+  } catch (err) {
+    erro.textContent = err.message;
+    erro.classList.add('show');
+    btn.disabled = false;
+    const textosRetry = {
+      'basico': '💳 Pagar R$ 99,90 e renovar →',
+      'pro': '💳 Pagar R$ 149,90 e renovar →',
+      'pro-fiscal': '💳 Pagar R$ 249,90 e renovar →',
+      'basico-anual': '💳 Pagar R$ 1.078,92 e renovar (12x) →',
+      'pro-anual': '💳 Pagar R$ 1.618,92 e renovar (12x) →',
+      'anual': '💳 Pagar R$ 1.080,00 e renovar (12x sem juros) →',
+      'mensal': '💳 Pagar R$ 99,90 e renovar →'
+    };
+    btn.textContent = textosRetry[_planoSelecionado] || '💳 Continuar →';
+  }
+}
+
+carregarDados();
+</script>
+</body>
+</html>

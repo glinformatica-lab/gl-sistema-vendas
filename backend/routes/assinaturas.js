@@ -12,12 +12,16 @@ const router = express.Router();
 
 // Configuração dos planos disponíveis
 const PLANOS = {
-  // === Planos principais ===
+  // === Planos MENSAIS ===
   basico:        { nome: 'Plano Básico',     valor: 99.90,   meses: 1,  modulosVendaOnline: false, moduloFiscal: false },
   pro:           { nome: 'Plano Pro',        valor: 149.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: false },
   'pro-fiscal':  { nome: 'Plano Pro Fiscal', valor: 249.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: true  },
-  // === Plano anual (legado - mantido pra compatibilidade) ===
-  anual:         { nome: 'Plano Anual',      valor: 1080.00, meses: 12, modulosVendaOnline: false, moduloFiscal: false },
+  // === Planos ANUAIS (10% de desconto) ===
+  'basico-anual':     { nome: 'Básico Anual',     valor: 1078.92, meses: 12, modulosVendaOnline: false, moduloFiscal: false },
+  'pro-anual':        { nome: 'Pro Anual',        valor: 1618.92, meses: 12, modulosVendaOnline: true,  moduloFiscal: false },
+  'pro-fiscal-anual': { nome: 'Pro Fiscal Anual', valor: 2698.92, meses: 12, modulosVendaOnline: true,  moduloFiscal: true  },
+  // === Plano anual legado (clientes antigos) ===
+  anual:         { nome: 'Plano Anual (legado)', valor: 1080.00, meses: 12, modulosVendaOnline: false, moduloFiscal: false },
   // === Plano de empresa extra (multi-empresa) ===
   'empresa-extra': { nome: 'Empresa Adicional', valor: 79.90, meses: 1, ehExtra: true }
 };
@@ -43,7 +47,7 @@ router.post('/iniciar', async (req, res) => {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
   // Bloqueia novas contratações de Pro Fiscal (ainda em desenvolvimento - aguardando NFe)
-  if (plano === 'pro-fiscal') {
+  if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
     return res.status(400).json({
       error: 'O Plano Pro Fiscal está em desenvolvimento. Entre em contato com a GL Informática pelo WhatsApp pra ser avisado quando estiver disponível.'
     });
@@ -111,7 +115,7 @@ router.post('/iniciar', async (req, res) => {
         email: emailAdmin,
         nome: nomeAdmin,
         formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
-        maxParcelas: plano === 'anual' ? 12 : 1
+        maxParcelas: ['anual','basico-anual','pro-anual','pro-fiscal-anual'].includes(plano) ? 12 : 1
       });
     } catch (err) {
       // Se PagBank falhar, faz rollback (deixa banco limpo)
@@ -326,7 +330,7 @@ router.post('/renovar', async (req, res) => {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
   // Bloqueia renovação no Pro Fiscal (em desenvolvimento)
-  if (plano === 'pro-fiscal') {
+  if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
     return res.status(400).json({
       error: 'O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico ou Pro.'
     });
@@ -369,7 +373,7 @@ router.post('/renovar', async (req, res) => {
         email: dados.email,
         nome: dados.nome_admin,
         formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
-        maxParcelas: plano === 'anual' ? 12 : 1
+        maxParcelas: ['anual','basico-anual','pro-anual','pro-fiscal-anual'].includes(plano) ? 12 : 1
       });
     } catch (err) {
       // Marca assinatura como erro (não trava o sistema)
@@ -533,7 +537,7 @@ async function processarPagamento(referencia, dadosPedido) {
 
       // === FLUXO NORMAL: ASSINATURA OU RENOVAÇÃO ===
       // Paga: ativa empresa
-      const meses = assin.plano === 'anual' ? 12 : 1;
+      const meses = ['anual','basico-anual','pro-anual','pro-fiscal-anual'].includes(assin.plano) ? 12 : 1;
       // Pega vencimento atual da empresa (pode ser passado ou futuro)
       const rVenc = await client.query(
         `SELECT data_vencimento FROM empresas WHERE id = $1 LIMIT 1`,
@@ -647,7 +651,7 @@ router.post('/renovar', autenticar, async (req, res) => {
   if (!plano || !PLANOS[plano]) {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
-  if (plano === 'pro-fiscal') {
+  if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
     return res.status(400).json({ error: 'O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico ou Pro.' });
   }
   const planoConfig = PLANOS[plano];
@@ -677,7 +681,7 @@ router.post('/renovar', autenticar, async (req, res) => {
       email: dados.email,
       nome: dados.usuario_nome,
       formas: ['CREDIT_CARD', 'BOLETO', 'PIX'],
-      maxParcelas: plano === 'anual' ? 12 : 1
+      maxParcelas: ['anual','basico-anual','pro-anual','pro-fiscal-anual'].includes(plano) ? 12 : 1
     });
     if (!checkout || !checkout.linkPagamento) {
       return res.status(502).json({ error: 'Erro ao gerar link de pagamento. Tente novamente.' });

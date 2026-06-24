@@ -66,6 +66,11 @@
     .plano.pro-fiscal.em-desenvolvimento:hover { transform:none; border-color:#7c3aed; box-shadow:none; }
     .plano.pro-fiscal.em-desenvolvimento::after { content:'EM BREVE'; }
 
+    /* Card Anual expansível */
+    .plano-anual-wrapper:hover { box-shadow:0 6px 24px rgba(22,163,74,0.18); transform:translateY(-1px); }
+    .anual-opcao:hover { transform:translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+    #opt-pro-fiscal-anual:hover { transform:none; box-shadow:none; }
+
     /* Formulário */
     .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
     .form-card.visivel { display:block; }
@@ -176,6 +181,71 @@
     </div>
   </div>
 
+  <!-- Card Anual EXPANSÍVEL (fora do grid principal pra ocupar largura cheia) -->
+  <div style="max-width:920px;margin:24px auto 0;">
+    <div class="plano plano-anual-wrapper" id="plano-anual-toggle" onclick="toggleAnual()" style="cursor:pointer;border:3px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#fff);padding:24px;border-radius:18px;position:relative;">
+      <div style="position:absolute;top:-12px;left:24px;background:#16a34a;color:#fff;padding:4px 12px;border-radius:14px;font-size:11px;font-weight:700;">💰 PAGUE ANUAL E ECONOMIZE 10%</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+        <div style="flex:1;min-width:240px;">
+          <h3 style="color:#15803d;margin:0 0 8px 0;font-size:22px;">🌟 Plano Anual</h3>
+          <div style="font-size:14px;color:#475569;">A partir de</div>
+          <div style="font-size:32px;font-weight:900;color:#15803d;">R$ 1.078,92<span style="font-size:14px;font-weight:400;color:#475569;">/ano</span></div>
+          <div style="font-size:13px;color:#475569;margin-top:4px;">Parcelado em até 12x sem juros</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:13px;color:#15803d;font-weight:700;margin-bottom:6px;">Ver opções</div>
+          <div id="anual-seta" style="font-size:22px;color:#15803d;transition:transform 0.2s;">▼</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-opções expandidas -->
+    <div id="anual-opcoes" style="display:none;margin-top:14px;background:#fff;border:2px solid #16a34a;border-radius:14px;padding:18px;">
+      <div style="font-size:13px;color:#475569;margin-bottom:14px;font-weight:600;">Escolha qual plano anual você quer:</div>
+
+      <!-- Opção: Básico Anual -->
+      <div class="anual-opcao" id="opt-basico-anual" onclick="selecionarPlano('basico-anual')" style="border:2px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:all 0.15s;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:700;color:#1e3a8a;font-size:15px;">📅 Básico Anual</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px;">Vendas, Estoque, Financeiro</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#16a34a;font-weight:700;">10% OFF</div>
+          <div style="font-size:22px;font-weight:900;color:#1e3a8a;">R$ 1.078,92<span style="font-size:11px;color:#668;font-weight:500;">/ano</span></div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 1.198,80</div>
+        </div>
+      </div>
+
+      <!-- Opção: Pro Anual (mais escolhido) -->
+      <div class="anual-opcao" id="opt-pro-anual" onclick="selecionarPlano('pro-anual')" style="border:3px solid #0891b2;border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;background:#f0f9ff;transition:all 0.15s;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:relative;">
+        <div style="position:absolute;top:-10px;right:14px;background:#0891b2;color:#fff;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;">⭐ MAIS ESCOLHIDO</div>
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:700;color:#0891b2;font-size:15px;">⚡ Pro Anual</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px;">Tudo do Básico + Catálogo Online + Pedidos WhatsApp</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#16a34a;font-weight:700;">10% OFF</div>
+          <div style="font-size:22px;font-weight:900;color:#0891b2;">R$ 1.618,92<span style="font-size:11px;color:#668;font-weight:500;">/ano</span></div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 1.798,80</div>
+        </div>
+      </div>
+
+      <!-- Opção: Pro Fiscal Anual (em dev) -->
+      <div class="anual-opcao" id="opt-pro-fiscal-anual" style="border:2px solid #7c3aed;border-radius:10px;padding:14px 18px;background:linear-gradient(135deg,#f5f3ff,#fff);opacity:0.85;cursor:not-allowed;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:relative;">
+        <div style="position:absolute;top:-10px;right:14px;background:#7c3aed;color:#fff;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;">🔧 EM BREVE</div>
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:700;color:#6d28d9;font-size:15px;">🧾 Pro Fiscal Anual</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px;">Tudo do Pro + Emissão de NF-e e NFC-e</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#16a34a;font-weight:700;">10% OFF</div>
+          <div style="font-size:22px;font-weight:900;color:#6d28d9;">R$ 2.698,92<span style="font-size:11px;color:#668;font-weight:500;">/ano</span></div>
+          <div style="font-size:10px;color:#668;text-decoration:line-through;">De R$ 2.998,80</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Banner Multi-Empresa -->
   <div style="max-width:920px;margin:32px auto 0;padding:20px 24px;background:linear-gradient(135deg, #f0f9ff, #fef3c7);border:2px solid #0891b2;border-radius:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
     <div style="font-size:42px;">🏢🏢</div>
@@ -253,11 +323,14 @@
 <script>
   let _planoSelecionado = null;
   const PLANOS = {
-    trial:        { nome: 'Teste Grátis 7 dias', valor: 0,      label: 'GRÁTIS por 7 dias' },
-    basico:       { nome: 'Plano Básico',        valor: 99.90,  label: 'R$ 99,90 / mês' },
-    pro:          { nome: 'Plano Pro',           valor: 149.90, label: 'R$ 149,90 / mês' },
-    'pro-fiscal': { nome: 'Plano Pro Fiscal',    valor: 249.90, label: 'R$ 249,90 / mês' },
-    anual:        { nome: 'Plano Anual',         valor: 1080.00, label: 'R$ 1.080,00 / ano' }
+    trial:                { nome: 'Teste Grátis 7 dias',  valor: 0,        label: 'GRÁTIS por 7 dias' },
+    basico:               { nome: 'Plano Básico',         valor: 99.90,    label: 'R$ 99,90 / mês' },
+    pro:                  { nome: 'Plano Pro',            valor: 149.90,   label: 'R$ 149,90 / mês' },
+    'pro-fiscal':         { nome: 'Plano Pro Fiscal',     valor: 249.90,   label: 'R$ 249,90 / mês' },
+    'basico-anual':       { nome: 'Plano Básico Anual',   valor: 1078.92,  label: 'R$ 1.078,92 / ano' },
+    'pro-anual':          { nome: 'Plano Pro Anual',      valor: 1618.92,  label: 'R$ 1.618,92 / ano' },
+    'pro-fiscal-anual':   { nome: 'Plano Pro Fiscal Anual', valor: 2698.92, label: 'R$ 2.698,92 / ano' },
+    anual:                { nome: 'Plano Anual',          valor: 1080.00,  label: 'R$ 1.080,00 / ano' }
   };
 
   // Carrega chave do reCaptcha do backend e injeta script do Google
@@ -279,8 +352,40 @@
 
   function selecionarPlano(p) {
     _planoSelecionado = p;
+    // Limpa seleção dos cards principais
     document.querySelectorAll('.plano').forEach(el => el.classList.remove('selecionado'));
-    document.getElementById('plano-' + p).classList.add('selecionado');
+    // Limpa seleção das opções anuais
+    document.querySelectorAll('.anual-opcao').forEach(el => {
+      // Reset estilo baseado no ID
+      if (el.id === 'opt-pro-anual') {
+        el.style.borderColor = '#0891b2';
+        el.style.borderWidth = '3px';
+      } else if (el.id === 'opt-pro-fiscal-anual') {
+        el.style.borderColor = '#7c3aed';
+        el.style.borderWidth = '2px';
+      } else {
+        el.style.borderColor = '#e2e8f0';
+        el.style.borderWidth = '2px';
+      }
+      el.style.background = el.id === 'opt-pro-anual' ? '#f0f9ff'
+        : el.id === 'opt-pro-fiscal-anual' ? 'linear-gradient(135deg,#f5f3ff,#fff)'
+        : '';
+    });
+
+    // Marca o selecionado conforme o tipo
+    const cardPrincipal = document.getElementById('plano-' + p);
+    if (cardPrincipal) {
+      cardPrincipal.classList.add('selecionado');
+    } else {
+      // É opção anual
+      const optEl = document.getElementById('opt-' + p);
+      if (optEl) {
+        optEl.style.borderColor = '#16a34a';
+        optEl.style.borderWidth = '3px';
+        optEl.style.background = 'linear-gradient(135deg,#dcfce7,#fff)';
+      }
+    }
+
     document.getElementById('form-card').classList.add('visivel');
     document.getElementById('resumo-plano').textContent = PLANOS[p].nome;
     document.getElementById('resumo-valor').textContent = PLANOS[p].label;
@@ -296,6 +401,19 @@
     setTimeout(() => {
       document.getElementById('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+  }
+
+  // Abre/fecha sub-opções do plano anual
+  function toggleAnual() {
+    const opcoes = document.getElementById('anual-opcoes');
+    const seta = document.getElementById('anual-seta');
+    if (opcoes.style.display === 'none' || !opcoes.style.display) {
+      opcoes.style.display = 'block';
+      seta.textContent = '▲';
+    } else {
+      opcoes.style.display = 'none';
+      seta.textContent = '▼';
+    }
   }
 
   // Máscaras

@@ -174,6 +174,9 @@
             <option value="basico">Básico (R$ 99,90)</option>
             <option value="pro">Pro (R$ 149,90) — Vendas Online</option>
             <option value="pro-fiscal">Pro Fiscal (R$ 249,90) — Vendas Online + NFe</option>
+            <option value="basico-anual">Básico Anual (R$ 1.078,92)</option>
+            <option value="pro-anual">Pro Anual (R$ 1.618,92)</option>
+            <option value="pro-fiscal-anual">Pro Fiscal Anual (R$ 2.698,92)</option>
             <option value="anual">Anual (legado)</option>
           </select>
         </div>
@@ -231,7 +234,10 @@
             <option value="basico">Básico (R$ 99,90) — + 1 mês</option>
             <option value="pro">Pro (R$ 149,90) — + 1 mês</option>
             <option value="pro-fiscal">Pro Fiscal (R$ 249,90) — + 1 mês</option>
-            <option value="anual">Anual (+ 12 meses)</option>
+            <option value="basico-anual">Básico Anual (R$ 1.078,92) — + 12 meses</option>
+            <option value="pro-anual">Pro Anual (R$ 1.618,92) — + 12 meses</option>
+            <option value="pro-fiscal-anual">Pro Fiscal Anual (R$ 2.698,92) — + 12 meses</option>
+            <option value="anual">Anual legado (+ 12 meses)</option>
           </select>
         </div>
         <div>
@@ -551,24 +557,26 @@
   document.getElementById('me-plano').addEventListener('change', (ev) => {
     const novoPlano = ev.target.value;
     const valoresSugeridos = {
-      'basico':     '99.90',
-      'pro':        '149.90',
-      'pro-fiscal': '249.90',
-      'anual':      '90.00',  // valor mensal proporcional do anual (1080/12)
-      'trial':      '0.00'
+      'basico':           '99.90',
+      'pro':              '149.90',
+      'pro-fiscal':       '249.90',
+      'basico-anual':     '89.91',   // valor mensal proporcional (1078.92/12)
+      'pro-anual':        '134.91',  // valor mensal proporcional (1618.92/12)
+      'pro-fiscal-anual': '224.91',  // valor mensal proporcional (2698.92/12)
+      'anual':            '90.00',
+      'trial':            '0.00'
     };
     if (valoresSugeridos[novoPlano] !== undefined) {
       document.getElementById('me-mensalidade').value = valoresSugeridos[novoPlano];
     }
-    // Módulo fiscal ativa AUTOMATICAMENTE no Pro Fiscal
+    // Módulo fiscal ativa AUTOMATICAMENTE no Pro Fiscal (mensal ou anual)
     const chkFiscal = document.getElementById('me-modulo-fiscal');
-    if (novoPlano === 'pro-fiscal') {
+    if (novoPlano === 'pro-fiscal' || novoPlano === 'pro-fiscal-anual') {
       chkFiscal.checked = true;
-    } else if (novoPlano === 'basico' || novoPlano === 'pro' || novoPlano === 'trial') {
-      // Plano sem fiscal: desmarca automaticamente
+    } else if (['basico', 'pro', 'trial', 'basico-anual', 'pro-anual'].includes(novoPlano)) {
       chkFiscal.checked = false;
     }
-    // anual mantém o que estava
+    // anual legado mantém o que estava
   });
   function closeEditar() {
     document.getElementById('modal-editar').classList.remove('show');
@@ -740,14 +748,18 @@
   }
   document.getElementById('pg-plano').addEventListener('change', (e) => {
     const v = e.target.value;
-    // Auto-preenche meses
-    document.getElementById('pg-meses').textContent = v === 'anual' ? '12 meses' : '1 mês';
+    // Auto-preenche meses (12 pros anuais, 1 pros mensais)
+    const ehAnual = ['anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual'].includes(v);
+    document.getElementById('pg-meses').textContent = ehAnual ? '12 meses' : '1 mês';
     // Auto-preenche valor sugerido por plano
     const valoresSugeridos = {
-      'basico': '99.90',
-      'pro': '149.90',
-      'pro-fiscal': '249.90',
-      'anual': '1080.00'
+      'basico':           '99.90',
+      'pro':              '149.90',
+      'pro-fiscal':       '249.90',
+      'basico-anual':     '1078.92',
+      'pro-anual':        '1618.92',
+      'pro-fiscal-anual': '2698.92',
+      'anual':            '1080.00'
     };
     if (valoresSugeridos[v]) {
       document.getElementById('pg-valor').value = valoresSugeridos[v];
