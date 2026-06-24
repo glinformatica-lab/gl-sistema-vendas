@@ -103,20 +103,20 @@
       </div>
       <div class="desc">Sem cartão de crédito</div>
       <ul>
-        <li>Acesso a TODAS as funcionalidades</li>
-        <li>Sistema completo por 7 dias</li>
+        <li>Acesso ao plano Pro</li>
+        <li>Catálogo Público + Pedidos Online</li>
         <li>Não precisa cadastrar cartão</li>
         <li>Cancele quando quiser</li>
-        <li>Após 7 dias, escolha um plano</li>
+        <li>Após 7 dias, escolha seu plano</li>
       </ul>
     </div>
 
-    <div class="plano" id="plano-mensal" onclick="selecionarPlano('mensal')">
-      <h3>📅 Mensal</h3>
+    <div class="plano" id="plano-basico" onclick="selecionarPlano('basico')">
+      <h3>📅 Básico</h3>
       <div class="preco">
         <span class="moeda">R$</span>99<span class="periodo">,90 / mês</span>
       </div>
-      <div class="desc">Cobrado mensalmente</div>
+      <div class="desc">Para quem começa</div>
       <ul>
         <li>Sistema de Vendas completo</li>
         <li>Controle de Estoque</li>
@@ -127,49 +127,36 @@
       </ul>
     </div>
 
-    <div class="plano popular" id="plano-anual" onclick="selecionarPlano('anual')">
-      <h3>🌟 Anual</h3>
-      <div class="economia">💰 Economize 10% (R$ 118,80/ano)</div>
+    <div class="plano popular" id="plano-pro" onclick="selecionarPlano('pro')">
+      <h3>⚡ Pro</h3>
+      <div class="economia">🚀 Mais escolhido</div>
       <div class="preco">
-        <span class="moeda">R$</span>90<span class="periodo">,00 / mês</span>
+        <span class="moeda">R$</span>149<span class="periodo">,90 / mês</span>
       </div>
-      <div class="desc">R$ 1.080,00 cobrados uma vez por ano</div>
+      <div class="desc">Para quem quer vender mais</div>
       <ul>
-        <li>Tudo do Plano Mensal</li>
-        <li><strong>10% de desconto</strong></li>
-        <li>Parcele em até 12x sem juros</li>
-        <li>Atendimento prioritário</li>
+        <li><strong>Tudo do plano Básico</strong></li>
+        <li>📋 <strong>Catálogo Público</strong> compartilhável</li>
+        <li>📥 <strong>Pedidos Online</strong> via WhatsApp</li>
+        <li>Clientes compram pelo seu link</li>
+        <li>Conversão em venda com 1 clique</li>
       </ul>
     </div>
 
-    <div class="plano em-breve" id="plano-pro">
-      <!--
-        ▶ ATIVAR PLANO PRO QUANDO FOCUS NFe ESTIVER FUNCIONANDO:
-           1. Remove class "em-breve" desta div
-           2. Adiciona onclick="selecionarPlano('pro')"
-           3. Adiciona 'pro' na const PLANOS abaixo (já tem no backend)
-           4. Remove o div "Estamos construindo!" do final
-           5. Atualiza textos: remover "(em breve)" e "🔧 Em desenvolvimento"
-        ▶ Backend (assinaturas.js) JÁ ESTÁ PRONTO:
-           - PLANOS.pro definido (R$ 249,90, módulo fiscal ativado automaticamente)
-           - Quando cliente pagar, modulo_fiscal_ativo vira TRUE automaticamente
-        ▶ Link manual do PagBank Pro: https://pag.ae/81RnorVwa
-           (não usado pelo sistema - sistema cria checkouts dinâmicos via API)
-      -->
-      <h3>⚡ Plano Pro</h3>
-      <div class="badge-dev">🔧 Em desenvolvimento</div>
+    <div class="plano" id="plano-pro-fiscal" onclick="selecionarPlano('pro-fiscal')" style="border-color:#7c3aed;">
+      <h3 style="color:#7c3aed;">🧾 Pro Fiscal</h3>
+      <div class="economia" style="background:#ede9fe;color:#6d28d9;">⭐ Mais completo</div>
       <div class="preco">
         <span class="moeda">R$</span>249<span class="periodo">,90 / mês</span>
       </div>
-      <div class="desc">Módulo fiscal completo</div>
+      <div class="desc">Para quem precisa emitir nota fiscal</div>
       <ul>
-        <li>Tudo do Plano Anual</li>
-        <li><strong>Emissão de NF-e</strong> <span style="color:#7c3aed;font-weight:700;">(em breve)</span></li>
-        <li><strong>Emissão de NFC-e</strong> <span style="color:#7c3aed;font-weight:700;">(em breve)</span></li>
+        <li><strong>Tudo do plano Pro</strong></li>
+        <li>🧾 <strong>Emissão de NF-e</strong></li>
+        <li>🧾 <strong>Emissão de NFC-e</strong></li>
+        <li>Configurações Fiscais avançadas</li>
+        <li>Atendimento prioritário</li>
       </ul>
-      <div style="margin-top:16px;padding:12px;background:#ede9fe;border-radius:8px;font-size:13px;color:#6d28d9;text-align:center;font-weight:600;">
-        🚀 Estamos construindo!<br>Em breve disponível.
-      </div>
     </div>
   </div>
 

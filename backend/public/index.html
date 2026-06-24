@@ -4530,61 +4530,73 @@ https://sistema.glinformatica.com.br
     }
   }
 
-  // Mostra tela amigável de upgrade
+  // Mostra modal amigável de upgrade (centralizado)
   function mostrarTelaUpgrade(nomeRecurso) {
-    // Esconde todas as páginas
-    document.querySelectorAll('[id^="page-"]').forEach(div => div.style.display = 'none');
-    // Cria ou reutiliza a página de upgrade
-    let pg = document.getElementById('page-upgrade');
-    if (!pg) {
-      pg = document.createElement('div');
-      pg.id = 'page-upgrade';
-      const main = document.querySelector('main') || document.body;
-      main.appendChild(pg);
-    }
-    pg.style.display = '';
-    pg.innerHTML = `
-      <div style="max-width:640px;margin:40px auto;padding:30px;background:#fff;border:1px solid var(--cinza-borda);border-radius:14px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.04);">
-        <div style="font-size:60px;margin-bottom:14px;">🚀</div>
-        <h1 style="color:#1e3a8a;font-size:24px;margin-bottom:10px;">${escapeHtml(nomeRecurso)} disponível no plano Pro</h1>
-        <p style="color:#475569;font-size:15px;margin-bottom:24px;line-height:1.6;">
-          Esse recurso faz parte do <strong>plano Pro</strong> ou superior.<br>
-          Faça upgrade pra ter acesso ao catálogo público compartilhável e gestão de pedidos online.
-        </p>
+    // Remove modal antigo se houver
+    const antigo = document.getElementById('modal-upgrade-plano');
+    if (antigo) antigo.remove();
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:24px 0;">
-          <div style="border:1px solid var(--cinza-borda);border-radius:10px;padding:16px;background:#f8fafc;">
-            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:6px;">Plano Pro</div>
-            <div style="font-size:24px;font-weight:800;color:#0891b2;">R$ 149,90<span style="font-size:13px;font-weight:400;color:#64748b;">/mês</span></div>
-            <ul style="text-align:left;font-size:12px;color:#475569;margin-top:10px;padding-left:18px;line-height:1.8;">
-              <li>Tudo do Básico</li>
-              <li><strong>Catálogo Público</strong></li>
-              <li><strong>Pedidos Online</strong></li>
-            </ul>
-          </div>
-          <div style="border:2px solid #0891b2;border-radius:10px;padding:16px;background:#f0f9ff;position:relative;">
-            <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#0891b2;color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;text-transform:uppercase;font-weight:700;">Mais completo</div>
-            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:6px;">Pro Fiscal</div>
-            <div style="font-size:24px;font-weight:800;color:#0891b2;">R$ 249,90<span style="font-size:13px;font-weight:400;color:#64748b;">/mês</span></div>
-            <ul style="text-align:left;font-size:12px;color:#475569;margin-top:10px;padding-left:18px;line-height:1.8;">
-              <li>Tudo do Pro</li>
-              <li><strong>NFe / NFCe</strong></li>
-              <li><strong>Config. Fiscais</strong></li>
-            </ul>
-          </div>
-        </div>
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const nomeEmpresa = empresa.nome || '';
+    const planoAtual = window._planoAtual || 'basico';
+    const labelPlanoAtual = ({
+      'basico': 'Básico (R$ 99,90)',
+      'trial': 'Trial',
+      'anual': 'Anual'
+    })[planoAtual] || planoAtual;
 
-        <p style="color:#64748b;font-size:13px;margin-bottom:18px;">
-          Entre em contato pelo WhatsApp pra fazer o upgrade:
-        </p>
-        <a href="https://wa.me/5562992347572?text=${encodeURIComponent('Olá! Gostaria de fazer upgrade do meu plano no GL Sistema.')}" target="_blank" style="display:inline-block;background:#25d366;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">
-          💬 Falar com a GL Informática
-        </a>
-        <div style="margin-top:20px;">
-          <button class="btn" onclick="showPage('dashboard')" style="background:#eceef2;color:#1e3a8a;">← Voltar pro Início</button>
+    const div = document.createElement('div');
+    div.id = 'modal-upgrade-plano';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:14px;';
+    div.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">
+        <button onclick="document.getElementById('modal-upgrade-plano').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:28px;cursor:pointer;color:#94a3b8;line-height:1;">&times;</button>
+        <div style="padding:28px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:10px;">🚀</div>
+          <h2 style="color:#1e3a8a;font-size:20px;margin-bottom:8px;">${escapeHtml(nomeRecurso)} no plano Pro</h2>
+          <p style="color:#475569;font-size:13px;margin-bottom:20px;line-height:1.5;">
+            Seu plano atual: <strong>${escapeHtml(labelPlanoAtual)}</strong><br>
+            Faça upgrade pra acessar Catálogo Público e Pedidos Online.
+          </p>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px;">
+            <div style="border:2px solid #0891b2;border-radius:10px;padding:16px;background:#f0f9ff;text-align:left;">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                <div>
+                  <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">Plano Pro</div>
+                  <div style="font-size:22px;font-weight:800;color:#0891b2;">R$ 149,90<span style="font-size:12px;font-weight:400;color:#64748b;">/mês</span></div>
+                </div>
+                <span style="background:#0891b2;color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;text-transform:uppercase;font-weight:700;">Recomendado</span>
+              </div>
+              <ul style="text-align:left;font-size:12px;color:#475569;padding-left:18px;line-height:1.7;margin:0;">
+                <li>Tudo do plano Básico</li>
+                <li><strong>Catálogo Público</strong> compartilhável</li>
+                <li><strong>Pedidos Online</strong> via WhatsApp</li>
+              </ul>
+            </div>
+
+            <div style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;text-align:left;">
+              <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">Pro Fiscal</div>
+              <div style="font-size:22px;font-weight:800;color:#7c3aed;">R$ 249,90<span style="font-size:12px;font-weight:400;color:#64748b;">/mês</span></div>
+              <ul style="text-align:left;font-size:12px;color:#475569;padding-left:18px;line-height:1.7;margin:8px 0 0 0;">
+                <li>Tudo do plano Pro</li>
+                <li><strong>NF-e / NFC-e</strong></li>
+              </ul>
+            </div>
+          </div>
+
+          <p style="color:#64748b;font-size:12px;margin-bottom:14px;">
+            Entre em contato pra fazer o upgrade:
+          </p>
+          <a href="https://wa.me/5562992347572?text=${encodeURIComponent('Olá! Sou da empresa ' + nomeEmpresa + ' (plano ' + labelPlanoAtual + '). Quero fazer upgrade pra ter acesso a Catálogo Público e Pedidos Online.')}" target="_blank" style="display:inline-block;background:#25d366;color:#fff;padding:11px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">
+            💬 Falar com a GL Informática
+          </a>
         </div>
       </div>
     `;
+    document.body.appendChild(div);
+    // Fecha ao clicar fora
+    div.addEventListener('click', e => { if (e.target === div) div.remove(); });
   }
 
   function showPage(pg) {
@@ -4595,9 +4607,9 @@ https://sistema.glinformatica.com.br
     }
     // Bloqueia Vendas Online se plano não inclui
     if (['catalogo', 'pedidos-online'].includes(pg) && !temVendasOnline()) {
-      document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
       const nomeRecurso = pg === 'catalogo' ? 'Catálogo Público' : 'Pedidos Online';
       mostrarTelaUpgrade(nomeRecurso);
+      // Não troca de página - mantém usuário onde estava
       if (window.innerWidth <= 900) fecharMenu();
       return;
     }
