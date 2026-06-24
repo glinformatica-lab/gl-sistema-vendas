@@ -6,6 +6,7 @@ const { autenticar } = require('../middleware/auth');
 
 // ====== MIDDLEWARE: VERIFICAR PLANO ======
 // Bloqueia acesso se o plano da empresa não estiver na lista de planos aceitos
+// Planos COM Vendas Online: pro, pro-fiscal, trial (trial dá acesso ao Pro)
 async function verificarPlanoVendaOnline(req, res, next) {
   try {
     if (!req.user || !req.user.empresaId) {
@@ -17,8 +18,8 @@ async function verificarPlanoVendaOnline(req, res, next) {
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Empresa não encontrada.' });
     const plano = r.rows[0].plano;
-    // Planos COM acesso a Vendas Online: pro, pro-fiscal
-    if (!['pro', 'pro-fiscal'].includes(plano)) {
+    // Planos COM acesso a Vendas Online: pro, pro-fiscal, trial
+    if (!['pro', 'pro-fiscal', 'trial'].includes(plano)) {
       return res.status(403).json({
         error: 'Recurso disponível apenas no plano Pro ou superior.',
         upgradeRequired: true,
@@ -314,7 +315,7 @@ router.get('/publico/:slug', async (req, res) => {
     const empresa = emp.rows[0];
 
     // Bloqueia se empresa não está no plano Pro ou Pro Fiscal
-    if (!['pro', 'pro-fiscal'].includes(empresa.plano)) {
+    if (!['pro', 'pro-fiscal', 'trial'].includes(empresa.plano)) {
       return res.status(404).json({ error: 'Esse catálogo não está disponível no momento.' });
     }
 
@@ -422,7 +423,7 @@ router.post('/publico/:slug/pedidos', async (req, res) => {
     const empresa = emp.rows[0];
 
     // Bloqueia se plano não tem Vendas Online
-    if (!['pro', 'pro-fiscal'].includes(empresa.plano)) {
+    if (!['pro', 'pro-fiscal', 'trial'].includes(empresa.plano)) {
       return res.status(403).json({ error: 'Esse catálogo não aceita pedidos no momento.' });
     }
     // Bloqueia se empresa suspensa
