@@ -325,6 +325,12 @@ router.post('/renovar', async (req, res) => {
   if (!plano || !PLANOS[plano]) {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
+  // Bloqueia renovação no Pro Fiscal (em desenvolvimento)
+  if (plano === 'pro-fiscal') {
+    return res.status(400).json({
+      error: 'O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico ou Pro.'
+    });
+  }
   if (!pagbank.tokenConfigurado()) {
     return res.status(503).json({ error: 'Pagamento online temporariamente indisponível. Entre em contato pelo WhatsApp.' });
   }
@@ -640,6 +646,9 @@ router.post('/renovar', autenticar, async (req, res) => {
   const { plano } = req.body || {};
   if (!plano || !PLANOS[plano]) {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
+  }
+  if (plano === 'pro-fiscal') {
+    return res.status(400).json({ error: 'O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico ou Pro.' });
   }
   const planoConfig = PLANOS[plano];
   try {
