@@ -546,6 +546,30 @@
     document.getElementById('me-erro').style.display = 'none';
     document.getElementById('modal-editar').classList.add('show');
   }
+
+  // Listener: ao mudar o plano, atualiza valor da mensalidade e módulo fiscal automaticamente
+  document.getElementById('me-plano').addEventListener('change', (ev) => {
+    const novoPlano = ev.target.value;
+    const valoresSugeridos = {
+      'basico':     '99.90',
+      'pro':        '149.90',
+      'pro-fiscal': '249.90',
+      'anual':      '90.00',  // valor mensal proporcional do anual (1080/12)
+      'trial':      '0.00'
+    };
+    if (valoresSugeridos[novoPlano] !== undefined) {
+      document.getElementById('me-mensalidade').value = valoresSugeridos[novoPlano];
+    }
+    // Módulo fiscal ativa AUTOMATICAMENTE no Pro Fiscal
+    const chkFiscal = document.getElementById('me-modulo-fiscal');
+    if (novoPlano === 'pro-fiscal') {
+      chkFiscal.checked = true;
+    } else if (novoPlano === 'basico' || novoPlano === 'pro' || novoPlano === 'trial') {
+      // Plano sem fiscal: desmarca automaticamente
+      chkFiscal.checked = false;
+    }
+    // anual mantém o que estava
+  });
   function closeEditar() {
     document.getElementById('modal-editar').classList.remove('show');
     _empresaEditandoId = null;

@@ -4507,9 +4507,10 @@ https://sistema.glinformatica.com.br
   }
 
   // ====== BLOQUEIO POR PLANO ======
-  // Planos com Vendas Online: pro, pro-fiscal, trial
+  // Planos com Vendas Online: pro, pro-fiscal, trial, anual
+  // (anual é legado de clientes antigos - mantém acesso)
   function temVendasOnline() {
-    return ['pro', 'pro-fiscal', 'trial'].includes(window._planoAtual || 'basico');
+    return ['pro', 'pro-fiscal', 'trial', 'anual'].includes(window._planoAtual || 'basico');
   }
   function temNFe() {
     return ['pro-fiscal'].includes(window._planoAtual || 'basico');
@@ -4708,12 +4709,13 @@ https://sistema.glinformatica.com.br
     } catch(e) {}
     window._papelAtual = papelAtual;
 
-    // Detecta plano da empresa
+    // Detecta plano da empresa (do localStorage por enquanto - será atualizado do server logo após)
     try {
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
       window._planoAtual = empresa.plano || 'basico';
     } catch(e) { window._planoAtual = 'basico'; }
-    aplicarBloqueioPorPlano();
+    // NÃO aplica bloqueio ainda - espera o /api/empresa retornar o plano correto
+    // (evita banner piscar com cache antigo)
 
     await atualizarTela();
     renderContasPagar();

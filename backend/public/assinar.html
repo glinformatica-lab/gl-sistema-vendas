@@ -54,6 +54,13 @@
     .plano.em-breve .preco { color:#94a3b8; }
     .plano.em-breve .badge-dev { display:inline-block; background:#ede9fe; color:#6d28d9; font-size:12px; font-weight:700; padding:5px 12px; border-radius:8px; margin-bottom:10px; }
 
+    /* Card Plano Pro Fiscal (lilás/roxo) */
+    .plano.pro-fiscal { background:linear-gradient(135deg, #f5f3ff, #fff); border-color:#7c3aed; }
+    .plano.pro-fiscal:hover { border-color:#6d28d9; box-shadow:0 6px 24px rgba(124,58,237,0.20); transform:translateY(-2px); }
+    .plano.pro-fiscal.selecionado { border-color:#6d28d9; background:linear-gradient(135deg, #ede9fe, #fff); box-shadow:0 6px 24px rgba(124,58,237,0.25); }
+    .plano.pro-fiscal h3 { color:#6d28d9; }
+    .plano.pro-fiscal::after { content:'MAIS COMPLETO'; position:absolute; top:-10px; right:14px; background:#7c3aed; color:#fff; padding:3px 12px; border-radius:14px; font-size:11px; font-weight:700; letter-spacing:0.5px; }
+
     /* Formulário */
     .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
     .form-card.visivel { display:block; }
@@ -143,8 +150,8 @@
       </ul>
     </div>
 
-    <div class="plano" id="plano-pro-fiscal" onclick="selecionarPlano('pro-fiscal')" style="border-color:#7c3aed;">
-      <h3 style="color:#7c3aed;">🧾 Pro Fiscal</h3>
+    <div class="plano pro-fiscal" id="plano-pro-fiscal" onclick="selecionarPlano('pro-fiscal')">
+      <h3>🧾 Pro Fiscal</h3>
       <div class="economia" style="background:#ede9fe;color:#6d28d9;">⭐ Mais completo</div>
       <div class="preco">
         <span class="moeda">R$</span>249<span class="periodo">,90 / mês</span>
