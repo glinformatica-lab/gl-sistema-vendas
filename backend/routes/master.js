@@ -136,7 +136,7 @@ router.put('/empresas/:id', async (req, res) => {
   const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo } = req.body || {};
   // Valida valores
   const statusValidos = ['trial', 'ativa', 'vencida', 'bloqueada'];
-  const planosValidos = ['trial', 'mensal', 'anual'];
+  const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'anual', 'mensal'];
   if (status && !statusValidos.includes(status)) return res.status(400).json({ error: 'Status inválido.' });
   if (plano && !planosValidos.includes(plano)) return res.status(400).json({ error: 'Plano inválido.' });
   try {
@@ -217,9 +217,16 @@ router.post('/empresas/:id/pagamentos', async (req, res) => {
   const { valor, dataPagamento, plano, formaPagamento, observacao } = req.body || {};
   if (!valor || valor <= 0) return res.status(400).json({ error: 'Valor inválido.' });
   if (!dataPagamento) return res.status(400).json({ error: 'Data de pagamento é obrigatória.' });
-  if (!plano || !['mensal', 'anual'].includes(plano)) return res.status(400).json({ error: 'Plano deve ser mensal ou anual.' });
+  const planosPagamentoValidos = ['basico', 'pro', 'pro-fiscal', 'anual', 'mensal'];
+  if (!plano || !planosPagamentoValidos.includes(plano)) {
+    return res.status(400).json({ error: 'Plano deve ser básico, pro, pro-fiscal ou anual.' });
+  }
 
+  // Quantos meses adicionar (anual = 12, demais = 1)
   const meses = plano === 'anual' ? 12 : 1;
+  // Calcula valor mensal (anual divide por 12, demais usa direto)
+  const valorMensalCalc = plano === 'anual' ? (Number(valor) / 12) : Number(valor);
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -240,7 +247,7 @@ router.post('/empresas/:id/pagamentos', async (req, res) => {
       `UPDATE empresas SET status='ativa', plano=$1, data_vencimento=$2,
               valor_mensalidade = COALESCE($3, valor_mensalidade)
        WHERE id=$4`,
-      [plano, novoVenc, plano === 'mensal' ? Number(valor) : Number(valor) / 12, req.params.id]
+      [plano, novoVenc, valorMensalCalc, req.params.id]
     );
 
     // Insere pagamento
