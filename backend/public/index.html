@@ -4805,6 +4805,8 @@ https://sistema.glinformatica.com.br
       // Atualiza plano com o valor real do backend
       window._planoAtual = empresaCompleta.plano || empresaLocal.plano || 'basico';
       aplicarBloqueioPorPlano();
+      // Re-aplica visibilidade do menu fiscal AGORA com dados frescos
+      if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
     renderGraficosDashboard();
   });
