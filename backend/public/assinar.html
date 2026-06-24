@@ -61,6 +61,11 @@
     .plano.pro-fiscal h3 { color:#6d28d9; }
     .plano.pro-fiscal::after { content:'MAIS COMPLETO'; position:absolute; top:-10px; right:14px; background:#7c3aed; color:#fff; padding:3px 12px; border-radius:14px; font-size:11px; font-weight:700; letter-spacing:0.5px; }
 
+    /* Card Pro Fiscal em desenvolvimento (mantém lilás mas desabilitado) */
+    .plano.pro-fiscal.em-desenvolvimento { cursor:default; opacity:0.85; }
+    .plano.pro-fiscal.em-desenvolvimento:hover { transform:none; border-color:#7c3aed; box-shadow:none; }
+    .plano.pro-fiscal.em-desenvolvimento::after { content:'EM BREVE'; }
+
     /* Formulário */
     .form-card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,0.05); display:none; }
     .form-card.visivel { display:block; }
@@ -150,9 +155,9 @@
       </ul>
     </div>
 
-    <div class="plano pro-fiscal" id="plano-pro-fiscal" onclick="selecionarPlano('pro-fiscal')">
+    <div class="plano pro-fiscal em-desenvolvimento" id="plano-pro-fiscal">
       <h3>🧾 Pro Fiscal</h3>
-      <div class="economia" style="background:#ede9fe;color:#6d28d9;">⭐ Mais completo</div>
+      <div class="economia" style="background:#ede9fe;color:#6d28d9;">🔧 Em desenvolvimento</div>
       <div class="preco">
         <span class="moeda">R$</span>249<span class="periodo">,90 / mês</span>
       </div>
@@ -164,6 +169,10 @@
         <li>Configurações Fiscais avançadas</li>
         <li>Atendimento prioritário</li>
       </ul>
+      <div style="margin-top:16px;padding:12px;background:#ede9fe;border-radius:8px;font-size:13px;color:#6d28d9;text-align:center;font-weight:600;">
+        🚀 Em breve disponível!<br>
+        <span style="font-size:11px;font-weight:400;">Quer ser avisado quando lançar? Fale com a gente no WhatsApp.</span>
+      </div>
     </div>
   </div>
 

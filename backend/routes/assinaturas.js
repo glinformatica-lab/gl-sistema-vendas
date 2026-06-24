@@ -42,6 +42,12 @@ router.post('/iniciar', async (req, res) => {
   if (!plano || !PLANOS[plano]) {
     return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
+  // Bloqueia novas contratações de Pro Fiscal (ainda em desenvolvimento - aguardando NFe)
+  if (plano === 'pro-fiscal') {
+    return res.status(400).json({
+      error: 'O Plano Pro Fiscal está em desenvolvimento. Entre em contato com a GL Informática pelo WhatsApp pra ser avisado quando estiver disponível.'
+    });
+  }
   if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
