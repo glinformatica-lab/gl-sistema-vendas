@@ -476,6 +476,7 @@
     <button class="menu-btn" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
     <button class="menu-btn" onclick="showPage('produtos')">&#128230; Produtos</button>
     <button class="menu-btn admin-only" onclick="showPage('catalogo')">&#128206; Catálogo Público</button>
+    <button class="menu-btn admin-only" onclick="showPage('pedidos-online')">&#128229; Pedidos Online <span id="badge-pedidos-novos" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     <button class="menu-btn" onclick="showPage('servicos')">&#128295; Serviços</button>
     <button class="menu-btn" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
     <button class="menu-btn" onclick="showPage('vendas')">&#128722; Vendas</button>
@@ -1102,6 +1103,38 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Pedidos Online (admin) -->
+    <div id="page-pedidos-online" style="display:none;">
+      <div class="page-title">📥 Pedidos Online</div>
+      <p style="color:#64748b;font-size:13px;margin-bottom:14px;">Pedidos feitos pelo catálogo público. Você pode converter em venda real com 1 clique.</p>
+
+      <!-- Filtros -->
+      <div class="filtros-chips" style="margin-bottom:14px;">
+        <span class="chips-label">Status:</span>
+        <button type="button" class="chip active" data-pst="todos" onclick="pedSetFiltro('todos')">Todos</button>
+        <button type="button" class="chip" data-pst="novo" onclick="pedSetFiltro('novo')">🆕 Novos</button>
+        <button type="button" class="chip" data-pst="em-atendimento" onclick="pedSetFiltro('em-atendimento')">⏳ Em Atendimento</button>
+        <button type="button" class="chip" data-pst="confirmado" onclick="pedSetFiltro('confirmado')">✅ Confirmados</button>
+        <button type="button" class="chip" data-pst="convertido-em-venda" onclick="pedSetFiltro('convertido-em-venda')">💰 Convertidos</button>
+        <button type="button" class="chip" data-pst="cancelado" onclick="pedSetFiltro('cancelado')">❌ Cancelados</button>
+      </div>
+
+      <div id="ped-loading" style="text-align:center;padding:40px;color:#64748b;">⏳ Carregando…</div>
+      <div id="ped-lista" style="display:none;"></div>
+    </div>
+
+    <!-- Modal detalhes do pedido -->
+    <div id="modal-ped" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;padding:14px;">
+      <div style="background:#fff;border-radius:14px;max-width:700px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;background:#f8fafc;">
+          <h2 id="ped-modal-titulo" style="color:#1e3a8a;margin:0;font-size:18px;">Pedido</h2>
+          <button onclick="document.getElementById('modal-ped').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;">&times;</button>
+        </div>
+        <div id="ped-modal-corpo" style="flex:1;overflow-y:auto;padding:18px 20px;"></div>
+        <div id="ped-modal-acoes" style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"></div>
       </div>
     </div>
 
@@ -3722,6 +3755,332 @@ https://sistema.glinformatica.com.br
     }
   }
 
+  // ====== PEDIDOS ONLINE (do catálogo público) ======
+  let _pedidos = [];
+  let _pedFiltro = 'todos';
+
+  async function pedCarregar() {
+    const loading = document.getElementById('ped-loading');
+    const lista = document.getElementById('ped-lista');
+    loading.style.display = '';
+    lista.style.display = 'none';
+    try {
+      const r = await api('GET', '/api/catalogo/pedidos');
+      _pedidos = r.pedidos || [];
+      atualizarBadgePedidos();
+      pedRenderLista();
+      loading.style.display = 'none';
+      lista.style.display = '';
+    } catch (err) {
+      loading.innerHTML = `<div style="color:#dc2626;">❌ Erro: ${escapeHtml(err.message || err)}</div>`;
+    }
+  }
+
+  // Atualiza badge no menu com contagem de pedidos NOVOS
+  function atualizarBadgePedidos() {
+    const novos = _pedidos.filter(p => p.status === 'novo').length;
+    const badge = document.getElementById('badge-pedidos-novos');
+    if (!badge) return;
+    if (novos > 0) {
+      badge.textContent = novos;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function pedSetFiltro(filtro) {
+    _pedFiltro = filtro;
+    document.querySelectorAll('[data-pst]').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-pst="${filtro}"]`)?.classList.add('active');
+    pedRenderLista();
+  }
+
+  // Helpers de status
+  function pedStatusBadge(status) {
+    const cores = {
+      'novo':                 { bg: '#dbeafe', fg: '#1e40af', label: '🆕 Novo' },
+      'em-atendimento':       { bg: '#fef3c7', fg: '#92400e', label: '⏳ Em Atendimento' },
+      'confirmado':           { bg: '#dcfce7', fg: '#166534', label: '✅ Confirmado' },
+      'convertido-em-venda':  { bg: '#e0e7ff', fg: '#3730a3', label: '💰 Convertido em Venda' },
+      'cancelado':            { bg: '#fee2e2', fg: '#991b1b', label: '❌ Cancelado' }
+    };
+    const c = cores[status] || cores['novo'];
+    return `<span style="display:inline-block;background:${c.bg};color:${c.fg};padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;">${c.label}</span>`;
+  }
+
+  function pedFormatarData(d) {
+    if (!d) return '—';
+    const data = new Date(d);
+    return data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function pedRenderLista() {
+    const div = document.getElementById('ped-lista');
+    let lista = _pedidos;
+    if (_pedFiltro !== 'todos') {
+      lista = lista.filter(p => p.status === _pedFiltro);
+    }
+
+    if (lista.length === 0) {
+      div.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:#94a3b8;font-style:italic;background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;">
+          <div style="font-size:48px;margin-bottom:14px;opacity:0.4;">📭</div>
+          ${_pedFiltro === 'todos' ? 'Nenhum pedido ainda. Quando alguém fizer um pedido pelo catálogo público, ele aparece aqui.' : 'Nenhum pedido com esse status.'}
+        </div>`;
+      return;
+    }
+
+    div.innerHTML = `
+      <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+              <th style="padding:10px;text-align:left;font-size:12px;color:#475569;">Pedido</th>
+              <th style="padding:10px;text-align:left;font-size:12px;color:#475569;">Cliente</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">Itens</th>
+              <th style="padding:10px;text-align:right;font-size:12px;color:#475569;">Total</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">Status</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;">Data</th>
+              <th style="padding:10px;text-align:center;font-size:12px;color:#475569;width:90px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lista.map(p => `
+              <tr style="border-bottom:1px solid #f1f5f9;${p.status === 'novo' ? 'background:#fffbeb;' : ''}">
+                <td style="padding:10px;font-weight:700;color:#1e3a8a;font-size:13px;">${escapeHtml(p.numero)}</td>
+                <td style="padding:10px;">
+                  <div style="font-weight:600;font-size:13px;color:#0f172a;">${escapeHtml(p.clienteNome)}</div>
+                  <div style="font-size:11px;color:#64748b;">${escapeHtml(p.clienteTelefone || '')}</div>
+                </td>
+                <td style="padding:10px;text-align:center;font-weight:600;">${p.qtdItens}</td>
+                <td style="padding:10px;text-align:right;font-weight:700;color:#16a34a;">${p.total > 0 ? formatarBRL(p.total) : '—'}</td>
+                <td style="padding:10px;text-align:center;">${pedStatusBadge(p.status)}</td>
+                <td style="padding:10px;text-align:center;font-size:12px;color:#64748b;">${pedFormatarData(p.criadoEm)}</td>
+                <td style="padding:10px;text-align:center;">
+                  <button class="btn-link" onclick="pedAbrirDetalhes(${p.id})" style="font-size:12px;">Ver →</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#64748b;">Total: ${lista.length} pedido(s)${_pedFiltro !== 'todos' ? ' filtrado(s)' : ''}</div>`;
+  }
+
+  async function pedAbrirDetalhes(id) {
+    const titulo = document.getElementById('ped-modal-titulo');
+    const corpo = document.getElementById('ped-modal-corpo');
+    const acoes = document.getElementById('ped-modal-acoes');
+    corpo.innerHTML = '<div style="text-align:center;padding:30px;color:#64748b;">⏳ Carregando...</div>';
+    acoes.innerHTML = '';
+    document.getElementById('modal-ped').style.display = 'flex';
+
+    try {
+      const r = await api('GET', '/api/catalogo/pedidos/' + id);
+      const p = r.pedido;
+      const itens = r.itens;
+      titulo.textContent = '📥 ' + p.numero;
+
+      // Monta endereço se tiver
+      const enderecoTxt = [
+        p.endereco + (p.complemento ? ', ' + p.complemento : ''),
+        p.bairro,
+        p.cidade + (p.uf ? '/' + p.uf : ''),
+        p.cep
+      ].filter(x => x && !x.startsWith(',') && x.trim() && x !== '/').join(', ');
+
+      corpo.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+          <div>
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:4px;">Cliente</div>
+            <div style="font-weight:700;color:#0f172a;">${escapeHtml(p.clienteNome)}</div>
+            <div style="font-size:13px;color:#475569;">📱 <a href="https://wa.me/55${String(p.clienteTelefone).replace(/\D/g,'')}" target="_blank" style="color:#16a34a;text-decoration:none;font-weight:600;">${escapeHtml(p.clienteTelefone)}</a></div>
+            ${p.clienteEmail ? `<div style="font-size:13px;color:#475569;">✉️ ${escapeHtml(p.clienteEmail)}</div>` : ''}
+            ${p.clienteDocumento ? `<div style="font-size:13px;color:#475569;">CPF/CNPJ: ${escapeHtml(p.clienteDocumento)}</div>` : ''}
+          </div>
+          <div>
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:4px;">Status</div>
+            <div style="margin-bottom:6px;">${pedStatusBadge(p.status)}</div>
+            <div style="font-size:12px;color:#64748b;">Recebido em: ${pedFormatarData(p.criadoEm)}</div>
+          </div>
+        </div>
+
+        ${enderecoTxt ? `
+          <div style="margin-bottom:14px;padding:10px;background:#f8fafc;border-radius:8px;border-left:3px solid #0891b2;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:4px;">📍 Endereço de Entrega</div>
+            <div style="font-size:13px;color:#0f172a;">${escapeHtml(enderecoTxt)}</div>
+          </div>` : ''}
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;">📦 Itens do Pedido</div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f8fafc;font-size:11px;color:#64748b;">
+                  <th style="padding:8px;text-align:left;">Produto</th>
+                  <th style="padding:8px;text-align:center;width:60px;">Qtd</th>
+                  <th style="padding:8px;text-align:right;width:90px;">Unit.</th>
+                  <th style="padding:8px;text-align:right;width:90px;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itens.map(it => `
+                  <tr style="border-top:1px solid #f1f5f9;">
+                    <td style="padding:8px;font-size:13px;">
+                      <div style="font-weight:600;">${escapeHtml(it.nome)}</div>
+                      ${it.codigo ? `<div style="font-size:10px;color:#94a3b8;">Cód ${escapeHtml(it.codigo)}</div>` : ''}
+                    </td>
+                    <td style="padding:8px;text-align:center;font-size:13px;">${it.quantidade}</td>
+                    <td style="padding:8px;text-align:right;font-size:13px;">${it.precoUnitario ? formatarBRL(it.precoUnitario) : '—'}</td>
+                    <td style="padding:8px;text-align:right;font-size:13px;font-weight:600;">${it.subtotal > 0 ? formatarBRL(it.subtotal) : '—'}</td>
+                  </tr>`).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+                  <td colspan="3" style="padding:10px;text-align:right;font-weight:700;font-size:13px;">Total:</td>
+                  <td style="padding:10px;text-align:right;font-weight:700;font-size:15px;color:#16a34a;">${p.total > 0 ? formatarBRL(p.total) : 'A combinar'}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        ${p.observacoes ? `
+          <div style="padding:10px;background:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;">
+            <div style="font-size:11px;color:#92400e;text-transform:uppercase;font-weight:600;margin-bottom:4px;">📝 Observações do Cliente</div>
+            <div style="font-size:13px;color:#0f172a;white-space:pre-wrap;">${escapeHtml(p.observacoes)}</div>
+          </div>` : ''}
+
+        ${p.vendaId ? `
+          <div style="margin-top:14px;padding:10px;background:#e0e7ff;border-radius:8px;border-left:3px solid #3730a3;">
+            <div style="font-size:11px;color:#3730a3;text-transform:uppercase;font-weight:600;margin-bottom:4px;">💰 Venda Associada</div>
+            <div style="font-size:13px;color:#0f172a;">Esse pedido virou a venda #${p.vendaId}.</div>
+          </div>` : ''}
+      `;
+
+      // Botões de ação por status
+      const btns = [];
+      // WhatsApp do cliente
+      btns.push(`<a href="https://wa.me/55${String(p.clienteTelefone).replace(/\D/g,'')}" target="_blank" style="background:#25d366;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">💬 WhatsApp</a>`);
+
+      if (p.status === 'novo') {
+        btns.push(`<button class="btn" onclick="pedMudarStatus(${p.id}, 'em-atendimento')" style="background:#f59e0b;">⏳ Marcar Em Atendimento</button>`);
+        btns.push(`<button class="btn" onclick="pedMudarStatus(${p.id}, 'confirmado')" style="background:#16a34a;">✅ Confirmar</button>`);
+      }
+      if (p.status === 'em-atendimento') {
+        btns.push(`<button class="btn" onclick="pedMudarStatus(${p.id}, 'confirmado')" style="background:#16a34a;">✅ Confirmar</button>`);
+      }
+      if (p.status === 'confirmado' && !p.vendaId) {
+        btns.push(`<button class="btn" onclick="pedConverterEmVenda(${p.id})" style="background:#3730a3;">💰 Converter em Venda</button>`);
+      }
+      if (p.status !== 'cancelado' && p.status !== 'convertido-em-venda') {
+        btns.push(`<button class="btn" onclick="pedMudarStatus(${p.id}, 'cancelado')" style="background:#dc2626;">❌ Cancelar</button>`);
+      }
+
+      acoes.innerHTML = btns.join('');
+    } catch (err) {
+      corpo.innerHTML = `<div style="color:#dc2626;padding:20px;">❌ Erro: ${escapeHtml(err.message || err)}</div>`;
+    }
+  }
+
+  async function pedMudarStatus(id, novoStatus) {
+    const labels = {
+      'em-atendimento': 'em atendimento',
+      'confirmado': 'confirmado',
+      'cancelado': 'CANCELADO'
+    };
+    if (novoStatus === 'cancelado' && !confirm('Tem certeza que deseja CANCELAR esse pedido?')) return;
+    try {
+      await api('PUT', '/api/catalogo/pedidos/' + id + '/status', { status: novoStatus });
+      // Atualiza local
+      const p = _pedidos.find(x => x.id === id);
+      if (p) p.status = novoStatus;
+      atualizarBadgePedidos();
+      pedRenderLista();
+      // Recarrega o modal pra mostrar os novos botões
+      pedAbrirDetalhes(id);
+    } catch (err) {
+      alert('Erro: ' + (err.message || err));
+    }
+  }
+
+  async function pedConverterEmVenda(id) {
+    if (!confirm('Converter esse pedido em uma venda real?\n\nIsso vai:\n- Criar uma venda no sistema\n- Reduzir o estoque dos produtos\n- Marcar o pedido como "Convertido"')) return;
+
+    try {
+      // Busca detalhes pra criar a venda
+      const r = await api('GET', '/api/catalogo/pedidos/' + id);
+      const p = r.pedido;
+      const itens = r.itens;
+
+      // Garante cliente cadastrado (cria se não existe)
+      let clienteFinal = p.clienteNome;
+      try {
+        const clientes = await api('GET', '/api/clientes');
+        const ja = (clientes || []).find(c => (c.telefone || '').replace(/\D/g, '') === (p.clienteTelefone || '').replace(/\D/g, ''));
+        if (!ja && p.clienteTelefone) {
+          // Cria cliente automaticamente
+          await api('POST', '/api/clientes', {
+            nome: p.clienteNome,
+            telefone: p.clienteTelefone,
+            email: p.clienteEmail || null,
+            doc: p.clienteDocumento || null,
+            endereco: p.endereco || null,
+            bairro: p.bairro || null,
+            cidade: p.cidade || null,
+            uf: p.uf || null
+          }).catch(() => {});
+        }
+      } catch(e) {}
+
+      // Monta itens da venda no formato esperado
+      const itensVenda = itens.map(it => ({
+        produto: it.nome,
+        codigo: it.codigo || null,
+        produtoId: it.produtoId || null,
+        qtd: Number(it.quantidade) || 1,
+        preco: Number(it.precoUnitario) || 0,
+        subtotal: Number(it.subtotal) || 0
+      }));
+
+      // Cria a venda
+      const obsVenda = `Pedido online ${p.numero}${p.observacoes ? ' - ' + p.observacoes : ''}`;
+      const venda = await api('POST', '/api/vendas', {
+        cliente: clienteFinal,
+        itens: itensVenda,
+        subtotal: Number(p.subtotal) || 0,
+        desconto: 0,
+        total: Number(p.total) || 0,
+        formaPagamento: 'A definir',
+        observacoes: obsVenda
+      });
+
+      // Marca pedido como convertido
+      await api('PUT', '/api/catalogo/pedidos/' + id + '/status', { status: 'convertido-em-venda' });
+
+      alert(`✅ Pedido convertido em venda!\n\nVenda criada com sucesso.`);
+      // Recarrega
+      document.getElementById('modal-ped').style.display = 'none';
+      await pedCarregar();
+    } catch (err) {
+      alert('❌ Erro ao converter: ' + (err.message || err));
+    }
+  }
+
+  // Verifica pedidos novos ao carregar o sistema (badge no menu)
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(async () => {
+      // Só carrega se for admin
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        if (u.papel !== 'admin') return;
+        const r = await api('GET', '/api/catalogo/pedidos?status=novo');
+        _pedidos = r.pedidos || [];
+        atualizarBadgePedidos();
+      } catch(e) {}
+    }, 2000);
+  });
+
   function abrirContratarEmpresaExtra() {
     document.getElementById('ce-nome').value = '';
     document.getElementById('ce-cnpj').value = '';
@@ -4032,6 +4391,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
     if(pg === 'minha-conta') carregarMinhaConta();
     if(pg === 'catalogo') catCarregar();
+    if(pg === 'pedidos-online') pedCarregar();
     if(pg === 'caixa') carregarCaixa();
   }
 
