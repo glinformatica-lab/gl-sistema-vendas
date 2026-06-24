@@ -4043,16 +4043,17 @@ https://sistema.glinformatica.com.br
         subtotal: Number(it.subtotal) || 0
       }));
 
-      // Cria a venda
+      // Cria a venda usando o formato esperado pela API (data + obs + pagamento)
       const obsVenda = `Pedido online ${p.numero}${p.observacoes ? ' - ' + p.observacoes : ''}`;
+      const hoje = new Date().toISOString().slice(0, 10);
       const venda = await api('POST', '/api/vendas', {
+        data: hoje,
         cliente: clienteFinal,
         itens: itensVenda,
-        subtotal: Number(p.subtotal) || 0,
         desconto: 0,
-        total: Number(p.total) || 0,
-        formaPagamento: 'A definir',
-        observacoes: obsVenda
+        pagamento: 'A definir',
+        parcelamento: null,
+        obs: obsVenda
       });
 
       // Marca pedido como convertido
