@@ -171,8 +171,10 @@
           <label>Plano</label>
           <select id="me-plano">
             <option value="trial">Trial</option>
-            <option value="mensal">Mensal</option>
-            <option value="anual">Anual</option>
+            <option value="basico">Básico (R$ 99,90)</option>
+            <option value="pro">Pro (R$ 149,90) — Vendas Online</option>
+            <option value="pro-fiscal">Pro Fiscal (R$ 249,90) — Vendas Online + NFe</option>
+            <option value="anual">Anual (legado)</option>
           </select>
         </div>
       </div>
@@ -226,7 +228,9 @@
         <div>
           <label>Plano contratado</label>
           <select id="pg-plano" required>
-            <option value="mensal">Mensal (+ 1 mês)</option>
+            <option value="basico">Básico (R$ 99,90) — + 1 mês</option>
+            <option value="pro">Pro (R$ 149,90) — + 1 mês</option>
+            <option value="pro-fiscal">Pro Fiscal (R$ 249,90) — + 1 mês</option>
             <option value="anual">Anual (+ 12 meses)</option>
           </select>
         </div>
@@ -704,14 +708,26 @@
     document.getElementById('pg-empresa-info').innerHTML =
       `<strong>${e.nome}</strong> · Vencimento atual: ${fmtData(e.dataVencimento)} · Plano atual: ${e.plano}`;
     document.getElementById('pg-data').value = new Date().toISOString().slice(0, 10);
-    document.getElementById('pg-plano').value = 'mensal';
-    document.getElementById('pg-valor').value = e.valorMensalidade || '';
+    document.getElementById('pg-plano').value = 'basico';
+    document.getElementById('pg-valor').value = '99.90';
     document.getElementById('pg-meses').textContent = '1 mês';
     document.getElementById('pg-erro').style.display = 'none';
     document.getElementById('modal-pagamento').classList.add('show');
   }
   document.getElementById('pg-plano').addEventListener('change', (e) => {
-    document.getElementById('pg-meses').textContent = e.target.value === 'anual' ? '12 meses' : '1 mês';
+    const v = e.target.value;
+    // Auto-preenche meses
+    document.getElementById('pg-meses').textContent = v === 'anual' ? '12 meses' : '1 mês';
+    // Auto-preenche valor sugerido por plano
+    const valoresSugeridos = {
+      'basico': '99.90',
+      'pro': '149.90',
+      'pro-fiscal': '249.90',
+      'anual': '1080.00'
+    };
+    if (valoresSugeridos[v]) {
+      document.getElementById('pg-valor').value = valoresSugeridos[v];
+    }
   });
   function closePagamento() {
     document.getElementById('modal-pagamento').classList.remove('show');
