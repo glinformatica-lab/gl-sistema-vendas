@@ -4,6 +4,34 @@ const router = express.Router();
 const db = require('../db');
 const { autenticar } = require('../middleware/auth');
 
+// ====== MIDDLEWARE: VERIFICAR PLANO ======
+// Bloqueia acesso se o plano da empresa não estiver na lista de planos aceitos
+async function verificarPlanoVendaOnline(req, res, next) {
+  try {
+    if (!req.user || !req.user.empresaId) {
+      return res.status(401).json({ error: 'Não autenticado.' });
+    }
+    const r = await db.query(
+      `SELECT plano FROM empresas WHERE id = $1`,
+      [req.user.empresaId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Empresa não encontrada.' });
+    const plano = r.rows[0].plano;
+    // Planos COM acesso a Vendas Online: pro, pro-fiscal
+    if (!['pro', 'pro-fiscal'].includes(plano)) {
+      return res.status(403).json({
+        error: 'Recurso disponível apenas no plano Pro ou superior.',
+        upgradeRequired: true,
+        planoAtual: plano
+      });
+    }
+    next();
+  } catch (err) {
+    console.error('[verificarPlanoVendaOnline]', err);
+    res.status(500).json({ error: 'Erro ao verificar plano.' });
+  }
+}
+
 // ====== HELPERS ======
 function gerarSlug(texto) {
   if (!texto) return '';
@@ -34,7 +62,7 @@ async function resolverSlugUnico(base, empresaIdAtual) {
 // ====== ROTAS ADMIN ======
 
 // GET /api/catalogo/config — dados completos pra tela admin
-router.get('/config', autenticar, async (req, res) => {
+router.get('/config', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   try {
     const emp = await db.query(
@@ -106,7 +134,7 @@ router.get('/config', autenticar, async (req, res) => {
 });
 
 // PUT /api/catalogo/config — atualiza config geral + slug
-router.put('/config', autenticar, async (req, res) => {
+router.put('/config', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { slug, ativo, mensagemTopo, whatsapp } = req.body || {};
 
@@ -157,7 +185,7 @@ router.put('/config', autenticar, async (req, res) => {
 });
 
 // POST /api/catalogo/itens — adiciona produtos ao catálogo (recebe array de produto_ids)
-router.post('/itens', autenticar, async (req, res) => {
+router.post('/itens', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { produtoIds } = req.body || {};
   if (!Array.isArray(produtoIds) || produtoIds.length === 0) {
@@ -192,7 +220,7 @@ router.post('/itens', autenticar, async (req, res) => {
 });
 
 // PUT /api/catalogo/itens/:id — edita um item (toggle preço, estoque, descrição)
-router.put('/itens/:id', autenticar, async (req, res) => {
+router.put('/itens/:id', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { mostrarPreco, mostrarEstoque, descricaoCustom } = req.body || {};
   try {
@@ -220,7 +248,7 @@ router.put('/itens/:id', autenticar, async (req, res) => {
 });
 
 // DELETE /api/catalogo/itens/:id — remove um produto do catálogo
-router.delete('/itens/:id', autenticar, async (req, res) => {
+router.delete('/itens/:id', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   try {
     await db.query(
@@ -235,7 +263,7 @@ router.delete('/itens/:id', autenticar, async (req, res) => {
 });
 
 // PUT /api/catalogo/itens/ordem — reordena itens (recebe array de IDs na nova ordem)
-router.put('/ordem', autenticar, async (req, res) => {
+router.put('/ordem', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { ordem } = req.body || {};
   if (!Array.isArray(ordem) || ordem.length === 0) {
@@ -278,12 +306,22 @@ router.get('/publico/:slug', async (req, res) => {
   }
   try {
     const emp = await db.query(
-      `SELECT e.id, e.nome, e.cnpj, e.telefone, e.email, e.endereco, e.bairro, e.cidade, e.uf, e.cep, e.logo
+      `SELECT e.id, e.nome, e.cnpj, e.telefone, e.email, e.endereco, e.bairro, e.cidade, e.uf, e.cep, e.logo, e.plano, e.status
        FROM empresas e WHERE e.catalogo_slug = $1 LIMIT 1`,
       [slug]
     );
     if (emp.rows.length === 0) return res.status(404).json({ error: 'Catálogo não encontrado.' });
     const empresa = emp.rows[0];
+
+    // Bloqueia se empresa não está no plano Pro ou Pro Fiscal
+    if (!['pro', 'pro-fiscal'].includes(empresa.plano)) {
+      return res.status(404).json({ error: 'Esse catálogo não está disponível no momento.' });
+    }
+
+    // Bloqueia se empresa está suspensa/cancelada
+    if (empresa.status && !['ativa', 'trial'].includes(empresa.status)) {
+      return res.status(404).json({ error: 'Esse catálogo não está disponível no momento.' });
+    }
 
     const cfg = await db.query(`SELECT * FROM catalogo_config WHERE empresa_id = $1`, [empresa.id]);
     if (cfg.rows.length === 0 || !cfg.rows[0].ativo) {
@@ -377,11 +415,20 @@ router.post('/publico/:slug/pedidos', async (req, res) => {
   try {
     // 1) Resolve empresa pelo slug
     const emp = await db.query(
-      `SELECT id, nome FROM empresas WHERE catalogo_slug = $1 LIMIT 1`,
+      `SELECT id, nome, plano, status FROM empresas WHERE catalogo_slug = $1 LIMIT 1`,
       [slug]
     );
     if (emp.rows.length === 0) return res.status(404).json({ error: 'Catálogo não encontrado.' });
     const empresa = emp.rows[0];
+
+    // Bloqueia se plano não tem Vendas Online
+    if (!['pro', 'pro-fiscal'].includes(empresa.plano)) {
+      return res.status(403).json({ error: 'Esse catálogo não aceita pedidos no momento.' });
+    }
+    // Bloqueia se empresa suspensa
+    if (empresa.status && !['ativa', 'trial'].includes(empresa.status)) {
+      return res.status(403).json({ error: 'Esse catálogo não aceita pedidos no momento.' });
+    }
 
     // 2) Verifica se catálogo está ativo
     const cfg = await db.query(`SELECT ativo FROM catalogo_config WHERE empresa_id = $1`, [empresa.id]);
@@ -483,7 +530,7 @@ router.post('/publico/:slug/pedidos', async (req, res) => {
 });
 
 // GET /api/catalogo/pedidos — admin lista pedidos da empresa
-router.get('/pedidos', autenticar, async (req, res) => {
+router.get('/pedidos', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { status, limit } = req.query;
   const lim = Math.min(parseInt(limit) || 100, 500);
@@ -544,7 +591,7 @@ router.get('/pedidos', autenticar, async (req, res) => {
 });
 
 // GET /api/catalogo/pedidos/:id — admin vê detalhes de um pedido
-router.get('/pedidos/:id', autenticar, async (req, res) => {
+router.get('/pedidos/:id', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   try {
     const p = await db.query(
@@ -597,7 +644,7 @@ router.get('/pedidos/:id', autenticar, async (req, res) => {
 });
 
 // PUT /api/catalogo/pedidos/:id/status — admin muda status
-router.put('/pedidos/:id/status', autenticar, async (req, res) => {
+router.put('/pedidos/:id/status', autenticar, verificarPlanoVendaOnline, async (req, res) => {
   if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
   const { status } = req.body || {};
   if (!['novo', 'em-atendimento', 'confirmado', 'cancelado', 'convertido-em-venda'].includes(status)) {

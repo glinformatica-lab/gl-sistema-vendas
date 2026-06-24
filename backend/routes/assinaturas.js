@@ -12,9 +12,13 @@ const router = express.Router();
 
 // Configuração dos planos disponíveis
 const PLANOS = {
-  mensal: { nome: 'Plano Mensal', valor: 99.90, meses: 1 },
-  anual:  { nome: 'Plano Anual',  valor: 1080.00, meses: 12 },
-  pro:    { nome: 'Plano Pro',    valor: 249.90, meses: 1, moduloFiscal: true },
+  // === Planos principais ===
+  basico:        { nome: 'Plano Básico',     valor: 99.90,   meses: 1,  modulosVendaOnline: false, moduloFiscal: false },
+  pro:           { nome: 'Plano Pro',        valor: 149.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: false },
+  'pro-fiscal':  { nome: 'Plano Pro Fiscal', valor: 249.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: true  },
+  // === Plano anual (legado - mantido pra compatibilidade) ===
+  anual:         { nome: 'Plano Anual',      valor: 1080.00, meses: 12, modulosVendaOnline: false, moduloFiscal: false },
+  // === Plano de empresa extra (multi-empresa) ===
   'empresa-extra': { nome: 'Empresa Adicional', valor: 79.90, meses: 1, ehExtra: true }
 };
 
@@ -36,7 +40,7 @@ router.post('/iniciar', async (req, res) => {
 
   // Validações de entrada
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "mensal" ou "anual".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
   if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
@@ -65,11 +69,13 @@ router.post('/iniciar', async (req, res) => {
     }
 
     // Cria empresa em "aguardando-pagamento" (origem = auto-assinatura)
+    // Calcula o valor mensal (anual divide por 12, outros usam direto)
+    const valorMensalCalc = planoConfig.meses > 1 ? (planoConfig.valor / planoConfig.meses) : planoConfig.valor;
     const empResult = await client.query(
       `INSERT INTO empresas (nome, cnpj, telefone, status, plano, valor_mensalidade, origem)
        VALUES ($1, $2, $3, 'aguardando-pagamento', $4, $5, 'auto-assinatura') RETURNING *`,
       [empresa.trim(), cnpj || null, telefone || null, plano,
-       plano === 'mensal' ? planoConfig.valor : (planoConfig.valor / 12)]
+       valorMensalCalc]
     );
     const novaEmpresa = empResult.rows[0];
 
@@ -311,7 +317,7 @@ router.post('/renovar', async (req, res) => {
 
   const { plano } = req.body || {};
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "mensal" ou "anual".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
   if (!pagbank.tokenConfigurado()) {
     return res.status(503).json({ error: 'Pagamento online temporariamente indisponível. Entre em contato pelo WhatsApp.' });
@@ -627,7 +633,7 @@ const { autenticar } = require('../middleware/auth');
 router.post('/renovar', autenticar, async (req, res) => {
   const { plano } = req.body || {};
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "mensal" ou "anual".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
   }
   const planoConfig = PLANOS[plano];
   try {
