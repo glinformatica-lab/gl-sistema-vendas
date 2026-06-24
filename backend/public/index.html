@@ -2034,32 +2034,59 @@
         <strong>Plano atual:</strong> <span id="renovacao-plano-atual">—</span>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
-        <!-- Card Mensal -->
-        <div id="card-mensal" onclick="selecionarPlanoRenovacao('mensal')"
-             style="border:3px solid #e2e8f0;border-radius:12px;padding:20px;cursor:pointer;transition:all 0.2s;background:#fff;">
-          <h3 style="color:var(--azul);margin:0 0 8px 0;font-size:16px;">📅 Plano Mensal</h3>
-          <div style="font-size:32px;font-weight:900;color:#1e3a8a;">R$ 99,90</div>
-          <div style="color:#668;font-size:13px;margin-bottom:12px;">/mês</div>
-          <ul style="font-size:13px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
-            <li>Sistema completo</li>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+        <!-- Card Básico -->
+        <div id="card-basico" onclick="selecionarPlanoRenovacao('basico')"
+             style="border:3px solid #e2e8f0;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:#fff;">
+          <h3 style="color:var(--azul);margin:0 0 6px 0;font-size:15px;">📅 Plano Básico</h3>
+          <div style="font-size:28px;font-weight:900;color:#1e3a8a;">R$ 99,90</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>Sistema de Vendas</li>
+            <li>Estoque + Financeiro</li>
             <li>+1 mês no vencimento</li>
-            <li>Suporte por WhatsApp</li>
+          </ul>
+        </div>
+
+        <!-- Card Pro (popular) -->
+        <div id="card-pro" onclick="selecionarPlanoRenovacao('pro')"
+             style="border:3px solid #0891b2;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:#f0f9ff;position:relative;">
+          <span style="position:absolute;top:-12px;right:12px;background:#0891b2;color:#fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;">MAIS ESCOLHIDO</span>
+          <h3 style="color:#0891b2;margin:0 0 6px 0;font-size:15px;">⚡ Plano Pro</h3>
+          <div style="font-size:28px;font-weight:900;color:#0891b2;">R$ 149,90</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li><strong>Tudo do Básico</strong></li>
+            <li>📋 Catálogo Público</li>
+            <li>📥 Pedidos Online</li>
+          </ul>
+        </div>
+
+        <!-- Card Pro Fiscal (em desenvolvimento) -->
+        <div id="card-pro-fiscal"
+             style="border:3px solid #7c3aed;border-radius:12px;padding:18px;cursor:not-allowed;background:linear-gradient(135deg,#f5f3ff,#fff);position:relative;opacity:0.85;">
+          <span style="position:absolute;top:-12px;right:12px;background:#7c3aed;color:#fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;">EM BREVE</span>
+          <h3 style="color:#6d28d9;margin:0 0 6px 0;font-size:15px;">🧾 Pro Fiscal</h3>
+          <div style="font-size:28px;font-weight:900;color:#6d28d9;">R$ 249,90</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li><strong>Tudo do Pro</strong></li>
+            <li>🧾 NF-e / NFC-e</li>
+            <li><span style="color:#7c3aed;font-weight:600;">Em desenvolvimento</span></li>
           </ul>
         </div>
 
         <!-- Card Anual -->
         <div id="card-anual" onclick="selecionarPlanoRenovacao('anual')"
-             style="border:3px solid #e2e8f0;border-radius:12px;padding:20px;cursor:pointer;transition:all 0.2s;background:#fff;position:relative;">
-          <span style="position:absolute;top:-12px;right:14px;background:#16a34a;color:#fff;padding:4px 12px;border-radius:14px;font-size:11px;font-weight:700;">10% OFF</span>
-          <h3 style="color:var(--azul);margin:0 0 8px 0;font-size:16px;">🌟 Plano Anual</h3>
-          <div style="font-size:32px;font-weight:900;color:#1e3a8a;">R$ 90,00</div>
-          <div style="color:#668;font-size:13px;margin-bottom:8px;">/mês (pago anualmente)</div>
-          <div style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;margin-bottom:8px;">💰 Economize R$ 118,80/ano</div>
-          <ul style="font-size:13px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
-            <li>Total: R$ 1.080,00</li>
-            <li>+12 meses no vencimento</li>
-            <li>Atendimento prioritário</li>
+             style="border:3px solid #e2e8f0;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:#fff;position:relative;">
+          <span style="position:absolute;top:-12px;right:12px;background:#16a34a;color:#fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;">10% OFF</span>
+          <h3 style="color:#16a34a;margin:0 0 6px 0;font-size:15px;">🌟 Plano Anual</h3>
+          <div style="font-size:28px;font-weight:900;color:#16a34a;">R$ 90,00</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês (anual)</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>Total: R$ 1.080/ano</li>
+            <li>12x sem juros</li>
+            <li>+12 meses</li>
           </ul>
         </div>
       </div>
@@ -10271,14 +10298,26 @@ ${conteudo}
 
   // ====== RENOVAÇÃO DE ASSINATURA ======
   let _planoRenovacao = null;
+  // Configurações dos cards (id, cor borda original, cor fundo original, cor borda selecionado)
+  const _cardsRenovacao = [
+    { id: 'card-basico', borderOff: '#e2e8f0', bgOff: '#fff', borderOn: '#1e3a8a', bgOn: 'linear-gradient(135deg, #f0f4ff, #fff)' },
+    { id: 'card-pro',    borderOff: '#0891b2', bgOff: '#f0f9ff', borderOn: '#0c4a6e', bgOn: 'linear-gradient(135deg, #cffafe, #fff)' },
+    { id: 'card-anual',  borderOff: '#e2e8f0', bgOff: '#fff', borderOn: '#15803d', bgOn: 'linear-gradient(135deg, #dcfce7, #fff)' }
+  ];
+
+  function resetCardsRenovacao() {
+    _cardsRenovacao.forEach(c => {
+      const el = document.getElementById(c.id);
+      if (!el) return;
+      el.style.borderColor = c.borderOff;
+      el.style.background = c.bgOff;
+    });
+  }
+
   function abrirRenovacao() {
     _planoRenovacao = null;
     document.getElementById('renovacao-erro').style.display = 'none';
-    // Reset cards
-    document.getElementById('card-mensal').style.borderColor = '#e2e8f0';
-    document.getElementById('card-mensal').style.background = '#fff';
-    document.getElementById('card-anual').style.borderColor = '#e2e8f0';
-    document.getElementById('card-anual').style.background = '#fff';
+    resetCardsRenovacao();
     // Reset botão
     const btn = document.getElementById('btn-renovar-confirmar');
     btn.disabled = true;
@@ -10288,7 +10327,14 @@ ${conteudo}
     // Mostra plano atual
     try {
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
-      const planoLabel = { 'mensal':'Mensal (R$ 99,90/mês)', 'anual':'Anual (R$ 1.080,00/ano)', 'trial':'Trial (7 dias)' };
+      const planoLabel = {
+        'basico': 'Básico (R$ 99,90/mês)',
+        'pro': 'Pro (R$ 149,90/mês)',
+        'pro-fiscal': 'Pro Fiscal (R$ 249,90/mês)',
+        'mensal': 'Mensal (R$ 99,90/mês)',
+        'anual': 'Anual (R$ 1.080,00/ano)',
+        'trial': 'Trial (7 dias)'
+      };
       const txtPlano = planoLabel[empresa.plano] || empresa.plano || '—';
       const elInfo = document.getElementById('renovacao-info-atual');
       const elPlano = document.getElementById('renovacao-plano-atual');
@@ -10305,23 +10351,33 @@ ${conteudo}
     document.getElementById('modal-renovacao').style.display = 'none';
   }
   function selecionarPlanoRenovacao(plano) {
+    // Pro Fiscal bloqueado (em dev)
+    if (plano === 'pro-fiscal') {
+      alert('O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico, Pro ou Anual.');
+      return;
+    }
     _planoRenovacao = plano;
-    // Reset visual de ambos
-    document.getElementById('card-mensal').style.borderColor = '#e2e8f0';
-    document.getElementById('card-mensal').style.background = '#fff';
-    document.getElementById('card-anual').style.borderColor = '#e2e8f0';
-    document.getElementById('card-anual').style.background = '#fff';
+    resetCardsRenovacao();
     // Marca o selecionado
     const card = document.getElementById('card-' + plano);
-    card.style.borderColor = '#1e3a8a';
-    card.style.background = 'linear-gradient(135deg, #f0f4ff, #fff)';
+    if (card) {
+      const config = _cardsRenovacao.find(c => c.id === 'card-' + plano);
+      if (config) {
+        card.style.borderColor = config.borderOn;
+        card.style.background = config.bgOn;
+      }
+    }
     // Atualiza botão
     const btn = document.getElementById('btn-renovar-confirmar');
     btn.disabled = false;
     btn.style.background = '#1e3a8a';
     btn.style.cursor = 'pointer';
-    const valorTxt = plano === 'mensal' ? 'R$ 99,90' : 'R$ 1.080,00';
-    btn.textContent = `Pagar ${valorTxt} →`;
+    const valores = {
+      'basico': 'R$ 99,90',
+      'pro': 'R$ 149,90',
+      'anual': 'R$ 1.080,00'
+    };
+    btn.textContent = `Pagar ${valores[plano] || ''} →`;
   }
   async function confirmarRenovacao() {
     if (!_planoRenovacao) return;
@@ -10354,8 +10410,12 @@ ${conteudo}
       btn.disabled = false;
       btn.style.background = '#1e3a8a';
       btn.style.cursor = 'pointer';
-      const valorTxt = _planoRenovacao === 'mensal' ? 'R$ 99,90' : 'R$ 1.080,00';
-      btn.textContent = `Pagar ${valorTxt} →`;
+      const valoresRetry = {
+        'basico': 'R$ 99,90',
+        'pro': 'R$ 149,90',
+        'anual': 'R$ 1.080,00'
+      };
+      btn.textContent = `Pagar ${valoresRetry[_planoRenovacao] || ''} →`;
     }
   }
 
