@@ -253,9 +253,11 @@
 <script>
   let _planoSelecionado = null;
   const PLANOS = {
-    trial:  { nome: 'Teste Grátis 7 dias', valor: 0, label: 'GRÁTIS por 7 dias' },
-    mensal: { nome: 'Plano Mensal', valor: 99.90, label: 'R$ 99,90 / mês' },
-    anual:  { nome: 'Plano Anual',  valor: 1080.00, label: 'R$ 1.080,00 / ano' }
+    trial:        { nome: 'Teste Grátis 7 dias', valor: 0,      label: 'GRÁTIS por 7 dias' },
+    basico:       { nome: 'Plano Básico',        valor: 99.90,  label: 'R$ 99,90 / mês' },
+    pro:          { nome: 'Plano Pro',           valor: 149.90, label: 'R$ 149,90 / mês' },
+    'pro-fiscal': { nome: 'Plano Pro Fiscal',    valor: 249.90, label: 'R$ 249,90 / mês' },
+    anual:        { nome: 'Plano Anual',         valor: 1080.00, label: 'R$ 1.080,00 / ano' }
   };
 
   // Carrega chave do reCaptcha do backend e injeta script do Google
