@@ -71,23 +71,30 @@ router.get('/pagamentos', async (req, res) => {
   try {
     // Tenta buscar da tabela pagamentos (criada pelo master) - se não existir, retorna array vazio
     const r = await db.query(
-      `SELECT id, valor, data_pagamento, forma, observacao, criado_em
+      `SELECT id, valor, data_pagamento, plano_aplicado, forma_pagamento,
+              meses_adicionados, novo_vencimento, observacao, criado_em
        FROM pagamentos
        WHERE empresa_id=$1
-       ORDER BY data_pagamento DESC, id DESC`,
+       ORDER BY data_pagamento DESC, id DESC
+       LIMIT 50`,
       [req.user.empresaId]
     ).catch(() => ({ rows: [] }));
-    res.json(r.rows.map(p => ({
-      id: p.id,
-      valor: Number(p.valor) || 0,
-      dataPagamento: formatarDataIso(p.data_pagamento),
-      forma: p.forma,
-      observacao: p.observacao,
-      criadoEm: p.criado_em
-    })));
+    res.json({
+      pagamentos: r.rows.map(p => ({
+        id: p.id,
+        valor: Number(p.valor) || 0,
+        dataPagamento: formatarDataIso(p.data_pagamento),
+        planoAplicado: p.plano_aplicado,
+        formaPagamento: p.forma_pagamento,
+        mesesAdicionados: p.meses_adicionados,
+        novoVencimento: formatarDataIso(p.novo_vencimento),
+        observacao: p.observacao,
+        criadoEm: p.criado_em
+      }))
+    });
   } catch (err) {
     console.error('[empresa/pagamentos]', err);
-    res.json([]);
+    res.json({ pagamentos: [] });
   }
 });
 

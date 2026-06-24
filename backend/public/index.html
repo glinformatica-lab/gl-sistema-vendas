@@ -1522,6 +1522,14 @@
           </p>
         </div>
 
+        <!-- Card Detalhamento do Plano (composição + upgrade + histórico) -->
+        <div id="mc-detalhe-plano-card" class="admin-only" style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;grid-column:span 2;">
+          <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">💼 Detalhamento do Plano</h3>
+          <div id="mc-detalhe-plano-conteudo" style="font-size:14px;line-height:1.6;color:#445;">
+            <p style="color:#94a3b8;font-style:italic;">Carregando...</p>
+          </div>
+        </div>
+
         <!-- Card Módulo Fiscal (Plano Pro) -->
         <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001;">
           <h3 style="color:var(--azul);margin-bottom:14px;font-size:16px;">🧾 Módulo Fiscal <span id="mc-fiscal-badge" style="display:none;font-size:11px;padding:2px 10px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:700;vertical-align:middle;margin-left:8px;">ATIVO</span></h3>
@@ -10591,6 +10599,190 @@ ${conteudo}
     }
   }
 
+  // Renderiza o card de detalhamento do plano (composição + upgrade + histórico)
+  function renderDetalhePlano(empresa) {
+    const div = document.getElementById('mc-detalhe-plano-conteudo');
+    if (!div) return;
+    const plano = empresa.plano || 'basico';
+
+    // Mapa de planos: nome, valor, módulos inclusos
+    const planosInfo = {
+      'basico': {
+        nome: 'Plano Básico',
+        valorTotal: 99.90,
+        cor: '#3960f9',
+        modulos: [
+          { nome: 'Sistema base (Vendas, Estoque, Financeiro, Relatórios)', valor: 99.90 }
+        ]
+      },
+      'pro': {
+        nome: 'Plano Pro',
+        valorTotal: 149.90,
+        cor: '#0891b2',
+        modulos: [
+          { nome: 'Sistema base (Vendas, Estoque, Financeiro, Relatórios)', valor: 99.90 },
+          { nome: '📋 Catálogo Público + 📥 Pedidos Online', valor: 50.00 }
+        ]
+      },
+      'pro-fiscal': {
+        nome: 'Plano Pro Fiscal',
+        valorTotal: 249.90,
+        cor: '#7c3aed',
+        modulos: [
+          { nome: 'Sistema base (Vendas, Estoque, Financeiro, Relatórios)', valor: 99.90 },
+          { nome: '📋 Catálogo Público + 📥 Pedidos Online', valor: 50.00 },
+          { nome: '🧾 Emissão de NF-e / NFC-e + Config. Fiscais', valor: 100.00 }
+        ]
+      },
+      'trial': {
+        nome: 'Trial (Pro por 7 dias)',
+        valorTotal: 0,
+        cor: '#f59e0b',
+        modulos: [
+          { nome: 'Período de teste com acesso ao Plano Pro', valor: 0 }
+        ]
+      },
+      'anual': {
+        nome: 'Plano Anual',
+        valorTotal: empresa.valorMensalidade || 0,
+        cor: '#16a34a',
+        modulos: [
+          { nome: 'Sistema base (Plano legado)', valor: empresa.valorMensalidade || 0 }
+        ]
+      }
+    };
+
+    const info = planosInfo[plano] || planosInfo['basico'];
+    const proximoUpgrade = plano === 'basico' ? planosInfo['pro'] : (plano === 'pro' ? planosInfo['pro-fiscal'] : null);
+    const diferenca = proximoUpgrade ? (proximoUpgrade.valorTotal - info.valorTotal) : 0;
+
+    // Monta HTML
+    let html = `
+      <!-- Resumo do plano -->
+      <div style="background:linear-gradient(135deg, #f8fafc, #fff);border-left:4px solid ${info.cor};padding:14px 16px;border-radius:8px;margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Seu plano atual</div>
+            <div style="font-size:22px;font-weight:800;color:${info.cor};margin-top:2px;">${info.nome}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px;color:#64748b;">Valor mensal</div>
+            <div style="font-size:22px;font-weight:800;color:${info.cor};">${formatarBRL(info.valorTotal)}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composição do plano -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📦 O que está incluído</div>
+        <div style="background:#f8fafc;border-radius:8px;overflow:hidden;">`;
+    info.modulos.forEach((m, i) => {
+      html += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;${i > 0 ? 'border-top:1px solid #e2e8f0;' : ''}">
+            <div style="font-size:13px;color:#0f172a;">✅ ${m.nome}</div>
+            <div style="font-size:13px;font-weight:700;color:#16a34a;white-space:nowrap;margin-left:14px;">${m.valor > 0 ? formatarBRL(m.valor) : 'Grátis'}</div>
+          </div>`;
+    });
+    html += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#e0f2fe;border-top:2px solid #0891b2;">
+            <div style="font-size:13px;font-weight:800;color:#0c4a6e;">Total mensal</div>
+            <div style="font-size:16px;font-weight:900;color:${info.cor};">${formatarBRL(info.valorTotal)}</div>
+          </div>
+        </div>
+      </div>`;
+
+    // Upgrade disponível
+    if (proximoUpgrade && plano !== 'trial' && plano !== 'anual') {
+      const novosModulos = proximoUpgrade.modulos.filter(nm => !info.modulos.some(m => m.nome === nm.nome));
+      html += `
+        <div style="background:linear-gradient(135deg, #f5f3ff, #fff);border:2px solid ${proximoUpgrade.cor};border-radius:10px;padding:16px;margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:${proximoUpgrade.cor};">🚀 Faça upgrade pro ${proximoUpgrade.nome}</div>
+            <div style="font-size:13px;color:#64748b;">+${formatarBRL(diferenca)}/mês</div>
+          </div>
+          <div style="font-size:12px;color:#475569;margin-bottom:10px;">Adicione:</div>
+          <ul style="margin:0 0 12px 0;padding-left:20px;font-size:13px;color:#475569;line-height:1.7;">`;
+      novosModulos.forEach(m => {
+        html += `<li>${m.nome}</li>`;
+      });
+      html += `
+          </ul>
+          <a href="https://wa.me/5562992347572?text=${encodeURIComponent('Olá! Sou da empresa ' + (empresa.nome || '') + ' (plano ' + info.nome + '). Quero fazer upgrade pro ' + proximoUpgrade.nome + '.')}" target="_blank" style="display:inline-block;background:#25d366;color:#fff;padding:9px 18px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;">
+            💬 Falar com a GL Informática pra fazer upgrade
+          </a>
+        </div>`;
+    } else if (plano === 'pro-fiscal') {
+      html += `
+        <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:18px;text-align:center;">
+          <div style="font-size:14px;font-weight:700;color:#166534;">⭐ Você está no plano MAIS COMPLETO!</div>
+          <div style="font-size:12px;color:#15803d;margin-top:4px;">Tem acesso a todos os recursos do sistema.</div>
+        </div>`;
+    }
+
+    // Histórico de pagamentos
+    html += `
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📊 Histórico de Pagamentos</div>
+        <div id="mc-hist-pagamentos">
+          <p style="color:#94a3b8;font-style:italic;font-size:13px;">Carregando histórico...</p>
+        </div>
+      </div>`;
+
+    div.innerHTML = html;
+
+    // Carrega histórico em background
+    carregarHistoricoPagamentos();
+  }
+
+  // Carrega histórico de pagamentos da empresa
+  async function carregarHistoricoPagamentos() {
+    const div = document.getElementById('mc-hist-pagamentos');
+    if (!div) return;
+    try {
+      const r = await api('GET', '/api/empresa/pagamentos');
+      const pagamentos = r.pagamentos || [];
+      if (pagamentos.length === 0) {
+        div.innerHTML = `
+          <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:20px;text-align:center;color:#94a3b8;font-style:italic;font-size:13px;">
+            Nenhum pagamento registrado ainda.
+          </div>`;
+        return;
+      }
+      const planoLabel = {
+        'basico': 'Básico',
+        'pro': 'Pro',
+        'pro-fiscal': 'Pro Fiscal',
+        'mensal': 'Mensal',
+        'anual': 'Anual',
+        'trial': 'Trial'
+      };
+      div.innerHTML = `
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Data</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Plano</th>
+                <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Valor</th>
+                <th style="padding:8px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Forma</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pagamentos.map(p => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:8px 12px;">${formatarDataBR(p.dataPagamento)}</td>
+                  <td style="padding:8px 12px;font-weight:600;">${escapeHtml(planoLabel[p.planoAplicado] || p.planoAplicado || '—')}</td>
+                  <td style="padding:8px 12px;text-align:right;font-weight:700;color:#16a34a;">${formatarBRL(p.valor)}</td>
+                  <td style="padding:8px 12px;text-align:center;font-size:12px;color:#64748b;">${escapeHtml(p.formaPagamento || '—')}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch (err) {
+      div.innerHTML = `<p style="color:#94a3b8;font-style:italic;font-size:13px;">Histórico não disponível.</p>`;
+    }
+  }
+
   async function carregarMinhaConta() {
     try {
       const me = await api('GET', '/api/auth/me');
@@ -10602,7 +10794,14 @@ ${conteudo}
       document.getElementById('mc-papel').textContent = u.papel === 'admin' ? 'Administrador' : (u.papel === 'vendedor' ? 'Vendedor' : (u.papel || '—'));
       // Card empresa
       document.getElementById('mc-empresa-nome').textContent = e.nome || '—';
-      const planoLabel = { 'mensal':'Mensal', 'anual':'Anual', 'trial':'Trial (7 dias)' };
+      const planoLabel = {
+        'basico': 'Básico',
+        'pro': 'Pro',
+        'pro-fiscal': 'Pro Fiscal',
+        'mensal':'Mensal',
+        'anual':'Anual',
+        'trial':'Trial (7 dias)'
+      };
       document.getElementById('mc-plano').textContent = planoLabel[e.plano] || (e.plano || '—');
       // Mostra valor APENAS se origem for auto-assinatura (cliente que assinou pelo /assinar)
       const linhaValor = document.getElementById('mc-valor-linha');
@@ -10638,6 +10837,14 @@ ${conteudo}
         } else {
           btnRenovar.style.display = 'none';
         }
+      }
+
+      // Renderiza o card detalhado do plano (composição + upgrade + histórico)
+      if (u.papel === 'admin') {
+        renderDetalhePlano(e);
+      } else {
+        const cardDetalhe = document.getElementById('mc-detalhe-plano-card');
+        if (cardDetalhe) cardDetalhe.style.display = 'none';
       }
 
       // Card Módulo Fiscal (Plano Pro)
