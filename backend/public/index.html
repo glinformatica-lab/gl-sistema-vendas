@@ -36,6 +36,49 @@
       display: flex; align-items: center; gap: 10px;
     }
     .menu-btn.active, .menu-btn:hover { background: var(--cinza); border-left: 4px solid var(--azul); color: var(--azul); }
+
+    /* Submenu (grupos) */
+    .menu-btn.menu-grupo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .menu-btn.menu-grupo.aberto {
+      background: #f0f9ff;
+      color: var(--azul);
+      font-weight: 600;
+    }
+    .grupo-seta {
+      font-size: 10px;
+      color: #94a3b8;
+      transition: transform 0.2s;
+    }
+    .menu-btn.menu-grupo.aberto .grupo-seta {
+      transform: rotate(180deg);
+      color: var(--azul);
+    }
+    .submenu {
+      background: #f8fafc;
+      border-left: 4px solid #cbd5e1;
+      margin-left: 0;
+    }
+    .menu-btn.submenu-item {
+      padding-left: 36px !important;
+      font-size: 13px;
+      color: #475569;
+      border-left: none;
+    }
+    .menu-btn.submenu-item.active {
+      background: #dbeafe;
+      color: var(--azul);
+      border-left: 4px solid var(--azul);
+      font-weight: 600;
+    }
+    .menu-btn.submenu-item:hover {
+      background: #e0f2fe;
+      border-left: 4px solid var(--azul);
+    }
     #conteudo { margin-left: 220px; flex: 1; padding: 40px 6vw 40px 6vw; }
     .cards { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 42px; }
     .card {
@@ -471,21 +514,63 @@
       <span>&#128269; Buscar...</span>
       <kbd style="background:#fff;color:#64748b;padding:1px 6px;border-radius:4px;font-size:10px;font-family:monospace;border:1px solid #cbd5e1;">Ctrl+K</kbd>
     </button>
-    <button class="menu-btn active" onclick="showPage('dashboard')">&#128202; Dashboard</button>
-    <button class="menu-btn" onclick="showPage('clientes')">&#128100; Clientes</button>
-    <button class="menu-btn" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
-    <button class="menu-btn" onclick="showPage('produtos')">&#128230; Produtos</button>
-    <button class="menu-btn admin-only" onclick="showPage('catalogo')">&#128206; Catálogo Público</button>
-    <button class="menu-btn admin-only" onclick="showPage('pedidos-online')">&#128229; Pedidos Online <span id="badge-pedidos-novos" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
-    <button class="menu-btn" onclick="showPage('servicos')">&#128295; Serviços</button>
-    <button class="menu-btn" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
-    <button class="menu-btn" onclick="showPage('vendas')">&#128722; Vendas</button>
-    <button class="menu-btn" onclick="showPage('caixa')">&#128181; Caixa</button>
-    <button class="menu-btn admin-only" onclick="showPage('financeiro')">&#128184; Financeiro</button>
+    <button class="menu-btn active" onclick="showPage('dashboard')">&#128202; Início</button>
+
+    <!-- Cadastros -->
+    <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('cadastros')" data-grupo="cadastros" type="button">
+      <span>&#128230; Cadastros</span>
+      <span class="grupo-seta" id="seta-cadastros">▼</span>
+    </button>
+    <div class="submenu" id="submenu-cadastros" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
+      <button class="menu-btn submenu-item" onclick="showPage('servicos')">&#128295; Serviços</button>
+      <button class="menu-btn submenu-item" onclick="showPage('clientes')">&#128100; Clientes</button>
+      <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
+    </div>
+
+    <!-- Vendas -->
+    <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('vendas')" data-grupo="vendas" type="button">
+      <span>&#128722; Vendas</span>
+      <span class="grupo-seta" id="seta-vendas">▼</span>
+    </button>
+    <div class="submenu" id="submenu-vendas" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('vendas')">&#128722; Vendas</button>
+      <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
+    </div>
+
+    <!-- Vendas Online (admin-only) -->
+    <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('vendas-online')" data-grupo="vendas-online" type="button">
+      <span>&#128187; Vendas Online <span id="badge-pedidos-novos-grupo" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></span>
+      <span class="grupo-seta" id="seta-vendas-online">▼</span>
+    </button>
+    <div class="submenu admin-only" id="submenu-vendas-online" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('catalogo')">&#128206; Catálogo Público</button>
+      <button class="menu-btn submenu-item" onclick="showPage('pedidos-online')">&#128229; Pedidos Online <span id="badge-pedidos-novos" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+    </div>
+
+    <!-- Financeiro -->
+    <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('financeiro')" data-grupo="financeiro" type="button">
+      <span>&#128176; Financeiro</span>
+      <span class="grupo-seta" id="seta-financeiro">▼</span>
+    </button>
+    <div class="submenu" id="submenu-financeiro" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('caixa')">&#128181; Caixa Diário</button>
+      <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128184; Contas a Pagar/Receber</button>
+    </div>
+
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
-    <button class="menu-btn admin-only" onclick="showPage('usuarios')">&#128101; Usuários</button>
-    <button class="menu-btn admin-only" onclick="showPage('configuracoes')">&#9881;&#65039; Configurações</button>
-    <button class="menu-btn admin-only fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
+
+    <!-- Configurações (admin-only) -->
+    <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('config')" data-grupo="config" type="button">
+      <span>&#9881;&#65039; Configurações</span>
+      <span class="grupo-seta" id="seta-config">▼</span>
+    </button>
+    <div class="submenu admin-only" id="submenu-config" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('configuracoes')">&#9881;&#65039; Geral</button>
+      <button class="menu-btn submenu-item" onclick="showPage('usuarios')">&#128101; Usuários</button>
+      <button class="menu-btn submenu-item fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
+    </div>
+
     <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
     <div style="flex:1;"></div>
     <div id="info-usuario" style="padding:14px 24px;border-top:1px solid var(--cinza-borda);font-size:12px;color:#668;"></div>
@@ -3780,12 +3865,13 @@ https://sistema.glinformatica.com.br
   function atualizarBadgePedidos() {
     const novos = _pedidos.filter(p => p.status === 'novo').length;
     const badge = document.getElementById('badge-pedidos-novos');
-    if (!badge) return;
+    const badgeGrupo = document.getElementById('badge-pedidos-novos-grupo');
     if (novos > 0) {
-      badge.textContent = novos;
-      badge.style.display = '';
+      if (badge) { badge.textContent = novos; badge.style.display = ''; }
+      if (badgeGrupo) { badgeGrupo.textContent = novos; badgeGrupo.style.display = ''; }
     } else {
-      badge.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      if (badgeGrupo) badgeGrupo.style.display = 'none';
     }
   }
 
@@ -4371,6 +4457,43 @@ https://sistema.glinformatica.com.br
     document.getElementById('menu-overlay').classList.remove('aberto');
   }
 
+  // Mapa: qual grupo de submenu cada página pertence
+  const _grupoMenu = {
+    'produtos': 'cadastros',
+    'servicos': 'cadastros',
+    'clientes': 'cadastros',
+    'fornecedores': 'cadastros',
+    'vendas': 'vendas',
+    'orcamentos': 'vendas',
+    'catalogo': 'vendas-online',
+    'pedidos-online': 'vendas-online',
+    'caixa': 'financeiro',
+    'financeiro': 'financeiro',
+    'configuracoes': 'config',
+    'usuarios': 'config',
+    'configuracoes-fiscais': 'config'
+  };
+
+  // Abre/fecha um grupo de submenu manualmente
+  function toggleGrupoMenu(grupo) {
+    const sub = document.getElementById('submenu-' + grupo);
+    const btn = document.querySelector('[data-grupo="' + grupo + '"]');
+    if (!sub || !btn) return;
+    const aberto = sub.style.display !== 'none';
+    sub.style.display = aberto ? 'none' : '';
+    btn.classList.toggle('aberto', !aberto);
+  }
+
+  // Garante que o grupo de uma página esteja aberto
+  function abrirGrupoDaPagina(pg) {
+    const grupo = _grupoMenu[pg];
+    if (!grupo) return;
+    const sub = document.getElementById('submenu-' + grupo);
+    const btn = document.querySelector('[data-grupo="' + grupo + '"]');
+    if (sub) sub.style.display = '';
+    if (btn) btn.classList.add('aberto');
+  }
+
   function showPage(pg) {
     // Bloqueia páginas de admin para vendedor
     if(window._papelAtual !== 'admin' && ['financeiro','relatorios','usuarios','configuracoes'].includes(pg)) {
@@ -4382,6 +4505,8 @@ https://sistema.glinformatica.com.br
     const btn = document.querySelector('.menu-btn[onclick*="\''+pg+'\'"]');
     if(btn) btn.classList.add('active');
     document.getElementById('page-'+pg).style.display = '';
+    // Abre o grupo de submenu correspondente (se houver)
+    abrirGrupoDaPagina(pg);
     // Fecha menu mobile depois de navegar
     if (window.innerWidth <= 900) fecharMenu();
     // Carrega usuários sob demanda
