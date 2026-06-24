@@ -334,4 +334,287 @@ router.get('/publico/:slug', async (req, res) => {
   }
 });
 
+// ====== ROTAS DE PEDIDOS ONLINE ======
+
+// Helper: gera número amigável do pedido (PED-2026-0001)
+async function gerarNumeroPedido(empresaId) {
+  const ano = new Date().getFullYear();
+  const r = await db.query(
+    `SELECT COUNT(*) AS qtd FROM pedidos_online
+     WHERE empresa_id = $1 AND EXTRACT(YEAR FROM criado_em) = $2`,
+    [empresaId, ano]
+  );
+  const seq = parseInt(r.rows[0].qtd) + 1;
+  return `PED-${ano}-${String(seq).padStart(4, '0')}`;
+}
+
+// POST /api/catalogo/publico/:slug/pedidos — cliente final cria pedido
+router.post('/publico/:slug/pedidos', async (req, res) => {
+  const slug = (req.params.slug || '').toLowerCase().trim();
+  if (!/^[a-z0-9-]{2,60}$/.test(slug)) {
+    return res.status(400).json({ error: 'Link inválido.' });
+  }
+  const {
+    clienteNome, clienteTelefone, clienteEmail, clienteDocumento,
+    endereco, bairro, cidade, uf, cep, complemento,
+    observacoes, itens
+  } = req.body || {};
+
+  // Validações básicas
+  if (!clienteNome || String(clienteNome).trim().length < 2) {
+    return res.status(400).json({ error: 'Informe o nome do cliente.' });
+  }
+  if (!clienteTelefone || String(clienteTelefone).replace(/\D/g, '').length < 10) {
+    return res.status(400).json({ error: 'Informe um telefone válido (com DDD).' });
+  }
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ error: 'Adicione pelo menos 1 produto ao pedido.' });
+  }
+  if (itens.length > 200) {
+    return res.status(400).json({ error: 'Pedido com muitos itens. Limite: 200.' });
+  }
+
+  try {
+    // 1) Resolve empresa pelo slug
+    const emp = await db.query(
+      `SELECT id, nome FROM empresas WHERE catalogo_slug = $1 LIMIT 1`,
+      [slug]
+    );
+    if (emp.rows.length === 0) return res.status(404).json({ error: 'Catálogo não encontrado.' });
+    const empresa = emp.rows[0];
+
+    // 2) Verifica se catálogo está ativo
+    const cfg = await db.query(`SELECT ativo FROM catalogo_config WHERE empresa_id = $1`, [empresa.id]);
+    if (cfg.rows.length === 0 || !cfg.rows[0].ativo) {
+      return res.status(403).json({ error: 'Esse catálogo não aceita pedidos no momento.' });
+    }
+
+    // 3) Valida e processa os itens (busca dados oficiais do banco)
+    const itensProcessados = [];
+    let subtotal = 0;
+    for (const it of itens) {
+      const itemId = parseInt(it.itemId); // ID em catalogo_itens
+      const qtd = Number(it.qtd) || 0;
+      if (!itemId || qtd <= 0 || qtd > 9999) continue;
+
+      // Busca produto pelo item do catálogo (garantindo que pertence à empresa)
+      const r = await db.query(
+        `SELECT ci.mostrar_preco, p.id AS produto_id, p.nome, p.codigo, p.preco_venda
+         FROM catalogo_itens ci
+         INNER JOIN produtos p ON p.id = ci.produto_id
+         WHERE ci.id = $1 AND ci.empresa_id = $2 LIMIT 1`,
+        [itemId, empresa.id]
+      );
+      if (r.rows.length === 0) continue;
+      const p = r.rows[0];
+      const precoUnit = (p.mostrar_preco && p.preco_venda) ? Number(p.preco_venda) : null;
+      const sub = precoUnit ? precoUnit * qtd : 0;
+      subtotal += sub;
+      itensProcessados.push({
+        produtoId: p.produto_id,
+        produtoNome: p.nome,
+        produtoCodigo: p.codigo,
+        quantidade: qtd,
+        precoUnitario: precoUnit,
+        subtotal: sub
+      });
+    }
+    if (itensProcessados.length === 0) {
+      return res.status(400).json({ error: 'Nenhum item válido no pedido.' });
+    }
+
+    // 4) Cria o pedido + itens (em transação)
+    const numero = await gerarNumeroPedido(empresa.id);
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const novoPedido = await client.query(
+        `INSERT INTO pedidos_online
+          (empresa_id, numero, cliente_nome, cliente_telefone, cliente_email, cliente_documento,
+           endereco, bairro, cidade, uf, cep, complemento,
+           subtotal, total, observacoes, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'novo')
+         RETURNING id, numero, criado_em`,
+        [
+          empresa.id, numero,
+          String(clienteNome).trim().slice(0, 200),
+          String(clienteTelefone).trim().slice(0, 30),
+          clienteEmail ? String(clienteEmail).trim().slice(0, 200) : null,
+          clienteDocumento ? String(clienteDocumento).trim().slice(0, 30) : null,
+          endereco ? String(endereco).trim().slice(0, 300) : null,
+          bairro ? String(bairro).trim().slice(0, 100) : null,
+          cidade ? String(cidade).trim().slice(0, 100) : null,
+          uf ? String(uf).trim().slice(0, 2).toUpperCase() : null,
+          cep ? String(cep).replace(/\D/g, '').slice(0, 8) : null,
+          complemento ? String(complemento).trim().slice(0, 200) : null,
+          subtotal, subtotal,
+          observacoes ? String(observacoes).trim().slice(0, 1000) : null
+        ]
+      );
+      const pedidoId = novoPedido.rows[0].id;
+      for (const it of itensProcessados) {
+        await client.query(
+          `INSERT INTO pedidos_online_itens
+            (pedido_id, produto_id, produto_nome, produto_codigo, quantidade, preco_unitario, subtotal)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [pedidoId, it.produtoId, it.produtoNome, it.produtoCodigo, it.quantidade, it.precoUnitario, it.subtotal]
+        );
+      }
+      await client.query('COMMIT');
+      res.json({
+        ok: true,
+        pedido: {
+          id: pedidoId,
+          numero,
+          total: subtotal,
+          empresaNome: empresa.nome
+        }
+      });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('[catalogo/pedidos POST]', err);
+    res.status(500).json({ error: 'Erro ao registrar pedido. Tente novamente.' });
+  }
+});
+
+// GET /api/catalogo/pedidos — admin lista pedidos da empresa
+router.get('/pedidos', autenticar, async (req, res) => {
+  if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
+  const { status, limit } = req.query;
+  const lim = Math.min(parseInt(limit) || 100, 500);
+  const where = ['empresa_id = $1'];
+  const params = [req.user.empresaId];
+  if (status) {
+    where.push('status = $2');
+    params.push(status);
+  }
+  try {
+    const r = await db.query(
+      `SELECT id, numero, cliente_nome, cliente_telefone, cliente_email,
+              endereco, bairro, cidade, uf, cep, complemento,
+              subtotal, total, status, observacoes, venda_id, criado_em
+       FROM pedidos_online
+       WHERE ${where.join(' AND ')}
+       ORDER BY criado_em DESC
+       LIMIT ${lim}`,
+      params
+    );
+    // Conta itens de cada pedido
+    const ids = r.rows.map(p => p.id);
+    let contadores = {};
+    if (ids.length > 0) {
+      const cont = await db.query(
+        `SELECT pedido_id, COUNT(*) AS qtd FROM pedidos_online_itens
+         WHERE pedido_id = ANY($1) GROUP BY pedido_id`,
+        [ids]
+      );
+      cont.rows.forEach(c => { contadores[c.pedido_id] = parseInt(c.qtd); });
+    }
+    res.json({
+      pedidos: r.rows.map(p => ({
+        id: p.id,
+        numero: p.numero,
+        clienteNome: p.cliente_nome,
+        clienteTelefone: p.cliente_telefone,
+        clienteEmail: p.cliente_email,
+        endereco: p.endereco,
+        bairro: p.bairro,
+        cidade: p.cidade,
+        uf: p.uf,
+        cep: p.cep,
+        complemento: p.complemento,
+        subtotal: Number(p.subtotal),
+        total: Number(p.total),
+        status: p.status,
+        observacoes: p.observacoes,
+        vendaId: p.venda_id,
+        qtdItens: contadores[p.id] || 0,
+        criadoEm: p.criado_em
+      }))
+    });
+  } catch (err) {
+    console.error('[catalogo/pedidos GET]', err);
+    res.status(500).json({ error: 'Erro ao listar pedidos.' });
+  }
+});
+
+// GET /api/catalogo/pedidos/:id — admin vê detalhes de um pedido
+router.get('/pedidos/:id', autenticar, async (req, res) => {
+  if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
+  try {
+    const p = await db.query(
+      `SELECT * FROM pedidos_online WHERE id = $1 AND empresa_id = $2 LIMIT 1`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (p.rows.length === 0) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const itens = await db.query(
+      `SELECT id, produto_id, produto_nome, produto_codigo, quantidade, preco_unitario, subtotal
+       FROM pedidos_online_itens WHERE pedido_id = $1`,
+      [req.params.id]
+    );
+    const pedido = p.rows[0];
+    res.json({
+      pedido: {
+        id: pedido.id,
+        numero: pedido.numero,
+        clienteNome: pedido.cliente_nome,
+        clienteTelefone: pedido.cliente_telefone,
+        clienteEmail: pedido.cliente_email,
+        clienteDocumento: pedido.cliente_documento,
+        endereco: pedido.endereco,
+        bairro: pedido.bairro,
+        cidade: pedido.cidade,
+        uf: pedido.uf,
+        cep: pedido.cep,
+        complemento: pedido.complemento,
+        subtotal: Number(pedido.subtotal),
+        total: Number(pedido.total),
+        status: pedido.status,
+        observacoes: pedido.observacoes,
+        vendaId: pedido.venda_id,
+        criadoEm: pedido.criado_em,
+        atualizadoEm: pedido.atualizado_em
+      },
+      itens: itens.rows.map(i => ({
+        id: i.id,
+        produtoId: i.produto_id,
+        nome: i.produto_nome,
+        codigo: i.produto_codigo,
+        quantidade: Number(i.quantidade),
+        precoUnitario: i.preco_unitario ? Number(i.preco_unitario) : null,
+        subtotal: i.subtotal ? Number(i.subtotal) : 0
+      }))
+    });
+  } catch (err) {
+    console.error('[catalogo/pedidos GET id]', err);
+    res.status(500).json({ error: 'Erro ao buscar pedido.' });
+  }
+});
+
+// PUT /api/catalogo/pedidos/:id/status — admin muda status
+router.put('/pedidos/:id/status', autenticar, async (req, res) => {
+  if (req.user.papel !== 'admin') return res.status(403).json({ error: 'Apenas administradores.' });
+  const { status } = req.body || {};
+  if (!['novo', 'em-atendimento', 'confirmado', 'cancelado', 'convertido-em-venda'].includes(status)) {
+    return res.status(400).json({ error: 'Status inválido.' });
+  }
+  try {
+    const r = await db.query(
+      `UPDATE pedidos_online SET status = $1, atualizado_em = NOW()
+       WHERE id = $2 AND empresa_id = $3 RETURNING id`,
+      [status, req.params.id, req.user.empresaId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[catalogo/pedidos status]', err);
+    res.status(500).json({ error: 'Erro ao atualizar status.' });
+  }
+});
+
 module.exports = router;
