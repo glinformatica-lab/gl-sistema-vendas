@@ -1062,6 +1062,27 @@
       <h3 style="margin-top:24px;margin-bottom:10px;">Fluxo de Caixa — Últimos 6 meses</h3>
       <canvas id="grafico-fluxo" style="max-width:720px;background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001"></canvas>
 
+      <!-- Filtro de período comum pras Contas a Pagar e Receber -->
+      <h3 style="margin-top:28px;margin-bottom:10px;">📅 Filtro de período (vale pra Pagar e Receber)</h3>
+      <div class="filtros-chips" id="chips-periodo-contas">
+        <span class="chips-label">Vencimento em:</span>
+        <button type="button" class="chip" data-periodo-contas="hoje" onclick="setPeriodoContas('hoje')">Hoje</button>
+        <button type="button" class="chip" data-periodo-contas="7d" onclick="setPeriodoContas('7d')">Próx. 7 dias</button>
+        <button type="button" class="chip active" data-periodo-contas="mes-atual" onclick="setPeriodoContas('mes-atual')">Mês atual</button>
+        <button type="button" class="chip" data-periodo-contas="mes-passado" onclick="setPeriodoContas('mes-passado')">Mês passado</button>
+        <button type="button" class="chip" data-periodo-contas="ano" onclick="setPeriodoContas('ano')">Ano atual</button>
+        <button type="button" class="chip" data-periodo-contas="tudo" onclick="setPeriodoContas('tudo')">Tudo</button>
+        <button type="button" class="chip" data-periodo-contas="custom" onclick="setPeriodoContas('custom')">Personalizado…</button>
+      </div>
+      <!-- Inputs de data personalizado (escondido por padrão) -->
+      <div id="contas-periodo-custom" style="display:none;margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:#475569;font-weight:600;">De:</span>
+        <input type="date" id="contas-data-de" onchange="aplicarPeriodoContasCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <span style="font-size:13px;color:#475569;font-weight:600;">Até:</span>
+        <input type="date" id="contas-data-ate" onchange="aplicarPeriodoContasCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <span id="contas-periodo-resumo" style="font-size:12px;color:#475569;font-style:italic;"></span>
+      </div>
+
       <h3 style="margin-top:28px;margin-bottom:10px;">Contas a Pagar</h3>
       <div class="filtros-chips" id="chips-pagar">
         <span class="chips-label">Filtrar:</span>
@@ -5604,6 +5625,91 @@ https://sistema.glinformatica.com.br
     const hoje = new Date().toISOString().slice(0, 10);
     return c.vencimento < hoje;
   }
+
+  // ====== FILTRO DE PERÍODO (comum pra Pagar e Receber) ======
+  let _periodoContas = 'mes-atual';
+  let _contasDataDe = null;
+  let _contasDataAte = null;
+
+  function setPeriodoContas(periodo) {
+    _periodoContas = periodo;
+    document.querySelectorAll('#chips-periodo-contas .chip').forEach(b => {
+      b.classList.toggle('active', b.dataset.periodoContas === periodo);
+    });
+    const boxCustom = document.getElementById('contas-periodo-custom');
+    if (boxCustom) {
+      boxCustom.style.display = (periodo === 'custom') ? 'flex' : 'none';
+    }
+    if (periodo === 'custom') {
+      const hoje = new Date();
+      const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      const inputDe = document.getElementById('contas-data-de');
+      const inputAte = document.getElementById('contas-data-ate');
+      if (inputDe && !inputDe.value) inputDe.value = inicio.toISOString().slice(0, 10);
+      if (inputAte && !inputAte.value) inputAte.value = fim.toISOString().slice(0, 10);
+      aplicarPeriodoContasCustom();
+      return;
+    }
+    renderContasPagar();
+    renderContasReceber();
+  }
+
+  function aplicarPeriodoContasCustom() {
+    const de = document.getElementById('contas-data-de').value;
+    const ate = document.getElementById('contas-data-ate').value;
+    if (de) _contasDataDe = de;
+    if (ate) _contasDataAte = ate;
+    const resumo = document.getElementById('contas-periodo-resumo');
+    if (resumo && _contasDataDe && _contasDataAte) {
+      const dDe = new Date(_contasDataDe + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dAte = new Date(_contasDataAte + 'T12:00:00').toLocaleDateString('pt-BR');
+      resumo.textContent = `Mostrando ${dDe} até ${dAte}`;
+    }
+    renderContasPagar();
+    renderContasReceber();
+  }
+
+  function calcularPeriodoContas() {
+    const hoje = new Date();
+    const formatISO = d => d.toISOString().slice(0, 10);
+    switch (_periodoContas) {
+      case 'tudo':         return { de: null, ate: null };
+      case 'hoje':         return { de: formatISO(hoje), ate: formatISO(hoje) };
+      case '7d': {
+        const fim = new Date(hoje); fim.setDate(fim.getDate() + 7);
+        return { de: formatISO(hoje), ate: formatISO(fim) };
+      }
+      case 'mes-passado': {
+        const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+        const fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+        return { de: formatISO(inicio), ate: formatISO(fim) };
+      }
+      case 'ano': {
+        const inicio = new Date(hoje.getFullYear(), 0, 1);
+        const fim = new Date(hoje.getFullYear(), 11, 31);
+        return { de: formatISO(inicio), ate: formatISO(fim) };
+      }
+      case 'custom':       return { de: _contasDataDe, ate: _contasDataAte };
+      case 'mes-atual':
+      default: {
+        const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+        return { de: formatISO(inicio), ate: formatISO(fim) };
+      }
+    }
+  }
+
+  function contaNoPeriodoContas(conta) {
+    const { de, ate } = calcularPeriodoContas();
+    if (!de && !ate) return true;
+    const venc = (conta.vencimento || '').slice(0, 10);
+    if (!venc) return true;
+    if (de && venc < de) return false;
+    if (ate && venc > ate) return false;
+    return true;
+  }
+
   function renderContasPagar() {
     const pendentes = dbContasPagar.filter(c => c.status === 'Pendente');
     const vencidas  = dbContasPagar.filter(contaEstaVencida);
@@ -5648,7 +5754,7 @@ https://sistema.glinformatica.com.br
           }).join('');
     }
 
-    // Tabela completa na aba Financeiro (com filtro aplicado)
+    // Tabela completa na aba Financeiro (com filtros de status E período aplicados)
     const tbodyFin = document.getElementById('tbody-financeiro-pagar');
     if(tbodyFin) {
       let lista;
@@ -5656,6 +5762,8 @@ https://sistema.glinformatica.com.br
       else if(_filtroContaPagar === 'vencidas') lista = vencidas;
       else if(_filtroContaPagar === 'pagas') lista = pagas;
       else lista = [...dbContasPagar];
+      // Aplica filtro de período
+      lista = lista.filter(contaNoPeriodoContas);
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
       tbodyFin.innerHTML = lista.length === 0
@@ -6935,7 +7043,7 @@ https://sistema.glinformatica.com.br
           }).join('');
     }
 
-    // Tabela completa na aba Financeiro (com filtro aplicado)
+    // Tabela completa na aba Financeiro (com filtros de status E período aplicados)
     const tbodyFin = document.getElementById('tbody-financeiro-receber');
     if(tbodyFin) {
       let lista;
@@ -6943,6 +7051,8 @@ https://sistema.glinformatica.com.br
       else if(_filtroContaReceber === 'vencidas') lista = vencidas;
       else if(_filtroContaReceber === 'pagas') lista = recebidas;
       else lista = [...dbContasReceber];
+      // Aplica filtro de período
+      lista = lista.filter(contaNoPeriodoContas);
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
       tbodyFin.innerHTML = lista.length === 0
