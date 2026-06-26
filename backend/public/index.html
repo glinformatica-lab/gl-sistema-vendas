@@ -1799,6 +1799,13 @@
         </div>
       </div>
 
+      <!-- Botão atualizar preços (só aparece se houver produtos no orçamento) -->
+      <div id="orc-atualizar-precos-box" style="display:none;margin-bottom:10px;text-align:right;">
+        <button type="button" onclick="abrirAtualizacaoPrecos()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">
+          🔄 Atualizar preços dos produtos
+        </button>
+      </div>
+
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px;">
           <thead style="background:#f1f5f9;">
@@ -1807,6 +1814,8 @@
               <th style="padding:8px;text-align:left;">Descrição</th>
               <th style="padding:8px;text-align:center;width:90px;">Qtd</th>
               <th style="padding:8px;text-align:right;width:120px;">Vlr Unit</th>
+              <th class="orc-th-custo admin-only" style="padding:8px;text-align:right;width:100px;background:#fef3c7;display:none;">Custo</th>
+              <th class="orc-th-margem admin-only" style="padding:8px;text-align:right;width:80px;background:#fef3c7;display:none;">Margem</th>
               <th style="padding:8px;text-align:right;width:120px;">Total</th>
               <th style="padding:8px;width:60px;"></th>
             </tr>
@@ -1853,6 +1862,31 @@
     </div>
   </div>
 
+  <!-- Modal Atualização de Preços (DIFF) -->
+  <div id="modal-atualizar-precos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;justify-content:center;align-items:flex-start;padding:20px 0;overflow-y:auto;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:760px;width:96%;margin:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="color:var(--azul);margin:0;font-size:20px;">🔄 Atualizar preços dos produtos</h2>
+        <button onclick="fecharAtualizacaoPrecos()" style="background:transparent;border:none;font-size:26px;color:#999;cursor:pointer;line-height:1;padding:0;">&times;</button>
+      </div>
+
+      <div id="atu-precos-info" style="background:#f0f9ff;border:1px solid #0891b2;color:#0c4a6e;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;">
+        Comparando preços do orçamento com os preços atuais cadastrados em <strong>Produtos</strong>. Marque quais quer atualizar:
+      </div>
+
+      <div id="atu-precos-lista">
+        <div style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</div>
+      </div>
+
+      <div id="atu-precos-erro" style="display:none;margin-top:14px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+        <button onclick="fecharAtualizacaoPrecos()" style="background:#eceef2;color:var(--azul);border:none;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button id="btn-aplicar-atu" onclick="aplicarAtualizacaoPrecos()" style="background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;">✓ Aplicar atualizações</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Visualização de Orçamento (com botão imprimir) -->
   <div id="modal-orc-view" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:flex-start;padding:20px 0;overflow-y:auto;">
     <div style="background:#fff;border-radius:14px;max-width:780px;width:96%;margin:10px;">
@@ -1860,6 +1894,7 @@
         <h2 style="color:var(--azul);margin:0;font-size:18px;">Visualizar Orçamento</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="imprimirOrcamento()" style="background:#16a34a;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">🖨️ Imprimir/PDF</button>
+          <button id="btn-imprimir-com-custos" class="admin-only" onclick="imprimirOrcamentoComCustos()" style="background:#f59e0b;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:none;" title="Versão admin com custos e margens (não envie ao cliente)">🔒 Com Custos</button>
           <button onclick="fecharOrcView()" style="background:#eceef2;color:var(--azul);border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Fechar</button>
         </div>
       </div>
@@ -9940,6 +9975,13 @@ ${conteudo}
       if (_produtosCacheLocal.length === 0) {
         try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
       }
+      // Preenche preco_custo nos itens que vieram do banco (não armazenamos custo nas tabelas de itens)
+      _orcItensTemp.forEach(it => {
+        if (it.tipo === 'produto' && it.produto_id && (it.preco_custo === undefined || it.preco_custo === null)) {
+          const p = _produtosCacheLocal.find(x => x.id === it.produto_id);
+          it.preco_custo = p ? (parseFloat(p.precoCusto) || 0) : 0;
+        }
+      });
       renderItensOrc();
       document.getElementById('orc-erro').style.display = 'none';
       document.getElementById('modal-orcamento').style.display = 'flex';
@@ -10017,6 +10059,7 @@ ${conteudo}
       descricao: p.nome,
       quantidade: 1,
       valor_unitario: parseFloat(p.precoVenda) || 0,
+      preco_custo: parseFloat(p.precoCusto) || 0,  // Guarda custo pra cálculo de margem
       desconto_item: 0
     });
     document.getElementById('busca-produto').value = '';
@@ -10062,6 +10105,131 @@ ${conteudo}
     `).join('');
     lista.style.display = 'block';
   }
+
+  // ====== ATUALIZAÇÃO DE PREÇOS NO ORÇAMENTO ======
+  let _atuPrecosDiff = []; // [{ index, descricao, antigo, novo, custoAntigo, custoNovo, marcado }]
+
+  async function abrirAtualizacaoPrecos() {
+    // Filtra só os produtos do orçamento
+    const itensComProduto = _orcItensTemp
+      .map((it, idx) => ({ idx, ...it }))
+      .filter(it => it.tipo === 'produto' && it.produto_id);
+
+    if (itensComProduto.length === 0) {
+      alert('Não há produtos no orçamento pra atualizar.');
+      return;
+    }
+
+    // Abre modal com loading
+    document.getElementById('atu-precos-erro').style.display = 'none';
+    document.getElementById('atu-precos-lista').innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Carregando produtos...</div>';
+    document.getElementById('modal-atualizar-precos').style.display = 'flex';
+
+    try {
+      // Busca preços atuais
+      const produtos = await api('GET', '/api/produtos');
+      _atuPrecosDiff = [];
+
+      itensComProduto.forEach(it => {
+        const pAtual = produtos.find(p => p.id === it.produto_id);
+        if (!pAtual) return; // produto não existe mais
+        const precoAntigo = parseFloat(it.valor_unitario) || 0;
+        const precoNovo = parseFloat(pAtual.precoVenda) || 0;
+        const custoAntigo = parseFloat(it.preco_custo) || 0;
+        const custoNovo = parseFloat(pAtual.precoCusto) || 0;
+        // Adiciona se houver QUALQUER diferença (venda ou custo)
+        if (Math.abs(precoAntigo - precoNovo) > 0.001 || Math.abs(custoAntigo - custoNovo) > 0.001) {
+          _atuPrecosDiff.push({
+            index: it.idx,
+            descricao: it.descricao,
+            antigo: precoAntigo,
+            novo: precoNovo,
+            custoAntigo,
+            custoNovo,
+            marcado: true
+          });
+        }
+      });
+
+      renderAtuPrecosLista();
+    } catch (e) {
+      document.getElementById('atu-precos-erro').textContent = 'Erro ao carregar produtos: ' + (e.message || e);
+      document.getElementById('atu-precos-erro').style.display = 'block';
+      document.getElementById('atu-precos-lista').innerHTML = '';
+    }
+  }
+
+  function renderAtuPrecosLista() {
+    const lista = document.getElementById('atu-precos-lista');
+    if (_atuPrecosDiff.length === 0) {
+      lista.innerHTML = '<div style="background:#dcfce7;color:#166534;padding:14px;border-radius:8px;text-align:center;font-weight:600;">✓ Todos os preços já estão atualizados! Nada a fazer.</div>';
+      document.getElementById('btn-aplicar-atu').style.display = 'none';
+      return;
+    }
+    document.getElementById('btn-aplicar-atu').style.display = '';
+    const ehAdmin = window._papelAtual === 'admin';
+    lista.innerHTML = `
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f1f5f9;">
+            <tr>
+              <th style="padding:10px;width:40px;"></th>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:right;">Preço Antigo</th>
+              <th style="padding:10px;text-align:right;">Preço Novo</th>
+              <th style="padding:10px;text-align:right;">Diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${_atuPrecosDiff.map((d, i) => {
+              const diff = d.novo - d.antigo;
+              const pct = d.antigo > 0 ? ((diff / d.antigo) * 100) : 0;
+              const cor = diff > 0 ? '#dc2626' : '#16a34a';
+              const sinal = diff > 0 ? '+' : '';
+              return `
+                <tr style="border-top:1px solid #e2e8f0;">
+                  <td style="padding:10px;text-align:center;">
+                    <input type="checkbox" ${d.marcado ? 'checked' : ''} onchange="_atuPrecosDiff[${i}].marcado = this.checked;" style="cursor:pointer;width:18px;height:18px;">
+                  </td>
+                  <td style="padding:10px;font-weight:600;">${escapeHtml(d.descricao)}</td>
+                  <td style="padding:10px;text-align:right;color:#666;text-decoration:line-through;">${formatarBRL(d.antigo)}</td>
+                  <td style="padding:10px;text-align:right;font-weight:700;color:var(--azul);">${formatarBRL(d.novo)}</td>
+                  <td style="padding:10px;text-align:right;color:${cor};font-weight:600;">
+                    ${sinal}${formatarBRL(diff)}<br>
+                    <span style="font-size:11px;">${sinal}${pct.toFixed(1)}%</span>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#475569;">
+        ${_atuPrecosDiff.length} produto(s) com diferença de preço. Marque/desmarque conforme desejar.
+      </div>
+    `;
+  }
+
+  function fecharAtualizacaoPrecos() {
+    document.getElementById('modal-atualizar-precos').style.display = 'none';
+  }
+
+  function aplicarAtualizacaoPrecos() {
+    let atualizados = 0;
+    _atuPrecosDiff.forEach(d => {
+      if (d.marcado && _orcItensTemp[d.index]) {
+        _orcItensTemp[d.index].valor_unitario = d.novo;
+        _orcItensTemp[d.index].preco_custo = d.custoNovo;
+        atualizados++;
+      }
+    });
+    fecharAtualizacaoPrecos();
+    renderItensOrc();
+    if (atualizados > 0) {
+      alert(`✓ ${atualizados} preço(s) atualizado(s). Não esqueça de salvar o orçamento.`);
+    }
+  }
+
   function selecionarServico(id) {
     const s = _servicosCache.find(x => x.id === id);
     if (!s) return;
@@ -10113,13 +10281,49 @@ ${conteudo}
   function renderItensOrc() {
     const tbody = document.getElementById('orc-itens-tbody');
     if (!tbody) return;
+
+    // Mostra/esconde colunas Custo e Margem conforme papel
+    const ehAdmin = window._papelAtual === 'admin';
+    document.querySelectorAll('.orc-th-custo, .orc-th-margem').forEach(el => {
+      el.style.display = ehAdmin ? '' : 'none';
+    });
+
+    // Mostra botão "Atualizar preços" só se tiver produtos
+    const temProduto = _orcItensTemp.some(it => it.tipo === 'produto' && it.produto_id);
+    const boxAtu = document.getElementById('orc-atualizar-precos-box');
+    if (boxAtu) boxAtu.style.display = temProduto ? '' : 'none';
+
+    const colspan = ehAdmin ? 8 : 6;
     if (_orcItensTemp.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhum item ainda. Use as buscas acima pra adicionar produtos ou serviços.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#889;padding:20px;">Nenhum item ainda. Use as buscas acima pra adicionar produtos ou serviços.</td></tr>`;
       recalcularOrc();
       return;
     }
     const tipoLabels = { 'produto': '📦', 'servico': '🔧', 'avulso': '✏️' };
-    tbody.innerHTML = _orcItensTemp.map((it, i) => `
+    tbody.innerHTML = _orcItensTemp.map((it, i) => {
+      const valorTotal = (it.quantidade || 1) * (it.valor_unitario || 0) - (it.desconto_item || 0);
+      // Calcula margem (só pra produtos com custo)
+      const temCusto = it.tipo === 'produto' && it.preco_custo > 0;
+      const margemPercent = temCusto && it.valor_unitario > 0
+        ? ((it.valor_unitario - it.preco_custo) / it.valor_unitario * 100)
+        : null;
+      // Cor da margem (vermelho se < 10%, amarelo 10-20%, verde > 20%)
+      let corMargem = '#16a34a';
+      if (margemPercent !== null) {
+        if (margemPercent < 10) corMargem = '#dc2626';
+        else if (margemPercent < 20) corMargem = '#f59e0b';
+      }
+
+      const colCusto = ehAdmin ? `
+        <td style="padding:6px;text-align:right;background:#fef9e7;font-size:12px;">
+          ${temCusto ? formatarBRL(it.preco_custo) : '<span style="color:#94a3b8;">—</span>'}
+        </td>` : '';
+      const colMargem = ehAdmin ? `
+        <td style="padding:6px;text-align:right;background:#fef9e7;font-size:12px;font-weight:700;color:${corMargem};">
+          ${margemPercent !== null ? margemPercent.toFixed(1) + '%' : '<span style="color:#94a3b8;font-weight:400;">—</span>'}
+        </td>` : '';
+
+      return `
       <tr>
         <td style="padding:6px;text-align:center;font-size:18px;">${tipoLabels[it.tipo] || ''}</td>
         <td style="padding:6px;">
@@ -10131,12 +10335,13 @@ ${conteudo}
         <td style="padding:6px;">
           <input type="number" step="0.01" min="0" value="${it.valor_unitario}" oninput="atualizarItemOrc(${i},'valor_unitario',parseFloat(this.value)||0)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
         </td>
-        <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL((it.quantidade||1) * (it.valor_unitario||0) - (it.desconto_item||0))}</td>
+        ${colCusto}${colMargem}
+        <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(valorTotal)}</td>
         <td style="padding:6px;text-align:center;">
           <button onclick="removerItemOrc(${i})" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">🗑️</button>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
     recalcularOrc();
   }
   function recalcularOrc() {
@@ -10311,6 +10516,11 @@ ${conteudo}
         </div>
       `;
       document.getElementById('modal-orc-view').style.display = 'flex';
+      // Mostra botão "Imprimir com custos" só pra admin
+      const btnCustos = document.getElementById('btn-imprimir-com-custos');
+      if (btnCustos) {
+        btnCustos.style.display = (window._papelAtual === 'admin') ? '' : 'none';
+      }
     } catch (err) { alert(err.message); }
   }
   function fecharOrcView() {
@@ -10327,6 +10537,120 @@ ${conteudo}
         @media print { body { padding: 0; } }
       </style>
       </head><body>${conteudo}</body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  }
+
+  // ====== IMPRIMIR ORÇAMENTO COM CUSTOS (versão ADMIN — não enviar ao cliente) ======
+  async function imprimirOrcamentoComCustos() {
+    if (!_orcVisualizando) return;
+    if (window._papelAtual !== 'admin') {
+      alert('Apenas administradores podem ver custos.');
+      return;
+    }
+    const orc = _orcVisualizando;
+    // Precisa do cache de produtos pra pegar custos atuais
+    if (_produtosCacheLocal.length === 0) {
+      try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
+    }
+
+    const tipoLabels = { 'produto': 'Produto', 'servico': 'Serviço', 'avulso': 'Item' };
+
+    let totalCusto = 0;
+    let totalVendaSemDesc = 0;
+
+    const itensHtml = (orc.itens || []).map(it => {
+      const qtd = parseFloat(it.quantidade) || 0;
+      const vu = parseFloat(it.valor_unitario) || 0;
+      const total = parseFloat(it.total) || (qtd * vu);
+      // Busca custo do produto no cache
+      let custoUnit = 0;
+      if (it.tipo === 'produto' && it.produto_id) {
+        const p = _produtosCacheLocal.find(x => x.id === it.produto_id);
+        custoUnit = p ? (parseFloat(p.precoCusto) || 0) : 0;
+      }
+      const custoTotal = qtd * custoUnit;
+      totalCusto += custoTotal;
+      totalVendaSemDesc += total;
+      const margemPct = vu > 0 ? ((vu - custoUnit) / vu * 100) : 0;
+      const corMargem = margemPct < 10 ? '#dc2626' : (margemPct < 20 ? '#f59e0b' : '#16a34a');
+      const ehProduto = it.tipo === 'produto' && it.produto_id;
+      return `
+        <tr>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${tipoLabels[it.tipo] || ''}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(it.descricao)}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;">${qtd}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fef9e7;">${ehProduto ? formatarBRL(custoUnit) : '<span style="color:#94a3b8;">—</span>'}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(vu)}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fef9e7;font-weight:700;color:${corMargem};">${ehProduto ? margemPct.toFixed(1) + '%' : '<span style="color:#94a3b8;font-weight:400;">—</span>'}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(total)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const desconto = parseFloat(orc.desconto) || 0;
+    const totalLiquido = parseFloat(orc.total) || (totalVendaSemDesc - desconto);
+    const lucroBruto = totalLiquido - totalCusto;
+    const margemGlobal = totalLiquido > 0 ? (lucroBruto / totalLiquido * 100) : 0;
+    const corMargemGlobal = margemGlobal < 10 ? '#dc2626' : (margemGlobal < 20 ? '#f59e0b' : '#16a34a');
+
+    const conteudoAdmin = `
+      ${cabecalhoEmpresaParaRecibo()}
+      <div style="background:#fef3c7;border:2px solid #f59e0b;color:#92400e;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;margin-bottom:14px;">
+        ⚠️ VERSÃO INTERNA (ADMINISTRADOR) — NÃO ENVIE ESTE DOCUMENTO AO CLIENTE
+      </div>
+      <div style="text-align:center;margin-bottom:18px;">
+        <h2 style="color:#1e3a8a;margin:0;font-size:22px;letter-spacing:1px;">ORÇAMENTO Nº ${orc.numero}</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:14px;">
+        <div>
+          <strong>Cliente:</strong> ${escapeHtml(orc.cliente_nome || '—')}<br>
+          ${orc.cliente_telefone ? `<strong>Telefone:</strong> ${escapeHtml(orc.cliente_telefone)}<br>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <strong>Data:</strong> ${formatarDataBR(orc.data_orcamento)}<br>
+          <strong>Validade:</strong> ${formatarDataBR(orc.data_validade)}<br>
+          <strong>Vendedor:</strong> ${escapeHtml(orc.vendedor_nome || '—')}
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px;">
+        <thead style="background:#f1f5f9;">
+          <tr>
+            <th style="padding:6px;text-align:left;border-bottom:2px solid #1e3a8a;">Tipo</th>
+            <th style="padding:6px;text-align:left;border-bottom:2px solid #1e3a8a;">Descrição</th>
+            <th style="padding:6px;text-align:center;border-bottom:2px solid #1e3a8a;">Qtd</th>
+            <th style="padding:6px;text-align:right;border-bottom:2px solid #1e3a8a;background:#fef9e7;">Custo Un.</th>
+            <th style="padding:6px;text-align:right;border-bottom:2px solid #1e3a8a;">Vlr Un.</th>
+            <th style="padding:6px;text-align:right;border-bottom:2px solid #1e3a8a;background:#fef9e7;">Margem</th>
+            <th style="padding:6px;text-align:right;border-bottom:2px solid #1e3a8a;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${itensHtml}</tbody>
+      </table>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:18px;">
+        <table style="font-size:14px;border:2px solid #f59e0b;border-radius:8px;padding:8px;">
+          <tr><td style="padding:4px 12px;text-align:right;">Subtotal de Venda:</td><td style="padding:4px 0;text-align:right;min-width:140px;">${formatarBRL(orc.subtotal)}</td></tr>
+          ${desconto > 0 ? `<tr><td style="padding:4px 12px;text-align:right;color:#16a34a;">Desconto:</td><td style="padding:4px 0;text-align:right;color:#16a34a;">- ${formatarBRL(desconto)}</td></tr>` : ''}
+          <tr style="font-size:16px;font-weight:700;color:#1e3a8a;border-top:1px solid #1e3a8a;"><td style="padding:6px 12px;text-align:right;">Total Cliente:</td><td style="padding:6px 0;text-align:right;">${formatarBRL(totalLiquido)}</td></tr>
+          <tr style="background:#fef9e7;"><td style="padding:6px 12px;text-align:right;color:#92400e;">Custo total:</td><td style="padding:6px 0;text-align:right;color:#92400e;font-weight:600;">${formatarBRL(totalCusto)}</td></tr>
+          <tr style="background:#dcfce7;border-top:1px solid ${corMargemGlobal};"><td style="padding:6px 12px;text-align:right;font-weight:700;">Lucro Bruto:</td><td style="padding:6px 0;text-align:right;font-weight:700;color:${corMargemGlobal};">${formatarBRL(lucroBruto)}</td></tr>
+          <tr style="background:#dcfce7;"><td style="padding:6px 12px;text-align:right;font-weight:700;">Margem Global:</td><td style="padding:6px 0;text-align:right;font-weight:700;font-size:16px;color:${corMargemGlobal};">${margemGlobal.toFixed(1)}%</td></tr>
+        </table>
+      </div>
+      ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
+      <div style="margin-top:24px;text-align:center;font-size:10px;color:#666;border-top:1px solid #e2e8f0;padding-top:10px;">
+        🔒 Documento interno gerado em ${new Date().toLocaleString('pt-BR')} · Status: ${orc.status.toUpperCase()}
+      </div>
+    `;
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento ${orc.numero} - COM CUSTOS</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 900px; margin: 0 auto; }
+        .empresa-header .lbl { color:#666; font-weight:600; }
+        @media print { body { padding: 10px; } }
+      </style>
+      </head><body>${conteudoAdmin}</body></html>`);
     w.document.close();
     setTimeout(() => w.print(), 300);
   }
