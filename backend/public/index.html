@@ -555,7 +555,9 @@
     </button>
     <div class="submenu" id="submenu-financeiro" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('caixa')">&#128181; Caixa Diário</button>
-      <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128184; Contas a Pagar/Receber</button>
+      <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128202; Resumo Financeiro</button>
+      <button class="menu-btn submenu-item admin-only" onclick="showPage('contas-pagar')">&#128184; Contas a Pagar</button>
+      <button class="menu-btn submenu-item admin-only" onclick="showPage('contas-receber')">&#128176; Contas a Receber</button>
     </div>
 
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
@@ -1062,56 +1064,117 @@
       <h3 style="margin-top:24px;margin-bottom:10px;">Fluxo de Caixa — Últimos 6 meses</h3>
       <canvas id="grafico-fluxo" style="max-width:720px;background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 10px #0001"></canvas>
 
-      <!-- Filtro de período comum pras Contas a Pagar e Receber -->
-      <h3 style="margin-top:28px;margin-bottom:10px;">📅 Filtro de período (vale pra Pagar e Receber)</h3>
-      <div class="filtros-chips" id="chips-periodo-contas">
-        <span class="chips-label">Vencimento em:</span>
-        <button type="button" class="chip" data-periodo-contas="hoje" onclick="setPeriodoContas('hoje')">Hoje</button>
-        <button type="button" class="chip" data-periodo-contas="7d" onclick="setPeriodoContas('7d')">Próx. 7 dias</button>
-        <button type="button" class="chip active" data-periodo-contas="mes-atual" onclick="setPeriodoContas('mes-atual')">Mês atual</button>
-        <button type="button" class="chip" data-periodo-contas="mes-passado" onclick="setPeriodoContas('mes-passado')">Mês passado</button>
-        <button type="button" class="chip" data-periodo-contas="ano" onclick="setPeriodoContas('ano')">Ano atual</button>
-        <button type="button" class="chip" data-periodo-contas="tudo" onclick="setPeriodoContas('tudo')">Tudo</button>
-        <button type="button" class="chip" data-periodo-contas="custom" onclick="setPeriodoContas('custom')">Personalizado…</button>
-      </div>
-      <!-- Inputs de data personalizado (escondido por padrão) -->
-      <div id="contas-periodo-custom" style="display:none;margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:13px;color:#475569;font-weight:600;">De:</span>
-        <input type="date" id="contas-data-de" onchange="aplicarPeriodoContasCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
-        <span style="font-size:13px;color:#475569;font-weight:600;">Até:</span>
-        <input type="date" id="contas-data-ate" onchange="aplicarPeriodoContasCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
-        <span id="contas-periodo-resumo" style="font-size:12px;color:#475569;font-style:italic;"></span>
+      <!-- Atalhos pras outras 2 páginas -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:24px;">
+        <div onclick="showPage('contas-pagar')" style="background:linear-gradient(135deg,#fee2e2,#fff);border:2px solid #dc2626;border-radius:12px;padding:18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:all 0.15s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 14px rgba(220,38,38,0.18)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:36px;">💸</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;color:#991b1b;font-size:16px;">Contas a Pagar</div>
+            <div style="font-size:13px;color:#475569;">Gerenciar despesas e fornecedores</div>
+          </div>
+          <div style="color:#dc2626;font-size:22px;">→</div>
+        </div>
+        <div onclick="showPage('contas-receber')" style="background:linear-gradient(135deg,#dcfce7,#fff);border:2px solid #16a34a;border-radius:12px;padding:18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:all 0.15s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 14px rgba(22,163,74,0.18)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:36px;">💵</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;color:#166534;font-size:16px;">Contas a Receber</div>
+            <div style="font-size:13px;color:#475569;">Gerenciar recebíveis e clientes</div>
+          </div>
+          <div style="color:#16a34a;font-size:22px;">→</div>
+        </div>
       </div>
 
-      <h3 style="margin-top:28px;margin-bottom:10px;">Contas a Pagar</h3>
-      <div class="filtros-chips" id="chips-pagar">
-        <span class="chips-label">Filtrar:</span>
-        <button type="button" class="chip" data-filtro="todas" onclick="setFiltroContaPagar('todas')">Todas <span class="chip-count" id="count-pagar-todas">0</span></button>
-        <button type="button" class="chip active" data-filtro="pendentes" onclick="setFiltroContaPagar('pendentes')">Pendentes <span class="chip-count" id="count-pagar-pendentes">0</span></button>
-        <button type="button" class="chip chip-vencidas" data-filtro="vencidas" onclick="setFiltroContaPagar('vencidas')">Vencidas <span class="chip-count" id="count-pagar-vencidas">0</span></button>
-        <button type="button" class="chip" data-filtro="pagas" onclick="setFiltroContaPagar('pagas')">Pagas <span class="chip-count" id="count-pagar-pagas">0</span></button>
+    </div>
+
+    <!-- =========== PÁGINA: CONTAS A PAGAR =========== -->
+    <div id="page-contas-pagar" style="display:none;">
+      <div class="page-title">💸 Contas a Pagar</div>
+      <div class="actions">
+        <button class="btn-vermelho" onclick="openContaManual('pagar')">+ Nova Conta a Pagar</button>
       </div>
+
+      <!-- Filtro de período -->
+      <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div class="filtros-chips" id="chips-periodo-pagar">
+          <span class="chips-label">Vencimento em:</span>
+          <button type="button" class="chip" data-periodo="hoje" onclick="setPeriodoPagar('hoje')">Hoje</button>
+          <button type="button" class="chip" data-periodo="7d" onclick="setPeriodoPagar('7d')">Próx. 7 dias</button>
+          <button type="button" class="chip active" data-periodo="mes-atual" onclick="setPeriodoPagar('mes-atual')">Mês atual</button>
+          <button type="button" class="chip" data-periodo="mes-passado" onclick="setPeriodoPagar('mes-passado')">Mês passado</button>
+          <button type="button" class="chip" data-periodo="ano" onclick="setPeriodoPagar('ano')">Ano atual</button>
+          <button type="button" class="chip" data-periodo="tudo" onclick="setPeriodoPagar('tudo')">Tudo</button>
+          <button type="button" class="chip" data-periodo="custom" onclick="setPeriodoPagar('custom')">Personalizado…</button>
+        </div>
+        <div id="pagar-periodo-custom" style="display:none;margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:#475569;font-weight:600;">De:</span>
+          <input type="date" id="pagar-data-de" onchange="aplicarPeriodoPagarCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <span style="font-size:13px;color:#475569;font-weight:600;">Até:</span>
+          <input type="date" id="pagar-data-ate" onchange="aplicarPeriodoPagarCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <span id="pagar-periodo-resumo" style="font-size:12px;color:#475569;font-style:italic;"></span>
+        </div>
+      </div>
+
+      <!-- Filtro de status -->
+      <div class="filtros-chips" id="chips-pagar-page">
+        <span class="chips-label">Status:</span>
+        <button type="button" class="chip" data-filtro="todas" onclick="setFiltroContaPagar('todas')">Todas <span class="chip-count" id="count-pagar-todas-page">0</span></button>
+        <button type="button" class="chip active" data-filtro="pendentes" onclick="setFiltroContaPagar('pendentes')">Pendentes <span class="chip-count" id="count-pagar-pendentes-page">0</span></button>
+        <button type="button" class="chip chip-vencidas" data-filtro="vencidas" onclick="setFiltroContaPagar('vencidas')">Vencidas <span class="chip-count" id="count-pagar-vencidas-page">0</span></button>
+        <button type="button" class="chip" data-filtro="pagas" onclick="setFiltroContaPagar('pagas')">Pagas <span class="chip-count" id="count-pagar-pagas-page">0</span></button>
+      </div>
+
       <table>
         <thead>
           <tr><th>Fornecedor</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr>
         </thead>
-        <tbody id="tbody-financeiro-pagar">
+        <tbody id="tbody-contas-pagar-page">
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
-      <h3 style="margin-top:28px;margin-bottom:10px;">Contas a Receber</h3>
-      <div class="filtros-chips" id="chips-receber">
-        <span class="chips-label">Filtrar:</span>
-        <button type="button" class="chip" data-filtro="todas" onclick="setFiltroContaReceber('todas')">Todas <span class="chip-count" id="count-receber-todas">0</span></button>
-        <button type="button" class="chip active" data-filtro="pendentes" onclick="setFiltroContaReceber('pendentes')">Pendentes <span class="chip-count" id="count-receber-pendentes">0</span></button>
-        <button type="button" class="chip chip-vencidas" data-filtro="vencidas" onclick="setFiltroContaReceber('vencidas')">Vencidas <span class="chip-count" id="count-receber-vencidas">0</span></button>
-        <button type="button" class="chip" data-filtro="pagas" onclick="setFiltroContaReceber('pagas')">Recebidas <span class="chip-count" id="count-receber-pagas">0</span></button>
+    </div>
+
+    <!-- =========== PÁGINA: CONTAS A RECEBER =========== -->
+    <div id="page-contas-receber" style="display:none;">
+      <div class="page-title">💵 Contas a Receber</div>
+      <div class="actions">
+        <button class="btn-verde" onclick="openContaManual('receber')">+ Nova Conta a Receber</button>
       </div>
+
+      <!-- Filtro de período -->
+      <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div class="filtros-chips" id="chips-periodo-receber">
+          <span class="chips-label">Vencimento em:</span>
+          <button type="button" class="chip" data-periodo="hoje" onclick="setPeriodoReceber('hoje')">Hoje</button>
+          <button type="button" class="chip" data-periodo="7d" onclick="setPeriodoReceber('7d')">Próx. 7 dias</button>
+          <button type="button" class="chip active" data-periodo="mes-atual" onclick="setPeriodoReceber('mes-atual')">Mês atual</button>
+          <button type="button" class="chip" data-periodo="mes-passado" onclick="setPeriodoReceber('mes-passado')">Mês passado</button>
+          <button type="button" class="chip" data-periodo="ano" onclick="setPeriodoReceber('ano')">Ano atual</button>
+          <button type="button" class="chip" data-periodo="tudo" onclick="setPeriodoReceber('tudo')">Tudo</button>
+          <button type="button" class="chip" data-periodo="custom" onclick="setPeriodoReceber('custom')">Personalizado…</button>
+        </div>
+        <div id="receber-periodo-custom" style="display:none;margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:#475569;font-weight:600;">De:</span>
+          <input type="date" id="receber-data-de" onchange="aplicarPeriodoReceberCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <span style="font-size:13px;color:#475569;font-weight:600;">Até:</span>
+          <input type="date" id="receber-data-ate" onchange="aplicarPeriodoReceberCustom()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <span id="receber-periodo-resumo" style="font-size:12px;color:#475569;font-style:italic;"></span>
+        </div>
+      </div>
+
+      <!-- Filtro de status -->
+      <div class="filtros-chips" id="chips-receber-page">
+        <span class="chips-label">Status:</span>
+        <button type="button" class="chip" data-filtro="todas" onclick="setFiltroContaReceber('todas')">Todas <span class="chip-count" id="count-receber-todas-page">0</span></button>
+        <button type="button" class="chip active" data-filtro="pendentes" onclick="setFiltroContaReceber('pendentes')">Pendentes <span class="chip-count" id="count-receber-pendentes-page">0</span></button>
+        <button type="button" class="chip chip-vencidas" data-filtro="vencidas" onclick="setFiltroContaReceber('vencidas')">Vencidas <span class="chip-count" id="count-receber-vencidas-page">0</span></button>
+        <button type="button" class="chip" data-filtro="pagas" onclick="setFiltroContaReceber('pagas')">Recebidas <span class="chip-count" id="count-receber-pagas-page">0</span></button>
+      </div>
+
       <table>
         <thead>
           <tr><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr>
         </thead>
-        <tbody id="tbody-financeiro-receber">
+        <tbody id="tbody-contas-receber-page">
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
@@ -4638,6 +4701,8 @@ https://sistema.glinformatica.com.br
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
     'financeiro': 'financeiro',
+    'contas-pagar': 'financeiro',
+    'contas-receber': 'financeiro',
     'configuracoes': 'config',
     'usuarios': 'config',
     'configuracoes-fiscais': 'config'
@@ -4759,7 +4824,7 @@ https://sistema.glinformatica.com.br
 
   function showPage(pg) {
     // Bloqueia páginas de admin para vendedor
-    if(window._papelAtual !== 'admin' && ['financeiro','relatorios','usuarios','configuracoes'].includes(pg)) {
+    if(window._papelAtual !== 'admin' && ['financeiro','contas-pagar','contas-receber','relatorios','usuarios','configuracoes'].includes(pg)) {
       alert('Acesso restrito a administradores.');
       return;
     }
@@ -4790,6 +4855,8 @@ https://sistema.glinformatica.com.br
     if(pg === 'catalogo') catCarregar();
     if(pg === 'pedidos-online') pedCarregar();
     if(pg === 'caixa') carregarCaixa();
+    if(pg === 'contas-pagar') renderContasPagar();
+    if(pg === 'contas-receber') renderContasReceber();
   }
 
   // ====== Dashboard - gráfico de evolução de vendas ======
@@ -5608,14 +5675,15 @@ https://sistema.glinformatica.com.br
   let _filtroContaReceber = 'pendentes';
   function setFiltroContaPagar(f) {
     _filtroContaPagar = f;
-    document.querySelectorAll('#chips-pagar .chip').forEach(c => {
+    // Atualiza chips na nova página (chips-pagar-page)
+    document.querySelectorAll('#chips-pagar-page .chip').forEach(c => {
       c.classList.toggle('active', c.dataset.filtro === f);
     });
     renderContasPagar();
   }
   function setFiltroContaReceber(f) {
     _filtroContaReceber = f;
-    document.querySelectorAll('#chips-receber .chip').forEach(c => {
+    document.querySelectorAll('#chips-receber-page .chip').forEach(c => {
       c.classList.toggle('active', c.dataset.filtro === f);
     });
     renderContasReceber();
@@ -5626,54 +5694,18 @@ https://sistema.glinformatica.com.br
     return c.vencimento < hoje;
   }
 
-  // ====== FILTRO DE PERÍODO (comum pra Pagar e Receber) ======
-  let _periodoContas = 'mes-atual';
-  let _contasDataDe = null;
-  let _contasDataAte = null;
+  // ====== FILTROS DE PERÍODO (separados pra Pagar e Receber) ======
+  let _periodoPagar = 'mes-atual';
+  let _periodoReceber = 'mes-atual';
+  let _pagarDataDe = null;
+  let _pagarDataAte = null;
+  let _receberDataDe = null;
+  let _receberDataAte = null;
 
-  function setPeriodoContas(periodo) {
-    _periodoContas = periodo;
-    document.querySelectorAll('#chips-periodo-contas .chip').forEach(b => {
-      b.classList.toggle('active', b.dataset.periodoContas === periodo);
-    });
-    const boxCustom = document.getElementById('contas-periodo-custom');
-    if (boxCustom) {
-      boxCustom.style.display = (periodo === 'custom') ? 'flex' : 'none';
-    }
-    if (periodo === 'custom') {
-      const hoje = new Date();
-      const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-      const inputDe = document.getElementById('contas-data-de');
-      const inputAte = document.getElementById('contas-data-ate');
-      if (inputDe && !inputDe.value) inputDe.value = inicio.toISOString().slice(0, 10);
-      if (inputAte && !inputAte.value) inputAte.value = fim.toISOString().slice(0, 10);
-      aplicarPeriodoContasCustom();
-      return;
-    }
-    renderContasPagar();
-    renderContasReceber();
-  }
-
-  function aplicarPeriodoContasCustom() {
-    const de = document.getElementById('contas-data-de').value;
-    const ate = document.getElementById('contas-data-ate').value;
-    if (de) _contasDataDe = de;
-    if (ate) _contasDataAte = ate;
-    const resumo = document.getElementById('contas-periodo-resumo');
-    if (resumo && _contasDataDe && _contasDataAte) {
-      const dDe = new Date(_contasDataDe + 'T12:00:00').toLocaleDateString('pt-BR');
-      const dAte = new Date(_contasDataAte + 'T12:00:00').toLocaleDateString('pt-BR');
-      resumo.textContent = `Mostrando ${dDe} até ${dAte}`;
-    }
-    renderContasPagar();
-    renderContasReceber();
-  }
-
-  function calcularPeriodoContas() {
+  function _calcPeriodoIntervalo(periodo, customDe, customAte) {
     const hoje = new Date();
     const formatISO = d => d.toISOString().slice(0, 10);
-    switch (_periodoContas) {
+    switch (periodo) {
       case 'tudo':         return { de: null, ate: null };
       case 'hoje':         return { de: formatISO(hoje), ate: formatISO(hoje) };
       case '7d': {
@@ -5690,7 +5722,7 @@ https://sistema.glinformatica.com.br
         const fim = new Date(hoje.getFullYear(), 11, 31);
         return { de: formatISO(inicio), ate: formatISO(fim) };
       }
-      case 'custom':       return { de: _contasDataDe, ate: _contasDataAte };
+      case 'custom':       return { de: customDe, ate: customAte };
       case 'mes-atual':
       default: {
         const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -5700,14 +5732,85 @@ https://sistema.glinformatica.com.br
     }
   }
 
-  function contaNoPeriodoContas(conta) {
-    const { de, ate } = calcularPeriodoContas();
-    if (!de && !ate) return true;
+  function _contaNoPeriodo(conta, intervalo) {
+    if (!intervalo.de && !intervalo.ate) return true;
     const venc = (conta.vencimento || '').slice(0, 10);
     if (!venc) return true;
-    if (de && venc < de) return false;
-    if (ate && venc > ate) return false;
+    if (intervalo.de && venc < intervalo.de) return false;
+    if (intervalo.ate && venc > intervalo.ate) return false;
     return true;
+  }
+
+  // === Pagar ===
+  function setPeriodoPagar(periodo) {
+    _periodoPagar = periodo;
+    document.querySelectorAll('#chips-periodo-pagar .chip').forEach(b => {
+      b.classList.toggle('active', b.dataset.periodo === periodo);
+    });
+    const boxCustom = document.getElementById('pagar-periodo-custom');
+    if (boxCustom) boxCustom.style.display = (periodo === 'custom') ? 'flex' : 'none';
+    if (periodo === 'custom') {
+      const hoje = new Date();
+      const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      const inputDe = document.getElementById('pagar-data-de');
+      const inputAte = document.getElementById('pagar-data-ate');
+      if (inputDe && !inputDe.value) inputDe.value = inicio.toISOString().slice(0, 10);
+      if (inputAte && !inputAte.value) inputAte.value = fim.toISOString().slice(0, 10);
+      aplicarPeriodoPagarCustom();
+      return;
+    }
+    renderContasPagar();
+  }
+
+  function aplicarPeriodoPagarCustom() {
+    const de = document.getElementById('pagar-data-de').value;
+    const ate = document.getElementById('pagar-data-ate').value;
+    if (de) _pagarDataDe = de;
+    if (ate) _pagarDataAte = ate;
+    const resumo = document.getElementById('pagar-periodo-resumo');
+    if (resumo && _pagarDataDe && _pagarDataAte) {
+      const dDe = new Date(_pagarDataDe + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dAte = new Date(_pagarDataAte + 'T12:00:00').toLocaleDateString('pt-BR');
+      resumo.textContent = `Mostrando ${dDe} até ${dAte}`;
+    }
+    renderContasPagar();
+  }
+
+  // === Receber ===
+  function setPeriodoReceber(periodo) {
+    _periodoReceber = periodo;
+    document.querySelectorAll('#chips-periodo-receber .chip').forEach(b => {
+      b.classList.toggle('active', b.dataset.periodo === periodo);
+    });
+    const boxCustom = document.getElementById('receber-periodo-custom');
+    if (boxCustom) boxCustom.style.display = (periodo === 'custom') ? 'flex' : 'none';
+    if (periodo === 'custom') {
+      const hoje = new Date();
+      const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      const inputDe = document.getElementById('receber-data-de');
+      const inputAte = document.getElementById('receber-data-ate');
+      if (inputDe && !inputDe.value) inputDe.value = inicio.toISOString().slice(0, 10);
+      if (inputAte && !inputAte.value) inputAte.value = fim.toISOString().slice(0, 10);
+      aplicarPeriodoReceberCustom();
+      return;
+    }
+    renderContasReceber();
+  }
+
+  function aplicarPeriodoReceberCustom() {
+    const de = document.getElementById('receber-data-de').value;
+    const ate = document.getElementById('receber-data-ate').value;
+    if (de) _receberDataDe = de;
+    if (ate) _receberDataAte = ate;
+    const resumo = document.getElementById('receber-periodo-resumo');
+    if (resumo && _receberDataDe && _receberDataAte) {
+      const dDe = new Date(_receberDataDe + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dAte = new Date(_receberDataAte + 'T12:00:00').toLocaleDateString('pt-BR');
+      resumo.textContent = `Mostrando ${dDe} até ${dAte}`;
+    }
+    renderContasReceber();
   }
 
   function renderContasPagar() {
@@ -5727,12 +5830,12 @@ https://sistema.glinformatica.com.br
         : `${pendentes.length} em aberto`;
     }
 
-    // Atualiza contadores dos chips
+    // Atualiza contadores dos chips (página Contas a Pagar)
     const setCount = (id, n) => { const el = document.getElementById(id); if(el) el.textContent = n; };
-    setCount('count-pagar-todas', dbContasPagar.length);
-    setCount('count-pagar-pendentes', pendentes.length);
-    setCount('count-pagar-vencidas', vencidas.length);
-    setCount('count-pagar-pagas', pagas.length);
+    setCount('count-pagar-todas-page', dbContasPagar.length);
+    setCount('count-pagar-pendentes-page', pendentes.length);
+    setCount('count-pagar-vencidas-page', vencidas.length);
+    setCount('count-pagar-pagas-page', pagas.length);
 
     // Tabela "Próximos Vencimentos" no Dashboard
     const tbodyDash = document.getElementById('tbody-contas-pagar-dash');
@@ -5754,16 +5857,17 @@ https://sistema.glinformatica.com.br
           }).join('');
     }
 
-    // Tabela completa na aba Financeiro (com filtros de status E período aplicados)
-    const tbodyFin = document.getElementById('tbody-financeiro-pagar');
+    // Tabela na página Contas a Pagar (com filtros de status E período próprio)
+    const tbodyFin = document.getElementById('tbody-contas-pagar-page');
     if(tbodyFin) {
       let lista;
       if(_filtroContaPagar === 'pendentes') lista = pendentes;
       else if(_filtroContaPagar === 'vencidas') lista = vencidas;
       else if(_filtroContaPagar === 'pagas') lista = pagas;
       else lista = [...dbContasPagar];
-      // Aplica filtro de período
-      lista = lista.filter(contaNoPeriodoContas);
+      // Aplica filtro de período (Pagar)
+      const intervaloPagar = _calcPeriodoIntervalo(_periodoPagar, _pagarDataDe, _pagarDataAte);
+      lista = lista.filter(c => _contaNoPeriodo(c, intervaloPagar));
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
       tbodyFin.innerHTML = lista.length === 0
@@ -7016,12 +7120,12 @@ https://sistema.glinformatica.com.br
         : `${pendentes.length} pendentes`;
     }
 
-    // Atualiza contadores dos chips
+    // Atualiza contadores dos chips (página Contas a Receber)
     const setCount = (id, n) => { const el = document.getElementById(id); if(el) el.textContent = n; };
-    setCount('count-receber-todas', dbContasReceber.length);
-    setCount('count-receber-pendentes', pendentes.length);
-    setCount('count-receber-vencidas', vencidas.length);
-    setCount('count-receber-pagas', recebidas.length);
+    setCount('count-receber-todas-page', dbContasReceber.length);
+    setCount('count-receber-pendentes-page', pendentes.length);
+    setCount('count-receber-vencidas-page', vencidas.length);
+    setCount('count-receber-pagas-page', recebidas.length);
 
     // Tabela próximos boletos no Dashboard
     const tbodyDash = document.getElementById('tbody-contas-receber-dash');
@@ -7043,16 +7147,17 @@ https://sistema.glinformatica.com.br
           }).join('');
     }
 
-    // Tabela completa na aba Financeiro (com filtros de status E período aplicados)
-    const tbodyFin = document.getElementById('tbody-financeiro-receber');
+    // Tabela na página Contas a Receber (com filtros de status E período próprio)
+    const tbodyFin = document.getElementById('tbody-contas-receber-page');
     if(tbodyFin) {
       let lista;
       if(_filtroContaReceber === 'pendentes') lista = pendentes;
       else if(_filtroContaReceber === 'vencidas') lista = vencidas;
       else if(_filtroContaReceber === 'pagas') lista = recebidas;
       else lista = [...dbContasReceber];
-      // Aplica filtro de período
-      lista = lista.filter(contaNoPeriodoContas);
+      // Aplica filtro de período (Receber)
+      const intervaloReceber = _calcPeriodoIntervalo(_periodoReceber, _receberDataDe, _receberDataAte);
+      lista = lista.filter(c => _contaNoPeriodo(c, intervaloReceber));
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
       tbodyFin.innerHTML = lista.length === 0
