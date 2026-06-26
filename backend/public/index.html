@@ -1093,6 +1093,25 @@
         <button class="btn-vermelho" onclick="openContaManual('pagar')">+ Nova Conta a Pagar</button>
       </div>
 
+      <!-- Cards totalizadores -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px;">
+        <div style="background:#fff;border:2px solid #0891b2;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total visível (filtro atual)</div>
+          <div id="pagar-total-visivel" style="font-size:24px;font-weight:900;color:#0c4a6e;margin-top:4px;">R$ 0,00</div>
+          <div id="pagar-total-visivel-info" style="font-size:11px;color:#475569;">0 contas listadas</div>
+        </div>
+        <div style="background:#fff;border:2px solid #f59e0b;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total pendente geral</div>
+          <div id="pagar-total-pendente-geral" style="font-size:24px;font-weight:900;color:#92400e;margin-top:4px;">R$ 0,00</div>
+          <div id="pagar-total-pendente-geral-info" style="font-size:11px;color:#475569;">0 pendentes (todas)</div>
+        </div>
+        <div style="background:#fff;border:2px solid #dc2626;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">⚠️ Total vencido</div>
+          <div id="pagar-total-vencido-geral" style="font-size:24px;font-weight:900;color:#991b1b;margin-top:4px;">R$ 0,00</div>
+          <div id="pagar-total-vencido-geral-info" style="font-size:11px;color:#475569;">0 vencidas</div>
+        </div>
+      </div>
+
       <!-- Filtro de período -->
       <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:14px;margin-bottom:14px;">
         <div class="filtros-chips" id="chips-periodo-pagar">
@@ -1138,6 +1157,25 @@
       <div class="page-title">💵 Contas a Receber</div>
       <div class="actions">
         <button class="btn-verde" onclick="openContaManual('receber')">+ Nova Conta a Receber</button>
+      </div>
+
+      <!-- Cards totalizadores -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px;">
+        <div style="background:#fff;border:2px solid #0891b2;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total visível (filtro atual)</div>
+          <div id="receber-total-visivel" style="font-size:24px;font-weight:900;color:#0c4a6e;margin-top:4px;">R$ 0,00</div>
+          <div id="receber-total-visivel-info" style="font-size:11px;color:#475569;">0 contas listadas</div>
+        </div>
+        <div style="background:#fff;border:2px solid #16a34a;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total a receber geral</div>
+          <div id="receber-total-pendente-geral" style="font-size:24px;font-weight:900;color:#166534;margin-top:4px;">R$ 0,00</div>
+          <div id="receber-total-pendente-geral-info" style="font-size:11px;color:#475569;">0 pendentes (todas)</div>
+        </div>
+        <div style="background:#fff;border:2px solid #dc2626;border-radius:10px;padding:14px 18px;">
+          <div style="font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">⚠️ Total vencido</div>
+          <div id="receber-total-vencido-geral" style="font-size:24px;font-weight:900;color:#991b1b;margin-top:4px;">R$ 0,00</div>
+          <div id="receber-total-vencido-geral-info" style="font-size:11px;color:#475569;">0 vencidas</div>
+        </div>
       </div>
 
       <!-- Filtro de período -->
@@ -5870,6 +5908,23 @@ https://sistema.glinformatica.com.br
       lista = lista.filter(c => _contaNoPeriodo(c, intervaloPagar));
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
+      // Atualiza cards totalizadores
+      const totalVisivel = lista.reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
+      const elTV = document.getElementById('pagar-total-visivel');
+      const elTVI = document.getElementById('pagar-total-visivel-info');
+      if (elTV) elTV.textContent = formatarBRL(totalVisivel);
+      if (elTVI) elTVI.textContent = `${lista.length} conta${lista.length === 1 ? '' : 's'} listada${lista.length === 1 ? '' : 's'}`;
+
+      const elTPG = document.getElementById('pagar-total-pendente-geral');
+      const elTPGI = document.getElementById('pagar-total-pendente-geral-info');
+      if (elTPG) elTPG.textContent = formatarBRL(totalPendente);
+      if (elTPGI) elTPGI.textContent = `${pendentes.length} pendente${pendentes.length === 1 ? '' : 's'} (todas)`;
+
+      const elTVG = document.getElementById('pagar-total-vencido-geral');
+      const elTVGI = document.getElementById('pagar-total-vencido-geral-info');
+      if (elTVG) elTVG.textContent = formatarBRL(totalVencidas);
+      if (elTVGI) elTVGI.textContent = `${vencidas.length} vencida${vencidas.length === 1 ? '' : 's'}`;
+
       tbodyFin.innerHTML = lista.length === 0
         ? '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;font-style:italic;">Nenhuma conta neste filtro.</td></tr>'
         : lista.map(c => {
@@ -7109,6 +7164,7 @@ https://sistema.glinformatica.com.br
     const vencidas  = dbContasReceber.filter(contaEstaVencida);
     const recebidas = dbContasReceber.filter(c => c.status === 'Recebida');
     const totalPendente = pendentes.reduce((s, c) => s + c.valor, 0);
+    const totalVencidas = vencidas.reduce((s, c) => s + c.valor, 0);
 
     // Card do Dashboard
     const cardValor  = document.getElementById('card-receber-valor');
@@ -7159,6 +7215,23 @@ https://sistema.glinformatica.com.br
       const intervaloReceber = _calcPeriodoIntervalo(_periodoReceber, _receberDataDe, _receberDataAte);
       lista = lista.filter(c => _contaNoPeriodo(c, intervaloReceber));
       lista = [...lista].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+
+      // Atualiza cards totalizadores
+      const totalVisivel = lista.reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
+      const elTV = document.getElementById('receber-total-visivel');
+      const elTVI = document.getElementById('receber-total-visivel-info');
+      if (elTV) elTV.textContent = formatarBRL(totalVisivel);
+      if (elTVI) elTVI.textContent = `${lista.length} conta${lista.length === 1 ? '' : 's'} listada${lista.length === 1 ? '' : 's'}`;
+
+      const elTPG = document.getElementById('receber-total-pendente-geral');
+      const elTPGI = document.getElementById('receber-total-pendente-geral-info');
+      if (elTPG) elTPG.textContent = formatarBRL(totalPendente);
+      if (elTPGI) elTPGI.textContent = `${pendentes.length} pendente${pendentes.length === 1 ? '' : 's'} (todas)`;
+
+      const elTVG = document.getElementById('receber-total-vencido-geral');
+      const elTVGI = document.getElementById('receber-total-vencido-geral-info');
+      if (elTVG) elTVG.textContent = formatarBRL(totalVencidas);
+      if (elTVGI) elTVGI.textContent = `${vencidas.length} vencida${vencidas.length === 1 ? '' : 's'}`;
 
       tbodyFin.innerHTML = lista.length === 0
         ? '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;font-style:italic;">Nenhuma conta neste filtro.</td></tr>'
