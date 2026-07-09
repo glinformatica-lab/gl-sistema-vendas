@@ -31,16 +31,6 @@
     .erro.show { display:block; }
     .row { display:flex; gap:10px; }
     .row > div { flex:1; }
-    .empresa-card {
-      display: block; width: 100%;
-      padding: 14px 16px; margin-bottom: 10px;
-      background: #f8f9fc; border: 2px solid #e2e6ee; border-radius: 10px;
-      text-align: left; cursor: pointer;
-      transition: all 0.2s; font-family: inherit;
-    }
-    .empresa-card:hover { background: #eef2ff; border-color: #3960f9; transform: translateY(-1px); }
-    .empresa-nome { font-size: 16px; font-weight: 700; color: #1e3a8a; margin-bottom: 4px; }
-    .empresa-info { font-size: 12px; color: #667; text-transform: uppercase; letter-spacing: 0.5px; }
   </style>
 </head>
 <body>
@@ -59,13 +49,7 @@
         <div class="erro" id="login-erro"></div>
         <button type="submit" class="btn" id="btn-login">Entrar</button>
       </form>
-      <!-- Escolha de empresa (multi-empresa) -->
-      <div id="escolha-empresa" style="display:none;">
-        <p style="font-size:14px;color:#557;margin-bottom:14px;">Você tem acesso a mais de uma empresa. Escolha qual deseja acessar:</p>
-        <div id="escolha-empresa-lista"></div>
-        <button type="button" class="btn" onclick="voltarParaLogin()" style="background:#eceef2;color:#1e3a8a;margin-top:8px;">Voltar</button>
-      </div>
-      <div class="toggle">Ainda não tem conta? <a href="/assinar.html" style="cursor:pointer;">Ver planos e assinar</a></div>
+      <div class="toggle">Ainda não tem conta? <a onclick="toggleForm('cadastro')">Cadastrar minha empresa</a></div>
     </div>
 
     <!-- CADASTRO -->
@@ -107,9 +91,11 @@
       </a>
     </div>
 
-    <!-- Link discreto pro painel Master -->
-    <div style="margin-top:14px;text-align:center;font-size:11px;">
-      <a href="/master.html" style="color:#aab;text-decoration:none;">Painel Master</a>
+    <!-- Botão Painel do Vendedor -->
+    <div style="margin-top:20px;text-align:center;">
+      <a href="/vendedor" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#0891b2,#0c4a6e);color:#fff;padding:10px 20px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;box-shadow:0 3px 8px rgba(8,145,178,0.25);">
+        🤝 Painel do Vendedor
+      </a>
     </div>
   </div>
 
@@ -130,36 +116,24 @@
     el.textContent = msg; el.classList.add('show');
   }
 
-  // Guarda credenciais pra reusar quando o cliente escolher empresa
-  let _credsLogin = null;
-
   document.getElementById('form-login-el').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-login');
     btn.disabled = true; btn.textContent = 'Entrando...';
     document.getElementById('login-erro').classList.remove('show');
-    const email = document.getElementById('login-email').value.trim();
-    const senha = document.getElementById('login-senha').value;
     try {
       const r = await fetch('/api/auth/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha })
+        body: JSON.stringify({
+          email: document.getElementById('login-email').value.trim(),
+          senha: document.getElementById('login-senha').value
+        })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Erro ao entrar');
-
-      // Multi-empresa: mostra tela de escolha
-      if (data.precisaEscolherEmpresa) {
-        _credsLogin = { email, senha };
-        mostrarEscolhaEmpresa(data.empresas);
-        return;
-      }
-
       localStorage.setItem('token', data.token);
       localStorage.setItem('usuario', JSON.stringify(data.usuario));
       localStorage.setItem('empresa', JSON.stringify(data.empresa));
-      if (data.temMultiEmpresa) localStorage.setItem('multiEmpresa', '1');
-      else localStorage.removeItem('multiEmpresa');
       window.location.href = '/index.html';
     } catch (err) {
       showErr('login-erro', err.message);
@@ -167,46 +141,6 @@
       btn.disabled = false; btn.textContent = 'Entrar';
     }
   });
-
-  // Mostra modal pra cliente escolher entre suas empresas
-  function mostrarEscolhaEmpresa(empresas) {
-    document.getElementById('form-login-el').style.display = 'none';
-    const div = document.getElementById('escolha-empresa');
-    div.style.display = '';
-    const lista = document.getElementById('escolha-empresa-lista');
-    lista.innerHTML = empresas.map(e => `
-      <button type="button" class="empresa-card" onclick="escolherEmpresa(${e.id})">
-        <div class="empresa-nome">${e.nome}</div>
-        <div class="empresa-info">${e.plano} · ${e.status}${e.moduloFiscalAtivo ? ' · 🧾 Pro' : ''}</div>
-      </button>
-    `).join('');
-  }
-
-  async function escolherEmpresa(empresaId) {
-    if (!_credsLogin) return;
-    document.getElementById('login-erro').classList.remove('show');
-    try {
-      const r = await fetch('/api/auth/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ..._credsLogin, empresaId })
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Erro ao entrar');
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('usuario', JSON.stringify(data.usuario));
-      localStorage.setItem('empresa', JSON.stringify(data.empresa));
-      if (data.temMultiEmpresa) localStorage.setItem('multiEmpresa', '1');
-      window.location.href = '/index.html';
-    } catch (err) {
-      showErr('login-erro', err.message);
-    }
-  }
-
-  function voltarParaLogin() {
-    document.getElementById('escolha-empresa').style.display = 'none';
-    document.getElementById('form-login-el').style.display = '';
-    _credsLogin = null;
-  }
 
   document.getElementById('form-cadastro-el').addEventListener('submit', async (e) => {
     e.preventDefault();
