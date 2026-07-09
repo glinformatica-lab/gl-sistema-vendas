@@ -111,6 +111,15 @@
   <h1>Comece a usar agora mesmo</h1>
   <p class="sub">Experimente <strong>7 dias grátis</strong> ou escolha o plano que cabe no seu negócio.</p>
 
+  <!-- Badge de indicação de vendedor (aparece se ?ref= válido) -->
+  <div id="badge-vendedor" style="display:none;max-width:520px;margin:0 auto 20px;padding:12px 18px;background:linear-gradient(135deg,#dcfce7,#fff);border:2px solid #16a34a;border-radius:12px;align-items:center;gap:12px;">
+    <div style="font-size:26px;">🤝</div>
+    <div style="flex:1;">
+      <div style="font-size:12px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Você foi indicado(a) por</div>
+      <div class="badge-nome" style="font-size:16px;font-weight:800;color:#15803d;">—</div>
+    </div>
+  </div>
+
   <div class="planos">
     <div class="plano trial-card" id="plano-trial" onclick="selecionarPlano('trial')">
       <h3>🎁 Teste Grátis</h3>
@@ -321,6 +330,47 @@
 
 <script>
   let _planoSelecionado = null;
+
+  // ====== CÓDIGO DE INDICAÇÃO (VENDEDOR) ======
+  // Detecta ?ref=NNNNNN na URL e salva. Persiste em localStorage por 30 dias.
+  let _refVendedor = null;
+  let _nomeVendedor = null;
+  (function detectarRef() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const refUrl = params.get('ref');
+      if (refUrl && /^\d{6}$/.test(refUrl)) {
+        _refVendedor = refUrl;
+        // Salva com timestamp
+        localStorage.setItem('gl-ref-vendedor', JSON.stringify({ codigo: refUrl, ts: Date.now() }));
+      } else {
+        // Tenta recuperar do localStorage se não estiver expirado (30 dias)
+        const salvo = JSON.parse(localStorage.getItem('gl-ref-vendedor') || 'null');
+        if (salvo && salvo.codigo && (Date.now() - salvo.ts) < 30 * 24 * 60 * 60 * 1000) {
+          _refVendedor = salvo.codigo;
+        }
+      }
+      // Consulta backend pra validar código e pegar nome (só cosmético)
+      if (_refVendedor) {
+        fetch('/api/vendedores/publico/' + _refVendedor)
+          .then(r => r.ok ? r.json() : Promise.reject())
+          .then(v => {
+            _nomeVendedor = v.nome;
+            const badge = document.getElementById('badge-vendedor');
+            if (badge) {
+              badge.style.display = 'flex';
+              badge.querySelector('.badge-nome').textContent = v.nome;
+            }
+          })
+          .catch(() => {
+            // Código inválido, limpa
+            _refVendedor = null;
+            localStorage.removeItem('gl-ref-vendedor');
+          });
+      }
+    } catch (e) { console.warn('Erro ao detectar ref:', e); }
+  })();
+
   const PLANOS = {
     trial:                { nome: 'Teste Grátis 7 dias',  valor: 0,        label: 'GRÁTIS por 7 dias' },
     basico:               { nome: 'Plano Básico',         valor: 99.90,    label: 'R$ 99,90 / mês' },
@@ -454,7 +504,8 @@
       telefone: document.getElementById('telefone').value.trim() || null,
       nomeAdmin: document.getElementById('nomeAdmin').value.trim(),
       emailAdmin: document.getElementById('emailAdmin').value.trim(),
-      senhaAdmin: document.getElementById('senhaAdmin').value
+      senhaAdmin: document.getElementById('senhaAdmin').value,
+      refVendedor: _refVendedor || null
     };
 
     btn.disabled = true;

@@ -146,7 +146,120 @@
 
     <h2 id="venc-section-title" style="display:none;">⚠️ Vencimentos próximos (7 dias)</h2>
     <div id="venc-proximos"></div>
+
+    <!-- Vendedores -->
+    <h2 style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;">
+      <span>🤝 Vendedores</span>
+      <button onclick="abrirModalNovoVendedor()" style="background:#16a34a;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">+ Novo Vendedor</button>
+    </h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Código</th>
+          <th>Telefone</th>
+          <th>Status</th>
+          <th>Indicações</th>
+          <th>Ativas</th>
+          <th>Comissão Paga</th>
+          <th>Pendente</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-vendedores"><tr><td colspan="9" style="text-align:center;color:#94a3b8;">Carregando…</td></tr></tbody>
+    </table>
+
+    <!-- Comissões -->
+    <h2 style="margin-top:24px;">💰 Comissões</h2>
+    <div style="margin-bottom:10px;font-size:13px;color:#475569;">
+      Comissões são criadas automaticamente quando o cliente indicado paga a primeira mensalidade.
+      Podem ser marcadas como pagas apenas <b>após 30 dias</b> do pagamento (regra anti-cancelamento).
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Data Venda</th>
+          <th>Vendedor</th>
+          <th>Empresa</th>
+          <th>Plano</th>
+          <th>Valor Venda</th>
+          <th>%</th>
+          <th>Comissão</th>
+          <th>Liberação</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-comissoes"><tr><td colspan="10" style="text-align:center;color:#94a3b8;">Carregando…</td></tr></tbody>
+    </table>
   </main>
+</div>
+
+<!-- Modal: novo vendedor -->
+<div class="modal" id="modal-vendedor">
+  <div class="modal-card">
+    <h2 id="mv-titulo">Novo Vendedor</h2>
+    <div class="grid">
+      <div>
+        <label>Nome completo *</label>
+        <input id="mv-nome" placeholder="Nome do vendedor">
+      </div>
+      <div>
+        <label>Telefone / WhatsApp</label>
+        <input id="mv-telefone" placeholder="(62) 90000-0000">
+      </div>
+      <div>
+        <label>E-mail (opcional)</label>
+        <input id="mv-email" type="email" placeholder="vendedor@email.com">
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="mv-status">
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo de chave PIX</label>
+        <select id="mv-tipo-pix">
+          <option value="">—</option>
+          <option value="cpf">CPF</option>
+          <option value="cnpj">CNPJ</option>
+          <option value="email">E-mail</option>
+          <option value="telefone">Telefone</option>
+          <option value="aleatoria">Chave aleatória</option>
+        </select>
+      </div>
+      <div>
+        <label>Chave PIX</label>
+        <input id="mv-chave-pix" placeholder="Chave para pagamento das comissões">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label>Observações</label>
+        <textarea id="mv-obs" rows="2" placeholder="Notas internas (não visível ao vendedor)"></textarea>
+      </div>
+    </div>
+    <div class="row-buttons" style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="salvarVendedor()" style="background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+      <button onclick="fecharModalVendedor()" style="background:#eceef2;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: definir senha do vendedor -->
+<div class="modal" id="modal-senha-vendedor">
+  <div class="modal-card">
+    <h2>Definir/Alterar Senha</h2>
+    <p style="font-size:13px;color:#475569;">Essa senha permite que o vendedor entre em <code>/vendedor</code> pra ver suas vendas e comissões.</p>
+    <div>
+      <label>Nova senha (mín. 6 caracteres)</label>
+      <input id="msv-senha" type="password" placeholder="Nova senha">
+    </div>
+    <div class="row-buttons" style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="salvarSenhaVendedor()" style="background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Salvar Senha</button>
+      <button onclick="fecharModalSenhaVendedor()" style="background:#eceef2;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: editar empresa -->
@@ -383,7 +496,7 @@
     document.getElementById('painel').style.display = 'block';
     const m = JSON.parse(localStorage.getItem('master-user') || '{}');
     document.getElementById('master-nome').textContent = `Olá, ${m.nome || ''}`;
-    await Promise.all([carregarDashboard(), carregarEmpresas()]);
+    await Promise.all([carregarDashboard(), carregarEmpresas(), carregarVendedores(), carregarComissoes()]);
     document.getElementById('updated-at').textContent = new Date().toLocaleTimeString('pt-BR');
   }
 
@@ -843,6 +956,185 @@
       alert(`"${e.nome}" excluída.`);
       await Promise.all([carregarDashboard(), carregarEmpresas()]);
     } catch(err) { alert('Erro: ' + err.message); }
+  }
+
+  // ====== VENDEDORES ======
+  let _vendedores = [];
+  let _vendedorEditId = null;
+  let _vendedorSenhaId = null;
+
+  async function carregarVendedores() {
+    const tbody = document.getElementById('tbody-vendedores');
+    if (!tbody) return;
+    try {
+      _vendedores = await api('GET', '/api/vendedores');
+      if (_vendedores.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">Nenhum vendedor cadastrado. Clique em "+ Novo Vendedor" pra começar.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = _vendedores.map(v => `
+        <tr>
+          <td><b>${escapeHtml(v.nome)}</b>${v.temSenha ? '' : ' <span title="Senha ainda não definida" style="color:#dc2626;font-size:11px;">⚠ sem senha</span>'}</td>
+          <td><code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-family:monospace;font-weight:700;color:#0891b2;">${escapeHtml(v.codigo)}</code></td>
+          <td>${escapeHtml(v.telefone || '—')}</td>
+          <td><span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;background:${v.status === 'ativo' ? '#dcfce7' : '#fee2e2'};color:${v.status === 'ativo' ? '#166534' : '#991b1b'};">${v.status}</span></td>
+          <td style="text-align:center;">${v.totalIndicacoes}</td>
+          <td style="text-align:center;color:#16a34a;font-weight:600;">${v.totalAtivas}</td>
+          <td style="color:#16a34a;font-weight:600;">${fmtBRL(v.totalPago)}</td>
+          <td style="color:#f59e0b;font-weight:600;">${fmtBRL(v.totalPendente)}</td>
+          <td>
+            <button onclick="copiarLinkVendedor('${escapeAttr(v.codigo)}')" title="Copiar link de indicação" style="background:#0891b2;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin:1px;">🔗</button>
+            <button onclick="editarVendedor(${v.id})" title="Editar" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin:1px;">✏️</button>
+            <button onclick="abrirDefinirSenha(${v.id}, '${escapeAttr(v.nome)}')" title="Definir senha" style="background:#6366f1;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin:1px;">🔒</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="9" style="color:#dc2626;text-align:center;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function copiarLinkVendedor(codigo) {
+    const link = `${window.location.origin}/assinar?ref=${codigo}`;
+    navigator.clipboard.writeText(link).then(() => {
+      alert('✓ Link copiado!\n\n' + link);
+    }).catch(() => {
+      prompt('Copie o link abaixo:', link);
+    });
+  }
+
+  function abrirModalNovoVendedor() {
+    _vendedorEditId = null;
+    document.getElementById('mv-titulo').textContent = 'Novo Vendedor';
+    document.getElementById('mv-nome').value = '';
+    document.getElementById('mv-telefone').value = '';
+    document.getElementById('mv-email').value = '';
+    document.getElementById('mv-status').value = 'ativo';
+    document.getElementById('mv-tipo-pix').value = '';
+    document.getElementById('mv-chave-pix').value = '';
+    document.getElementById('mv-obs').value = '';
+    document.getElementById('modal-vendedor').classList.add('open');
+  }
+
+  function editarVendedor(id) {
+    const v = _vendedores.find(x => x.id === id);
+    if (!v) return;
+    _vendedorEditId = id;
+    document.getElementById('mv-titulo').textContent = `Editar: ${v.nome} (código ${v.codigo})`;
+    document.getElementById('mv-nome').value = v.nome || '';
+    document.getElementById('mv-telefone').value = v.telefone || '';
+    document.getElementById('mv-email').value = v.email || '';
+    document.getElementById('mv-status').value = v.status || 'ativo';
+    document.getElementById('mv-tipo-pix').value = v.tipoPix || '';
+    document.getElementById('mv-chave-pix').value = v.chavePix || '';
+    document.getElementById('mv-obs').value = v.observacoes || '';
+    document.getElementById('modal-vendedor').classList.add('open');
+  }
+
+  function fecharModalVendedor() {
+    document.getElementById('modal-vendedor').classList.remove('open');
+  }
+
+  async function salvarVendedor() {
+    const nome = document.getElementById('mv-nome').value.trim();
+    if (!nome) { alert('Informe o nome.'); return; }
+    const payload = {
+      nome,
+      telefone: document.getElementById('mv-telefone').value.trim() || null,
+      email: document.getElementById('mv-email').value.trim() || null,
+      status: document.getElementById('mv-status').value,
+      tipoPix: document.getElementById('mv-tipo-pix').value || null,
+      chavePix: document.getElementById('mv-chave-pix').value.trim() || null,
+      observacoes: document.getElementById('mv-obs').value.trim() || null,
+    };
+    try {
+      if (_vendedorEditId) {
+        await api('PATCH', `/api/vendedores/${_vendedorEditId}`, payload);
+      } else {
+        await api('POST', '/api/vendedores', payload);
+      }
+      fecharModalVendedor();
+      await carregarVendedores();
+    } catch (e) { alert('Erro: ' + e.message); }
+  }
+
+  function abrirDefinirSenha(id, nome) {
+    _vendedorSenhaId = id;
+    document.querySelector('#modal-senha-vendedor h2').textContent = `Senha de ${nome}`;
+    document.getElementById('msv-senha').value = '';
+    document.getElementById('modal-senha-vendedor').classList.add('open');
+    setTimeout(() => document.getElementById('msv-senha').focus(), 100);
+  }
+
+  function fecharModalSenhaVendedor() {
+    document.getElementById('modal-senha-vendedor').classList.remove('open');
+  }
+
+  async function salvarSenhaVendedor() {
+    const senha = document.getElementById('msv-senha').value;
+    if (!senha || senha.length < 6) { alert('Senha deve ter pelo menos 6 caracteres.'); return; }
+    try {
+      await api('POST', `/api/vendedores/${_vendedorSenhaId}/definir-senha`, { senha });
+      fecharModalSenhaVendedor();
+      await carregarVendedores();
+      alert('✓ Senha definida.');
+    } catch (e) { alert('Erro: ' + e.message); }
+  }
+
+  // ====== COMISSÕES ======
+  async function carregarComissoes() {
+    const tbody = document.getElementById('tbody-comissoes');
+    if (!tbody) return;
+    try {
+      const c = await api('GET', '/api/vendedores/comissoes/todas');
+      if (c.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:20px;">Nenhuma comissão registrada ainda. Comissões aparecem aqui quando o primeiro cliente indicado paga.</td></tr>';
+        return;
+      }
+      const hoje = new Date().toISOString().slice(0, 10);
+      tbody.innerHTML = c.map(x => {
+        const liberacao = String(x.data_liberacao).slice(0, 10);
+        const disponivel = liberacao <= hoje;
+        const statusColors = { pendente: '#f59e0b', paga: '#16a34a', cancelada: '#94a3b8' };
+        const cor = statusColors[x.status] || '#475569';
+        return `
+          <tr>
+            <td>${new Date(x.data_venda).toLocaleDateString('pt-BR')}</td>
+            <td><b>${escapeHtml(x.vendedor_nome)}</b><br><small style="color:#94a3b8;">${escapeHtml(x.vendedor_codigo)}</small></td>
+            <td>${escapeHtml(x.empresa_nome)}</td>
+            <td>${escapeHtml(x.plano)}</td>
+            <td>${fmtBRL(x.valor_venda)}</td>
+            <td>${x.percentual}%</td>
+            <td style="font-weight:700;color:#16a34a;">${fmtBRL(x.valor_comissao)}</td>
+            <td>${new Date(x.data_liberacao).toLocaleDateString('pt-BR')}${disponivel && x.status === 'pendente' ? ' <span style="color:#16a34a;font-weight:700;">✓</span>' : ''}</td>
+            <td><span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;background:${cor}22;color:${cor};">${x.status}</span></td>
+            <td>
+              ${x.status === 'pendente' && disponivel ? `<button onclick="marcarComissaoPaga(${x.id})" style="background:#16a34a;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;" title="Marcar como paga">✓ Pagar</button>` : ''}
+              ${x.status === 'pendente' ? `<button onclick="cancelarComissao(${x.id})" style="background:#dc2626;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-left:2px;" title="Cancelar (ex: cliente cancelou)">✗</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="10" style="color:#dc2626;text-align:center;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  async function marcarComissaoPaga(id) {
+    if (!confirm('Confirmar pagamento desta comissão?')) return;
+    try {
+      await api('POST', `/api/vendedores/comissoes/${id}/marcar-paga`, {});
+      await Promise.all([carregarComissoes(), carregarVendedores()]);
+    } catch (e) { alert('Erro: ' + e.message); }
+  }
+
+  async function cancelarComissao(id) {
+    const motivo = prompt('Motivo do cancelamento? (ex: cliente cancelou nos 30 dias)');
+    if (motivo === null) return;
+    try {
+      await api('POST', `/api/vendedores/comissoes/${id}/cancelar`, { motivo });
+      await Promise.all([carregarComissoes(), carregarVendedores()]);
+    } catch (e) { alert('Erro: ' + e.message); }
   }
 </script>
 </body>

@@ -14,6 +14,7 @@ app.use(express.json({ limit: '5mb' }));
 // Rotas públicas (sem auth)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/assinaturas', require('./routes/assinaturas'));
+app.use('/api/vendedores', require('./routes/vendedores'));
 
 // Catálogo público — tem rotas com e sem auth (controle interno na própria rota)
 app.use('/api/catalogo', require('./routes/catalogo'));
@@ -41,6 +42,9 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 
 // URLs amigáveis (sem .html)
 app.get('/assinar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinar.html')));
+app.get('/vendedor', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'vendedor.html'));
+});
 app.get('/assinatura-sucesso', (req, res) => res.sendFile(path.join(__dirname, 'public', 'assinatura-sucesso.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/renovar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'renovar.html')));

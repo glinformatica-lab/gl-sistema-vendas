@@ -40,7 +40,7 @@ function emailValido(e) {
 // Body: { plano, empresa, cnpj?, telefone?, nomeAdmin, emailAdmin, senhaAdmin }
 // Cria empresa em "aguardando-pagamento" + admin + assinatura + checkout PagBank.
 router.post('/iniciar', async (req, res) => {
-  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
+  const { plano, empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, refVendedor } = req.body || {};
 
   // Validações de entrada
   if (!plano || !PLANOS[plano]) {
@@ -81,11 +81,27 @@ router.post('/iniciar', async (req, res) => {
     // Cria empresa em "aguardando-pagamento" (origem = auto-assinatura)
     // Calcula o valor mensal (anual divide por 12, outros usam direto)
     const valorMensalCalc = planoConfig.meses > 1 ? (planoConfig.valor / planoConfig.meses) : planoConfig.valor;
+
+    // Verifica código de indicação (vendedor)
+    let vendedorId = null;
+    if (refVendedor) {
+      const codigo = String(refVendedor).trim();
+      if (/^\d{6}$/.test(codigo)) {
+        try {
+          const vend = await client.query('SELECT id FROM vendedores WHERE codigo = $1 AND status = $2', [codigo, 'ativo']);
+          if (vend.rows.length > 0) vendedorId = vend.rows[0].id;
+        } catch (e) {
+          // Se tabela ainda não existe (migration não rodada), ignora silenciosamente
+          console.warn('[iniciar] Não conseguiu verificar vendedor:', e.message);
+        }
+      }
+    }
+
     const empResult = await client.query(
-      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, valor_mensalidade, origem)
-       VALUES ($1, $2, $3, 'aguardando-pagamento', $4, $5, 'auto-assinatura') RETURNING *`,
+      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, valor_mensalidade, origem, vendedor_id)
+       VALUES ($1, $2, $3, 'aguardando-pagamento', $4, $5, 'auto-assinatura', $6) RETURNING *`,
       [empresa.trim(), cnpj || null, telefone || null, plano,
-       valorMensalCalc]
+       valorMensalCalc, vendedorId]
     );
     const novaEmpresa = empResult.rows[0];
 
@@ -212,7 +228,7 @@ router.get('/:ref', async (req, res) => {
 
 // === POST /api/assinaturas/trial === Cria empresa com 7 dias grátis (sem pagamento)
 router.post('/trial', async (req, res) => {
-  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin } = req.body || {};
+  const { empresa, cnpj, telefone, nomeAdmin, emailAdmin, senhaAdmin, refVendedor } = req.body || {};
   if (!empresa || !empresa.trim()) return res.status(400).json({ error: 'Informe o nome da empresa.' });
   if (!nomeAdmin || !nomeAdmin.trim()) return res.status(400).json({ error: 'Informe o nome do administrador.' });
   if (!emailValido(emailAdmin)) return res.status(400).json({ error: 'E-mail inválido.' });
@@ -247,10 +263,25 @@ router.post('/trial', async (req, res) => {
     const dataVenc = new Date();
     dataVenc.setDate(dataVenc.getDate() + 7);
     const vencIso = dataVenc.toISOString().slice(0, 10);
+
+    // Verifica código de indicação (vendedor)
+    let vendedorId = null;
+    if (refVendedor) {
+      const codigo = String(refVendedor).trim();
+      if (/^\d{6}$/.test(codigo)) {
+        try {
+          const vend = await client.query('SELECT id FROM vendedores WHERE codigo = $1 AND status = $2', [codigo, 'ativo']);
+          if (vend.rows.length > 0) vendedorId = vend.rows[0].id;
+        } catch (e) {
+          console.warn('[trial] Não conseguiu verificar vendedor:', e.message);
+        }
+      }
+    }
+
     const empResult = await client.query(
-      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, data_vencimento, valor_mensalidade, origem)
-       VALUES ($1, $2, $3, 'trial', 'trial', $4, 0, 'auto-assinatura') RETURNING *`,
-      [empresa.trim(), cnpj || null, telefone || null, vencIso]
+      `INSERT INTO empresas (nome, cnpj, telefone, status, plano, data_vencimento, valor_mensalidade, origem, vendedor_id)
+       VALUES ($1, $2, $3, 'trial', 'trial', $4, 0, 'auto-assinatura', $5) RETURNING *`,
+      [empresa.trim(), cnpj || null, telefone || null, vencIso, vendedorId]
     );
     const novaEmpresa = empResult.rows[0];
     // Cria admin
@@ -587,13 +618,46 @@ async function processarPagamento(referencia, dadosPedido) {
       }
 
       // Registra pagamento na tabela pagamentos (mesma usada pelo Master)
-      await client.query(
+      const pagInsert = await client.query(
         `INSERT INTO pagamentos (empresa_id, valor, data_pagamento, plano_aplicado,
                                  meses_adicionados, novo_vencimento, forma_pagamento, observacao)
-         VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6,$7)`,
+         VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6,$7) RETURNING id`,
         [assin.empresa_id, assin.valor, assin.plano, meses, vencIso,
          forma || 'PagBank', `Auto-assinatura ${referencia}`]
       );
+      const pagamentoId = pagInsert.rows[0].id;
+
+      // === COMISSÃO DE VENDEDOR (se empresa foi indicada) ===
+      try {
+        const rEmpVend = await client.query(
+          `SELECT vendedor_id FROM empresas WHERE id = $1 AND vendedor_id IS NOT NULL`,
+          [assin.empresa_id]
+        );
+        if (rEmpVend.rows.length > 0) {
+          const vendedorId = rEmpVend.rows[0].vendedor_id;
+          // Verifica se já não existe comissão pra esta empresa (só na PRIMEIRA venda paga)
+          const rExist = await client.query(
+            `SELECT id FROM comissoes WHERE empresa_id = $1 LIMIT 1`,
+            [assin.empresa_id]
+          );
+          if (rExist.rows.length === 0) {
+            // Regras: mensal = 100%; anual = 15%
+            const planosAnuais = ['anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual'];
+            const percentual = planosAnuais.includes(assin.plano) ? 15 : 100;
+            const valorComissao = +(parseFloat(assin.valor) * (percentual / 100)).toFixed(2);
+            // Data de liberação = data do pagamento + 30 dias (regra 30 dias)
+            await client.query(
+              `INSERT INTO comissoes (vendedor_id, empresa_id, pagamento_id, plano, valor_venda, percentual, valor_comissao, data_venda, data_liberacao, status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', 'pendente')`,
+              [vendedorId, assin.empresa_id, pagamentoId, assin.plano, parseFloat(assin.valor), percentual, valorComissao]
+            );
+            console.log(`[webhook] ✓ Comissão criada: vendedor ${vendedorId}, valor R$ ${valorComissao} (${percentual}%), liberação em 30 dias`);
+          }
+        }
+      } catch (e) {
+        // Se a tabela comissoes não existe ainda (migration v23 não rodou), ignora
+        console.warn('[webhook] Não conseguiu criar comissão:', e.message);
+      }
 
       console.log(`[webhook] ✓ Assinatura ${referencia} paga, empresa ${assin.empresa_id} ativada até ${vencIso}`);
 
