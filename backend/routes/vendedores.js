@@ -1,6 +1,6 @@
 // routes/vendedores.js — Sistema de vendedores + comissões
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const db = require('../db');
