@@ -2,142 +2,372 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Painel do Vendedor — GL Sistema</title>
+  <title>Painel do Revendedor — GL Sistema</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #263449;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%); min-height: 100vh; color: #1e293b; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #0c4a6e, #1e3a8a); color: #fff; padding: 20px 24px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
-    .header .logo { font-size: 20px; font-weight: 800; }
-    .header .logo span { font-weight: 400; opacity: 0.85; }
-    .header .info { text-align: right; font-size: 14px; }
-    .btn-sair { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      background-image: radial-gradient(at 20% 0%, rgba(56,189,248,0.08) 0, transparent 50%),
+                        radial-gradient(at 80% 100%, rgba(168,85,247,0.06) 0, transparent 50%);
+      min-height: 100vh;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    a { color: var(--accent); text-decoration: none; }
+    code { font-family: 'SF Mono', Consolas, monospace; }
 
-    /* Login */
-    .login-box { max-width: 420px; margin: 60px auto; background: #fff; padding: 30px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-    .login-box h1 { color: #0c4a6e; font-size: 24px; margin-bottom: 8px; text-align: center; }
-    .login-box p { color: #475569; font-size: 13px; text-align: center; margin-bottom: 20px; }
-    .login-box label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin: 12px 0 6px; }
-    .login-box input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
-    .login-box button { width: 100%; background: #1e3a8a; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 16px; }
-    .login-box button:hover { background: #0c4a6e; }
-    .erro { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+    /* ==== LOGIN ==== */
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login-box {
+      max-width: 440px; width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 40px 32px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(56,189,248,0.05);
+    }
+    .login-box h1 {
+      font-size: 26px; font-weight: 800; margin-bottom: 6px;
+      background: linear-gradient(90deg, #38bdf8, #a855f7);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .login-box .subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 28px; }
+    .login-box label {
+      display: block; font-size: 12px; font-weight: 600; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 6px;
+    }
+    .login-box input {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      font-size: 15px; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .login-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,0.15); }
+    .login-box input#lv-codigo { text-align: center; letter-spacing: 4px; font-family: 'SF Mono', Consolas, monospace; font-size: 18px; font-weight: 700; }
+    .btn-entrar {
+      width: 100%; margin-top: 22px;
+      background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+      color: #fff; border: none; padding: 13px;
+      border-radius: 10px; font-weight: 700; font-size: 15px; cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 4px 14px rgba(14,165,233,0.35);
+    }
+    .btn-entrar:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(14,165,233,0.45); }
+    .btn-entrar:disabled { opacity: 0.6; cursor: wait; }
+    .erro {
+      background: rgba(239,68,68,0.1); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3);
+      padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none;
+    }
+    .footer-signup {
+      margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); text-align: center;
+    }
+    .footer-signup .titulo { font-size: 13px; color: var(--text-dim); font-weight: 600; margin-bottom: 6px; }
+    .footer-signup .desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.6; }
+    .btn-whatsapp {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #25D366; color: #fff;
+      padding: 11px 22px; border-radius: 10px; font-weight: 700; font-size: 14px;
+      box-shadow: 0 4px 14px rgba(37,211,102,0.35);
+      transition: transform 0.1s;
+    }
+    .btn-whatsapp:hover { transform: translateY(-1px); color: #fff; }
 
-    /* Painel */
-    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
-    .card { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .card .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; }
-    .card .valor { font-size: 24px; font-weight: 900; }
-    .card .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
-    .card.azul { border-left: 4px solid #0891b2; } .card.azul .lbl { color: #0891b2; } .card.azul .valor { color: #0c4a6e; }
-    .card.verde { border-left: 4px solid #16a34a; } .card.verde .lbl { color: #16a34a; } .card.verde .valor { color: #166534; }
-    .card.amarelo { border-left: 4px solid #f59e0b; } .card.amarelo .lbl { color: #f59e0b; } .card.amarelo .valor { color: #92400e; }
-    .card.vermelho { border-left: 4px solid #dc2626; } .card.vermelho .lbl { color: #dc2626; } .card.vermelho .valor { color: #991b1b; }
+    /* ==== TOP HEADER (painel) ==== */
+    .top-header {
+      background: rgba(30,41,59,0.7); backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      padding: 18px 24px; border-radius: 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 22px;
+    }
+    .top-header .brand { display: flex; align-items: center; gap: 12px; }
+    .top-header .brand-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: 0 4px 12px rgba(14,165,233,0.4);
+    }
+    .top-header .brand-text .titulo { font-size: 17px; font-weight: 800; }
+    .top-header .brand-text .sub { font-size: 12px; color: var(--text-dim); }
+    .top-header .user-info { display: flex; align-items: center; gap: 14px; }
+    .top-header .user-info .txt { text-align: right; }
+    .top-header .user-info .txt .nome { font-weight: 700; font-size: 14px; }
+    .top-header .user-info .txt .codigo {
+      font-size: 12px; color: var(--text-dim); font-family: 'SF Mono', Consolas, monospace;
+      background: var(--bg); padding: 2px 8px; border-radius: 6px; margin-top: 2px; display: inline-block;
+    }
+    .btn-sair {
+      background: rgba(239,68,68,0.1); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3);
+      padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-sair:hover { background: rgba(239,68,68,0.2); }
 
-    .filtros { background: #fff; padding: 14px 18px; border-radius: 10px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .filtros label { font-size: 13px; font-weight: 600; color: #334155; }
-    .filtros select, .filtros input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    /* ==== META BOX ==== */
+    .meta-box {
+      background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(56,189,248,0.08));
+      border: 1px solid rgba(16,185,129,0.3);
+      padding: 20px 24px; border-radius: 14px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    }
+    .meta-box.miss {
+      background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.06));
+      border-color: rgba(245,158,11,0.3);
+    }
+    .meta-box .icon { font-size: 40px; }
+    .meta-box .info { flex: 1; min-width: 200px; }
+    .meta-box .titulo-meta { font-size: 18px; font-weight: 800; margin-bottom: 2px; color: var(--text); }
+    .meta-box .desc-meta { font-size: 13px; color: var(--text-dim); }
+    .meta-box .desc-meta b { color: var(--green); }
+    .meta-box.miss .desc-meta b { color: var(--amber); }
+    .meta-progress {
+      min-width: 180px; text-align: right;
+    }
+    .meta-progress .contador { font-size: 32px; font-weight: 900; line-height: 1; color: var(--green); }
+    .meta-box.miss .meta-progress .contador { color: var(--amber); }
+    .meta-progress .contador span { color: var(--text-muted); font-size: 20px; }
+    .meta-progress .barra { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .meta-progress .barra > div { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); transition: width 0.5s; }
+    .meta-box.miss .meta-progress .barra > div { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 
-    .meta-box { background: linear-gradient(135deg, #dcfce7, #fff); border: 2px solid #16a34a; padding: 14px 18px; border-radius: 10px; margin-bottom: 14px; }
-    .meta-box.miss { background: linear-gradient(135deg, #fef3c7, #fff); border-color: #f59e0b; }
-    .meta-box h3 { color: #15803d; font-size: 16px; margin-bottom: 6px; }
-    .meta-box.miss h3 { color: #92400e; }
+    /* ==== CARDS ==== */
+    .cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px; margin-bottom: 22px;
+    }
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 18px 20px; border-radius: 14px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .card:hover { transform: translateY(-2px); border-color: rgba(56,189,248,0.3); }
+    .card .top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .card .icon-box {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .card.azul .icon-box { background: rgba(56,189,248,0.15); color: #38bdf8; }
+    .card.verde .icon-box { background: rgba(16,185,129,0.15); color: #10b981; }
+    .card.amber .icon-box { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .card.purple .icon-box { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .card .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); font-weight: 700; }
+    .card .valor { font-size: 26px; font-weight: 900; color: var(--text); margin-top: 2px; }
+    .card .sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 
-    table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-collapse: collapse; margin-bottom: 20px; }
-    thead { background: #f1f5f9; }
-    th, td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
-    th { font-weight: 700; color: #334155; text-transform: uppercase; font-size: 11px; }
-    .status-badge { padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; }
-    .status-pendente { background: #fef3c7; color: #92400e; }
-    .status-paga { background: #dcfce7; color: #166534; }
-    .status-cancelada { background: #f1f5f9; color: #64748b; }
+    /* ==== LINK DE INDICAÇÃO ==== */
+    .link-box {
+      background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(56,189,248,0.08));
+      border: 1px solid rgba(168,85,247,0.25);
+      padding: 18px 22px; border-radius: 14px; margin-bottom: 22px;
+    }
+    .link-box .titulo { font-size: 13px; color: var(--text-dim); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .link-box .link-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .link-box .link-url {
+      flex: 1; min-width: 200px;
+      background: var(--bg); padding: 12px 16px; border-radius: 10px;
+      font-family: 'SF Mono', Consolas, monospace; font-size: 13px; color: var(--accent);
+      border: 1px solid var(--border); overflow-x: auto; white-space: nowrap;
+    }
+    .btn-copy {
+      background: linear-gradient(90deg, #7c3aed, #a855f7);
+      color: #fff; border: none; padding: 12px 20px; border-radius: 10px;
+      font-weight: 700; font-size: 13px; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(168,85,247,0.35);
+      transition: transform 0.1s;
+    }
+    .btn-copy:hover { transform: translateY(-1px); }
 
-    .box-info { background: #f0f9ff; border: 1px solid #0891b2; color: #0c4a6e; padding: 12px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+    /* ==== INFO BOX ==== */
+    .info-box {
+      background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25);
+      color: #7dd3fc; padding: 14px 18px; border-radius: 12px; font-size: 13px; line-height: 1.6;
+      margin-bottom: 22px;
+    }
+    .info-box b { color: var(--text); }
+
+    /* ==== FILTROS ==== */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 12px; }
+    .section-header h2 { font-size: 18px; font-weight: 800; color: var(--text); }
+    .filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filtros label { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+    .filtros select {
+      padding: 8px 12px; background: var(--bg-card); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; font-size: 13px; cursor: pointer;
+      font-family: inherit;
+    }
+    .filtros select:focus { outline: none; border-color: var(--accent); }
+
+    /* ==== TABELA ==== */
+    .table-wrap {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; margin-bottom: 22px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: rgba(255,255,255,0.03); }
+    th, td { padding: 12px 16px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
+    th { font-weight: 700; color: var(--text-dim); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr:last-child td { border-bottom: none; }
+    td.destaque { font-weight: 700; color: var(--green); }
+    .status-badge {
+      padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .status-pendente { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .status-paga { background: rgba(16,185,129,0.15); color: #34d399; }
+    .status-cancelada { background: rgba(148,163,184,0.15); color: var(--text-dim); }
+
+    .empty-state {
+      padding: 60px 20px; text-align: center; color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; opacity: 0.4; margin-bottom: 12px; }
+
+    @media (max-width: 640px) {
+      .container { padding: 14px; }
+      .meta-box { text-align: center; flex-direction: column; }
+      .meta-progress { text-align: center; }
+      th, td { padding: 10px; font-size: 12px; }
+    }
   </style>
 </head>
 <body>
-  <!-- Login -->
-  <div id="login-box" class="login-box">
-    <h1>🤝 Painel do Vendedor</h1>
-    <p>Acompanhe suas vendas e comissões do GL Sistema</p>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-wrap" class="login-wrap">
+  <div class="login-box">
+    <h1>Painel do Revendedor</h1>
+    <p class="subtitle">Acompanhe suas indicações, comissões e metas</p>
+
     <label>Seu código (6 dígitos)</label>
-    <input id="lv-codigo" placeholder="000000" maxlength="6" autocomplete="off">
+    <input id="lv-codigo" placeholder="000000" maxlength="6" autocomplete="off" inputmode="numeric">
+
     <label>Senha</label>
-    <input id="lv-senha" type="password" placeholder="••••••••">
-    <button onclick="loginVendedor()">Entrar</button>
+    <input id="lv-senha" type="password" placeholder="••••••••" autocomplete="current-password">
+
+    <button class="btn-entrar" onclick="loginVendedor()">Entrar</button>
     <div id="lv-erro" class="erro"></div>
 
-    <!-- Bloco: Ainda não é vendedor? -->
-    <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:center;">
-      <div style="font-size:13px;color:#475569;margin-bottom:10px;font-weight:600;">
-        Ainda não é vendedor?
-      </div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.5;">
-        Ganhe comissões vendendo o GL Sistema.<br>
-        Fale conosco e saiba mais!
-      </div>
-      <a href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20como%20me%20tornar%20um%20vendedor%20do%20GL%20Sistema"
-         target="_blank" rel="noopener"
-         style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:11px 20px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;box-shadow:0 3px 8px rgba(37,211,102,0.25);">
-        📱 Quero ser vendedor
+    <div class="footer-signup">
+      <div class="titulo">Ainda não é revendedor?</div>
+      <div class="desc">Ganhe comissões vendendo o GL Sistema. Fale conosco e saiba como começar!</div>
+      <a class="btn-whatsapp" target="_blank" rel="noopener"
+         href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20como%20me%20tornar%20um%20revendedor%20do%20GL%20Sistema">
+        📱 Quero ser revendedor
       </a>
     </div>
   </div>
+</div>
 
-  <!-- Painel -->
-  <div id="painel" class="container" style="display:none;">
-    <div class="header">
-      <div>
-        <div class="logo">🤝 Painel do Vendedor</div>
-        <div style="font-size:12px;opacity:0.85;margin-top:2px;">GL Sistema de Vendas</div>
-      </div>
-      <div class="info">
-        <div><b id="v-nome">—</b></div>
-        <div style="font-size:12px;opacity:0.85;">Código: <b id="v-codigo">—</b></div>
-        <button class="btn-sair" onclick="logoutVendedor()">Sair</button>
+<!-- ============ PAINEL ============ -->
+<div id="painel" class="container" style="display:none;">
+  <!-- Top -->
+  <div class="top-header">
+    <div class="brand">
+      <div class="brand-icon">🤝</div>
+      <div class="brand-text">
+        <div class="titulo">Painel do Revendedor</div>
+        <div class="sub">GL Sistema de Vendas</div>
       </div>
     </div>
-
-    <!-- Meta -->
-    <div id="meta-box" class="meta-box">
-      <h3 id="meta-titulo">🎯 Meta do mês: 5 vendas</h3>
-      <div id="meta-detalhe" style="font-size:14px;color:#334155;">—</div>
-    </div>
-
-    <!-- Cards resumo -->
-    <div class="card-grid">
-      <div class="card azul">
-        <div class="lbl">Total de indicações</div>
-        <div class="valor" id="dash-indicacoes">0</div>
-        <div class="sub">Clientes que entraram pelo seu link</div>
+    <div class="user-info">
+      <div class="txt">
+        <div class="nome" id="v-nome">—</div>
+        <div class="codigo">Cód: <span id="v-codigo">—</span></div>
       </div>
-      <div class="card verde">
+      <button class="btn-sair" onclick="logoutVendedor()">Sair</button>
+    </div>
+  </div>
+
+  <!-- Meta -->
+  <div id="meta-box" class="meta-box">
+    <div class="icon" id="meta-icon">🎯</div>
+    <div class="info">
+      <div class="titulo-meta" id="meta-titulo">Meta do mês</div>
+      <div class="desc-meta" id="meta-detalhe">Carregando...</div>
+    </div>
+    <div class="meta-progress">
+      <div class="contador"><span id="meta-atual">0</span><span>/5</span></div>
+      <div class="barra"><div id="meta-barra" style="width:0%;"></div></div>
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards">
+    <div class="card azul">
+      <div class="top">
+        <div class="icon-box">📊</div>
+        <div class="lbl">Indicações totais</div>
+      </div>
+      <div class="valor" id="dash-indicacoes">0</div>
+      <div class="sub">Clientes que entraram pelo seu link</div>
+    </div>
+    <div class="card verde">
+      <div class="top">
+        <div class="icon-box">✅</div>
         <div class="lbl">Comissões pagas</div>
-        <div class="valor" id="dash-pago">R$ 0,00</div>
-        <div class="sub">Total que você já recebeu</div>
       </div>
-      <div class="card amarelo">
+      <div class="valor" id="dash-pago">R$ 0,00</div>
+      <div class="sub">Total que você já recebeu</div>
+    </div>
+    <div class="card amber">
+      <div class="top">
+        <div class="icon-box">💰</div>
         <div class="lbl">Liberadas — a receber</div>
-        <div class="valor" id="dash-liberado">R$ 0,00</div>
-        <div class="sub">Passou dos 30 dias, aguardando pagamento</div>
       </div>
-      <div class="card vermelho">
-        <div class="lbl">Aguardando 30 dias</div>
-        <div class="valor" id="dash-bloqueado">R$ 0,00</div>
-        <div class="sub">Ainda em período de proteção</div>
+      <div class="valor" id="dash-liberado">R$ 0,00</div>
+      <div class="sub">Passou dos 30 dias, aguardando pagamento</div>
+    </div>
+    <div class="card purple">
+      <div class="top">
+        <div class="icon-box">⏳</div>
+        <div class="lbl">Em análise (30 dias)</div>
       </div>
+      <div class="valor" id="dash-bloqueado">R$ 0,00</div>
+      <div class="sub">Período de proteção anti-cancelamento</div>
     </div>
+  </div>
 
-    <div class="box-info">
-      💡 <b>Como funciona:</b> a comissão de cada venda é <b>liberada após 30 dias</b> do pagamento do cliente
-      (proteção contra cancelamento). Depois disso, o pagamento é feito por PIX.
-      Se o cliente cancelar nos primeiros 30 dias, aquela comissão é cancelada.
+  <!-- Link de indicação -->
+  <div class="link-box">
+    <div class="titulo">🔗 Seu link de indicação</div>
+    <div class="link-row">
+      <div class="link-url" id="link-indicacao">carregando...</div>
+      <button class="btn-copy" onclick="copiarLink()">📋 Copiar link</button>
     </div>
+  </div>
 
-    <!-- Filtros -->
+  <!-- Info -->
+  <div class="info-box">
+    💡 <b>Como funciona:</b> a comissão de cada venda é <b>liberada após 30 dias</b> do pagamento do cliente
+    (proteção contra cancelamento). Depois disso, o pagamento é feito por PIX.
+    Se o cliente cancelar nos primeiros 30 dias, aquela comissão é cancelada.
+  </div>
+
+  <!-- Vendas -->
+  <div class="section-header">
+    <h2>📋 Minhas Vendas</h2>
     <div class="filtros">
-      <label>Filtrar por mês:</label>
+      <label>Mês:</label>
       <select id="filtro-mes" onchange="carregarVendas()">
         <option value="">Todos</option>
         <option value="01">Janeiro</option><option value="02">Fevereiro</option>
@@ -150,24 +380,28 @@
       <label>Ano:</label>
       <select id="filtro-ano" onchange="carregarVendas()"></select>
     </div>
+  </div>
 
-    <!-- Tabela -->
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>Data</th>
           <th>Cliente</th>
           <th>Plano</th>
-          <th>Valor Venda</th>
+          <th>Valor</th>
           <th>%</th>
-          <th>Sua Comissão</th>
+          <th>Sua comissão</th>
           <th>Liberação</th>
           <th>Status</th>
         </tr>
       </thead>
-      <tbody id="tbody-vendas"><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px;">Carregando...</td></tr></tbody>
+      <tbody id="tbody-vendas">
+        <tr><td colspan="8" class="empty-state">Carregando...</td></tr>
+      </tbody>
     </table>
   </div>
+</div>
 
 <script>
   const API = window.location.origin;
@@ -219,16 +453,18 @@
 
   function logoutVendedor() {
     delToken();
-    document.getElementById('login-box').style.display = '';
+    document.getElementById('login-wrap').style.display = '';
     document.getElementById('painel').style.display = 'none';
   }
 
   async function mostrarPainel() {
-    document.getElementById('login-box').style.display = 'none';
+    document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('painel').style.display = '';
     const v = JSON.parse(localStorage.getItem('vendedor-user') || '{}');
     document.getElementById('v-nome').textContent = v.nome || '';
     document.getElementById('v-codigo').textContent = v.codigo || '';
+    // Link de indicação
+    document.getElementById('link-indicacao').textContent = `${window.location.origin}/assinar?ref=${v.codigo}`;
     // Preenche anos
     const anoAtual = new Date().getFullYear();
     const selAno = document.getElementById('filtro-ano');
@@ -259,7 +495,7 @@
 
   async function carregarVendas() {
     const tbody = document.getElementById('tbody-vendas');
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Carregando...</td></tr>';
     const ano = document.getElementById('filtro-ano').value;
     const mes = document.getElementById('filtro-mes').value;
     let qs = '';
@@ -267,22 +503,13 @@
     if (mes) qs += (qs ? '&' : '?') + 'mes=' + mes;
     try {
       const d = await api('GET', '/api/vendedores/me/vendas' + qs);
-      // Atualiza meta
-      const box = document.getElementById('meta-box');
-      const tit = document.getElementById('meta-titulo');
-      const det = document.getElementById('meta-detalhe');
-      if (d.metaAtingida) {
-        box.classList.remove('miss');
-        tit.textContent = `🎉 Meta atingida! ${d.totalVendas} venda(s) no período`;
-        det.innerHTML = `Comissão do período: <b>${fmtBRL(d.totalComissao)}</b>. Parabéns! 🎁 Prêmio surpresa a caminho.`;
-      } else {
-        box.classList.add('miss');
-        const faltam = 5 - d.totalVendas;
-        tit.textContent = `🎯 ${d.totalVendas}/${d.metaMensal} vendas — faltam ${faltam}`;
-        det.innerHTML = `Comissão acumulada no período: <b>${fmtBRL(d.totalComissao)}</b>. Continue firme! 💪`;
-      }
+      atualizarMeta(d);
       if (d.vendas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px;">Nenhuma venda no período selecionado.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">
+          <div class="icon">📭</div>
+          <div>Nenhuma venda no período selecionado.</div>
+          <div style="font-size:12px;margin-top:8px;opacity:0.7;">Compartilhe seu link e comece a indicar!</div>
+        </td></tr>`;
         return;
       }
       const hoje = new Date().toISOString().slice(0, 10);
@@ -298,15 +525,53 @@
             <td>${escapeHtml(v.plano)}</td>
             <td>${fmtBRL(v.valor_venda)}</td>
             <td>${v.percentual}%</td>
-            <td style="font-weight:700;color:#16a34a;">${fmtBRL(v.valor_comissao)}</td>
+            <td class="destaque">${fmtBRL(v.valor_comissao)}</td>
             <td>${new Date(v.data_liberacao).toLocaleDateString('pt-BR')}${disponivel && v.status === 'pendente' ? ' ✓' : ''}</td>
             <td><span class="status-badge ${statusCls}">${statusLabel}</span></td>
           </tr>
         `;
       }).join('');
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="8" style="color:#dc2626;text-align:center;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:#fca5a5;">Erro: ${escapeHtml(e.message)}</td></tr>`;
     }
+  }
+
+  function atualizarMeta(d) {
+    const box = document.getElementById('meta-box');
+    const tit = document.getElementById('meta-titulo');
+    const det = document.getElementById('meta-detalhe');
+    const icon = document.getElementById('meta-icon');
+    const atualEl = document.getElementById('meta-atual');
+    const barra = document.getElementById('meta-barra');
+
+    const pct = Math.min(100, (d.totalVendas / d.metaMensal) * 100);
+    barra.style.width = pct + '%';
+    atualEl.textContent = d.totalVendas;
+
+    if (d.metaAtingida) {
+      box.classList.remove('miss');
+      icon.textContent = '🎉';
+      tit.textContent = 'Meta atingida! Parabéns!';
+      det.innerHTML = `Comissão do período: <b>${fmtBRL(d.totalComissao)}</b>. Prêmio surpresa a caminho! 🎁`;
+    } else {
+      box.classList.add('miss');
+      icon.textContent = '🎯';
+      const faltam = d.metaMensal - d.totalVendas;
+      tit.textContent = `Meta do mês: ${d.metaMensal} vendas`;
+      det.innerHTML = `Faltam <b>${faltam}</b> pra bater a meta. Comissão acumulada: <b>${fmtBRL(d.totalComissao)}</b>. 💪`;
+    }
+  }
+
+  function copiarLink() {
+    const link = document.getElementById('link-indicacao').textContent;
+    navigator.clipboard.writeText(link).then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copiado!';
+      setTimeout(() => btn.textContent = orig, 1500);
+    }).catch(() => {
+      prompt('Copie o link abaixo:', link);
+    });
   }
 
   // Enter no login
