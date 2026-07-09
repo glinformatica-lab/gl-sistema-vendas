@@ -1013,7 +1013,7 @@
     document.getElementById('mv-tipo-pix').value = '';
     document.getElementById('mv-chave-pix').value = '';
     document.getElementById('mv-obs').value = '';
-    document.getElementById('modal-vendedor').classList.add('open');
+    document.getElementById('modal-vendedor').classList.add('show');
   }
 
   function editarVendedor(id) {
@@ -1028,11 +1028,11 @@
     document.getElementById('mv-tipo-pix').value = v.tipoPix || '';
     document.getElementById('mv-chave-pix').value = v.chavePix || '';
     document.getElementById('mv-obs').value = v.observacoes || '';
-    document.getElementById('modal-vendedor').classList.add('open');
+    document.getElementById('modal-vendedor').classList.add('show');
   }
 
   function fecharModalVendedor() {
-    document.getElementById('modal-vendedor').classList.remove('open');
+    document.getElementById('modal-vendedor').classList.remove('show');
   }
 
   async function salvarVendedor() {
@@ -1062,12 +1062,12 @@
     _vendedorSenhaId = id;
     document.querySelector('#modal-senha-vendedor h2').textContent = `Senha de ${nome}`;
     document.getElementById('msv-senha').value = '';
-    document.getElementById('modal-senha-vendedor').classList.add('open');
+    document.getElementById('modal-senha-vendedor').classList.add('show');
     setTimeout(() => document.getElementById('msv-senha').focus(), 100);
   }
 
   function fecharModalSenhaVendedor() {
-    document.getElementById('modal-senha-vendedor').classList.remove('open');
+    document.getElementById('modal-senha-vendedor').classList.remove('show');
   }
 
   async function salvarSenhaVendedor() {
