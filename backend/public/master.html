@@ -967,7 +967,7 @@
     const tbody = document.getElementById('tbody-vendedores');
     if (!tbody) return;
     try {
-      _vendedores = await api('GET', '/api/vendedores');
+      _vendedores = await api('GET', '/api/master-vendedores');
       if (_vendedores.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">Nenhum vendedor cadastrado. Clique em "+ Novo Vendedor" pra começar.</td></tr>';
         return;
@@ -1049,9 +1049,9 @@
     };
     try {
       if (_vendedorEditId) {
-        await api('PATCH', `/api/vendedores/${_vendedorEditId}`, payload);
+        await api('PATCH', `/api/master-vendedores/${_vendedorEditId}`, payload);
       } else {
-        await api('POST', '/api/vendedores', payload);
+        await api('POST', '/api/master-vendedores', payload);
       }
       fecharModalVendedor();
       await carregarVendedores();
@@ -1074,7 +1074,7 @@
     const senha = document.getElementById('msv-senha').value;
     if (!senha || senha.length < 6) { alert('Senha deve ter pelo menos 6 caracteres.'); return; }
     try {
-      await api('POST', `/api/vendedores/${_vendedorSenhaId}/definir-senha`, { senha });
+      await api('POST', `/api/master-vendedores/${_vendedorSenhaId}/definir-senha`, { senha });
       fecharModalSenhaVendedor();
       await carregarVendedores();
       alert('✓ Senha definida.');
@@ -1086,7 +1086,7 @@
     const tbody = document.getElementById('tbody-comissoes');
     if (!tbody) return;
     try {
-      const c = await api('GET', '/api/vendedores/comissoes/todas');
+      const c = await api('GET', '/api/master-vendedores/comissoes/todas');
       if (c.length === 0) {
         tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:20px;">Nenhuma comissão registrada ainda. Comissões aparecem aqui quando o primeiro cliente indicado paga.</td></tr>';
         return;
@@ -1123,7 +1123,7 @@
   async function marcarComissaoPaga(id) {
     if (!confirm('Confirmar pagamento desta comissão?')) return;
     try {
-      await api('POST', `/api/vendedores/comissoes/${id}/marcar-paga`, {});
+      await api('POST', `/api/master-vendedores/comissoes/${id}/marcar-paga`, {});
       await Promise.all([carregarComissoes(), carregarVendedores()]);
     } catch (e) { alert('Erro: ' + e.message); }
   }
@@ -1132,7 +1132,7 @@
     const motivo = prompt('Motivo do cancelamento? (ex: cliente cancelou nos 30 dias)');
     if (motivo === null) return;
     try {
-      await api('POST', `/api/vendedores/comissoes/${id}/cancelar`, { motivo });
+      await api('POST', `/api/master-vendedores/comissoes/${id}/cancelar`, { motivo });
       await Promise.all([carregarComissoes(), carregarVendedores()]);
     } catch (e) { alert('Erro: ' + e.message); }
   }
