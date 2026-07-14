@@ -52,6 +52,15 @@
       <div class="toggle">Ainda não tem conta? <a onclick="toggleForm('cadastro')">Cadastrar minha empresa</a></div>
     </div>
 
+    <!-- ESCOLHER EMPRESA (quando mesmo email tem múltiplas empresas) -->
+    <div id="form-escolher-empresa" style="display:none;">
+      <h1>Escolha uma empresa</h1>
+      <div class="sub">Sua conta está vinculada a várias empresas. Selecione qual deseja acessar agora.</div>
+      <div id="lista-empresas" style="display:flex;flex-direction:column;gap:10px;margin:16px 0;"></div>
+      <div class="erro" id="esc-erro"></div>
+      <button type="button" class="btn" onclick="voltarPraLogin()" style="background:#eceef2;color:var(--azul);margin-top:8px;">Voltar</button>
+    </div>
+
     <!-- CADASTRO -->
     <div id="form-cadastro" style="display:none;">
       <h1>Cadastrar empresa</h1>
@@ -131,6 +140,14 @@
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Erro ao entrar');
+
+      // Se backend pediu pra escolher empresa (email vinculado a múltiplas)
+      if (data.precisaEscolherEmpresa && Array.isArray(data.empresas)) {
+        mostrarEscolhaEmpresa(data.empresas);
+        return;
+      }
+
+      if (!data.token) throw new Error('Token não recebido do servidor. Tente novamente.');
       localStorage.setItem('token', data.token);
       localStorage.setItem('usuario', JSON.stringify(data.usuario));
       localStorage.setItem('empresa', JSON.stringify(data.empresa));
@@ -173,6 +190,73 @@
       btn.disabled = false; btn.textContent = 'Criar conta';
     }
   });
+
+  // ============ ESCOLHA DE EMPRESA (multi-empresa) ============
+  let _senhaCache = null; // Guarda a senha em memória pra reenvia no login com empresaId
+
+  function mostrarEscolhaEmpresa(empresas) {
+    // Guarda a senha digitada em memória (pra reusar no login com empresaId)
+    _senhaCache = document.getElementById('login-senha').value;
+    // Esconde login, mostra escolha
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-cadastro').style.display = 'none';
+    document.getElementById('form-escolher-empresa').style.display = 'block';
+    // Popula lista
+    const lista = document.getElementById('lista-empresas');
+    lista.innerHTML = empresas.map(e => {
+      const statusCor = e.status === 'ativa' || e.status === 'trial' ? '#16a34a' : '#f59e0b';
+      const statusTxt = e.status === 'ativa' ? '✓ Ativa'
+                      : e.status === 'trial' ? '⏱ Teste grátis'
+                      : e.status === 'vencida' ? '⚠ Vencida'
+                      : '● ' + e.status;
+      return `
+        <button type="button" onclick="escolherEmpresa(${e.id})"
+                style="background:#fff;border:2px solid #e2e8f0;padding:14px 16px;border-radius:10px;text-align:left;cursor:pointer;transition:all 0.15s;display:flex;justify-content:space-between;align-items:center;gap:12px;"
+                onmouseover="this.style.borderColor='#0891b2';this.style.background='#f0f9ff';"
+                onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff';">
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:15px;color:#1e3a8a;">${escapeHtmlLogin(e.nome)}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">Plano: ${escapeHtmlLogin(e.plano || '—')}</div>
+          </div>
+          <div style="font-size:11px;font-weight:700;color:${statusCor};">${statusTxt}</div>
+          <div style="color:#0891b2;font-size:20px;">→</div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function voltarPraLogin() {
+    document.getElementById('form-escolher-empresa').style.display = 'none';
+    document.getElementById('form-login').style.display = 'block';
+    _senhaCache = null;
+  }
+
+  async function escolherEmpresa(empresaId) {
+    const email = document.getElementById('login-email').value.trim();
+    const senha = _senhaCache;
+    if (!senha) { voltarPraLogin(); return; }
+    document.getElementById('esc-erro').classList.remove('show');
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha, empresaId })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao entrar');
+      if (!data.token) throw new Error('Token não recebido do servidor.');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('usuario', JSON.stringify(data.usuario));
+      localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      _senhaCache = null;
+      window.location.href = '/index.html';
+    } catch (err) {
+      showErr('esc-erro', err.message);
+    }
+  }
+
+  function escapeHtmlLogin(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
 </script>
 </body>
 </html>
