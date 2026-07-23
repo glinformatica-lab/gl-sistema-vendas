@@ -4920,6 +4920,16 @@ https://sistema.glinformatica.com.br
       if (localStorage.getItem('multiEmpresa') === '1') {
         const btnTrocar = document.getElementById('btn-trocar-empresa');
         if (btnTrocar) btnTrocar.style.display = '';
+      } else {
+        // Verificação defensiva: chama /api/auth/minhas-empresas pra descobrir
+        // (cobre casos de tokens antigos onde multiEmpresa não foi salvo no login)
+        api('GET', '/api/auth/minhas-empresas').then(r => {
+          if (r && Array.isArray(r.empresas) && r.empresas.length > 1) {
+            localStorage.setItem('multiEmpresa', '1');
+            const btnTrocar = document.getElementById('btn-trocar-empresa');
+            if (btnTrocar) btnTrocar.style.display = '';
+          }
+        }).catch(() => {}); // silencioso — se falhar não é crítico
       }
       // Banner de licença (trial / vencimento próximo / expirado)
       try {

@@ -151,6 +151,8 @@
       localStorage.setItem('token', data.token);
       localStorage.setItem('usuario', JSON.stringify(data.usuario));
       localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      if (data.temMultiEmpresa) localStorage.setItem('multiEmpresa', '1');
+      else localStorage.removeItem('multiEmpresa');
       window.location.href = '/index.html';
     } catch (err) {
       showErr('login-erro', err.message);
@@ -247,6 +249,8 @@
       localStorage.setItem('token', data.token);
       localStorage.setItem('usuario', JSON.stringify(data.usuario));
       localStorage.setItem('empresa', JSON.stringify(data.empresa));
+      // Se veio da tela de escolha, com certeza tem múltiplas empresas
+      localStorage.setItem('multiEmpresa', '1');
       _senhaCache = null;
       window.location.href = '/index.html';
     } catch (err) {
