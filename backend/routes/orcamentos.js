@@ -124,15 +124,15 @@ router.post('/', async (req, res) => {
       await client.query(
         `INSERT INTO orcamento_itens
          (orcamento_id, tipo, produto_id, servico_id, descricao, quantidade,
-          valor_unitario, desconto_item, total, ordem)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          valor_unitario, desconto_item, total, ordem, ambiente_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [orcamento.id, it.tipo || 'avulso',
          it.produto_id || null, it.servico_id || null,
          it.descricao || '',
          parseFloat(it.quantidade) || 1,
          parseFloat(it.valor_unitario) || 0,
          parseFloat(it.desconto_item) || 0,
-         it.total, i]
+         it.total, i, it.ambiente_id ? parseInt(it.ambiente_id) : null]
       );
     }
 
@@ -208,15 +208,15 @@ router.put('/:id', async (req, res) => {
       await client.query(
         `INSERT INTO orcamento_itens
          (orcamento_id, tipo, produto_id, servico_id, descricao, quantidade,
-          valor_unitario, desconto_item, total, ordem)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          valor_unitario, desconto_item, total, ordem, ambiente_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [id, it.tipo || 'avulso',
          it.produto_id || null, it.servico_id || null,
          it.descricao || '',
          parseFloat(it.quantidade) || 1,
          parseFloat(it.valor_unitario) || 0,
          parseFloat(it.desconto_item) || 0,
-         it.total, i]
+         it.total, i, it.ambiente_id ? parseInt(it.ambiente_id) : null]
       );
     }
 

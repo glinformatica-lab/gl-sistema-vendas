@@ -364,6 +364,20 @@
         <p id="me-fiscal-data" style="margin:8px 0 0 32px;font-size:11px;color:#778;display:none;"></p>
       </div>
 
+      <!-- Ambientes em Orçamento (uso: iluminação, marcenaria, decoração) -->
+      <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:14px;margin:12px 0;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="checkbox" id="me-usa-ambientes" style="width:20px;height:20px;cursor:pointer;">
+          <label for="me-usa-ambientes" style="margin:0;font-weight:600;color:#92400e;cursor:pointer;font-size:14px;">
+            🏠 Ativar Ambientes em Orçamento
+          </label>
+        </div>
+        <p style="margin:6px 0 0 32px;font-size:12px;color:#557;line-height:1.4;">
+          Permite organizar itens do orçamento por ambiente (Sala, Quarto, Cozinha, etc). Ideal pra iluminação, marcenaria e decoração.<br>
+          <strong style="color:#92400e;">Cliente cadastra os ambientes uma vez e usa em vários orçamentos.</strong>
+        </p>
+      </div>
+
       <label>Observações</label>
       <textarea id="me-observacao" rows="3"></textarea>
 
@@ -725,6 +739,8 @@
     } else {
       dataFiscalEl.style.display = 'none';
     }
+    // Ambientes
+    document.getElementById('me-usa-ambientes').checked = !!(e.usaAmbientes);
     document.getElementById('me-erro').style.display = 'none';
     document.getElementById('modal-editar').classList.add('show');
   }
@@ -770,7 +786,8 @@
         dataVencimento: document.getElementById('me-vencimento').value || null,
         valorMensalidade: parseFloat(document.getElementById('me-mensalidade').value) || 0,
         observacao: document.getElementById('me-observacao').value.trim(),
-        moduloFiscalAtivo: document.getElementById('me-modulo-fiscal').checked
+        moduloFiscalAtivo: document.getElementById('me-modulo-fiscal').checked,
+        usaAmbientes: document.getElementById('me-usa-ambientes').checked
       });
       closeEditar();
       await Promise.all([carregarDashboard(), carregarEmpresas()]);

@@ -18,6 +18,7 @@ app.use('/api/catalogo', require('./routes/catalogo'));
 app.use('/api/produtos',        autenticar, verificarAcesso, require('./routes/produtos'));
 app.use('/api/servicos',        autenticar, verificarAcesso, require('./routes/servicos'));
 app.use('/api/orcamentos',      autenticar, verificarAcesso, require('./routes/orcamentos'));
+app.use('/api/ambientes',       autenticar, verificarAcesso, require('./routes/ambientes'));
 app.use('/api/clientes',        autenticar, verificarAcesso, require('./routes/clientes'));
 app.use('/api/fornecedores',    autenticar, verificarAcesso, require('./routes/fornecedores'));
 app.use('/api/vendas',          autenticar, verificarAcesso, require('./routes/vendas'));

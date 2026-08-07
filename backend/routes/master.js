@@ -133,7 +133,7 @@ router.get('/empresas/:id', async (req, res) => {
 
 // Atualizar empresa (status, plano, vencimento, mensalidade, observação)
 router.put('/empresas/:id', async (req, res) => {
-  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo } = req.body || {};
+  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo, usaAmbientes } = req.body || {};
   // Valida valores
   const statusValidos = ['trial', 'ativa', 'vencida', 'bloqueada'];
   const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
@@ -141,12 +141,17 @@ router.put('/empresas/:id', async (req, res) => {
   if (plano && !planosValidos.includes(plano)) return res.status(400).json({ error: 'Plano inválido.' });
   try {
     // Se moduloFiscalAtivo foi enviado, ajusta também o moduloFiscalAtivadoEm
-    // Quando ativa: registra data atual; quando desativa: mantém histórico (não apaga)
     let setModuloFiscal = '';
     if (moduloFiscalAtivo === true || moduloFiscalAtivo === false) {
       setModuloFiscal = `,
          modulo_fiscal_ativo = $8,
          modulo_fiscal_ativado_em = CASE WHEN $8 = TRUE AND modulo_fiscal_ativo = FALSE THEN NOW() ELSE modulo_fiscal_ativado_em END`;
+    }
+    // Feature: usa_ambientes
+    let setAmbientes = '';
+    if (usaAmbientes === true || usaAmbientes === false) {
+      const posParam = setModuloFiscal ? 9 : 8;
+      setAmbientes = `, usa_ambientes = $${posParam}`;
     }
     const params = [
       nome || null, status || null, plano || null, dataVencimento || null,
@@ -155,6 +160,7 @@ router.put('/empresas/:id', async (req, res) => {
       req.params.id
     ];
     if (setModuloFiscal) params.push(moduloFiscalAtivo);
+    if (setAmbientes) params.push(usaAmbientes);
     const r = await db.query(
       `UPDATE empresas SET
          nome = COALESCE($1, nome),
@@ -163,7 +169,7 @@ router.put('/empresas/:id', async (req, res) => {
          data_vencimento = COALESCE($4, data_vencimento),
          valor_mensalidade = COALESCE($5, valor_mensalidade),
          observacao = COALESCE($6, observacao)
-         ${setModuloFiscal}
+         ${setModuloFiscal}${setAmbientes}
        WHERE id=$7 RETURNING *`,
       params
     );
