@@ -524,6 +524,7 @@
     <div class="submenu" id="submenu-cadastros" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
       <button class="menu-btn submenu-item" onclick="showPage('servicos')">&#128295; Serviços</button>
+      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('clientes')">&#128100; Clientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
     </div>
@@ -873,6 +874,29 @@
       <table>
         <thead><tr><th>Nome</th><th>Descrição</th><th>Valor</th><th class="acoes">Ações</th></tr></thead>
         <tbody id="tbody-servicos"></tbody>
+      </table>
+    </div>
+
+    <!-- Ambientes (só aparece se empresa tem usa_ambientes = true) -->
+    <div id="page-ambientes" style="display:none;">
+      <div class="page-title">🏠 Ambientes</div>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;">
+        💡 <b>Como funciona:</b> cadastre aqui os ambientes que você usa nos orçamentos (sala, quarto, cozinha, etc). Na hora de criar um orçamento, você poderá organizar os itens por ambiente e o cliente verá o subtotal de cada um.
+      </div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+        <button class="btn" onclick="openNovoAmbiente()">+ Novo Ambiente</button>
+        <input id="filtro-ambientes" type="text" placeholder="Buscar ambiente..." oninput="renderAmbientes()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th style="width:120px;text-align:center;">Ordem</th>
+            <th style="width:100px;text-align:center;">Status</th>
+            <th class="acoes">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ambientes"></tbody>
       </table>
     </div>
 
@@ -1846,6 +1870,34 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal de Ambiente -->
+  <div id="modal-ambiente" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:28px;border-radius:14px;max-width:440px;width:92%;max-height:92vh;overflow-y:auto;">
+      <h2 id="titulo-modal-ambiente" style="color:var(--azul);margin:0 0 18px 0;">🏠 Novo Ambiente</h2>
+      <input type="hidden" id="amb-id">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Nome do ambiente *</label>
+          <input type="text" id="amb-nome" placeholder="Ex: SALA, QUARTO, COZINHA" required style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;text-transform:uppercase;">
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Nomes são salvos em MAIÚSCULO automaticamente</div>
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Ordem de exibição</label>
+          <input type="number" id="amb-ordem" value="0" min="0" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Menor número aparece primeiro nas abas do orçamento</div>
+        </div>
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #0891b2;color:#0c4a6e;padding:10px;border-radius:6px;font-size:12px;margin-top:12px;">
+        💡 <b>Sugestões comuns:</b> Sala, Sala de Jantar, Cozinha, Quarto, Quarto Master, Suíte, Banheiro, Lavabo, Escritório, Varanda, Área Externa, Corredor
+      </div>
+      <div id="amb-erro" class="erro" style="display:none;margin-top:12px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button class="btn" onclick="salvarAmbiente()" style="flex:1;">Salvar</button>
+        <button class="btn" onclick="fecharAmbiente()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-servico" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:28px;border-radius:14px;max-width:480px;width:92%;max-height:92vh;overflow-y:auto;">
       <h2 id="titulo-modal-servico" style="color:var(--azul);margin:0 0 18px 0;">Novo Serviço</h2>
@@ -1926,6 +1978,16 @@
         <button type="button" onclick="abrirAtualizacaoPrecos()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">
           🔄 Atualizar preços dos produtos
         </button>
+      </div>
+
+      <!-- ABAS DE AMBIENTES (só aparece se usa_ambientes ativo) -->
+      <div id="orc-ambientes-tabs" class="feature-ambientes" style="display:none;margin-bottom:10px;">
+        <div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:8px 12px;border-radius:6px 6px 0 0;font-size:12px;color:#92400e;font-weight:600;">
+          🏠 Organizar itens por ambiente:
+        </div>
+        <div id="orc-tabs-list" style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:#fffbeb;border:1px solid #fef3c7;border-top:none;border-radius:0 0 6px 6px;">
+          <!-- abas renderizadas dinamicamente -->
+        </div>
       </div>
 
       <div style="overflow-x:auto;">
@@ -4731,6 +4793,7 @@ https://sistema.glinformatica.com.br
   const _grupoMenu = {
     'produtos': 'cadastros',
     'servicos': 'cadastros',
+    'ambientes': 'cadastros',
     'clientes': 'cadastros',
     'fornecedores': 'cadastros',
     'vendas': 'vendas',
@@ -4866,6 +4929,14 @@ https://sistema.glinformatica.com.br
       alert('Acesso restrito a administradores.');
       return;
     }
+    // Bloqueia Ambientes se empresa não tem recurso ativo
+    if (pg === 'ambientes') {
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!empresa.usaAmbientes) {
+        alert('Recurso de Ambientes não está ativo pra sua empresa. Entre em contato com o suporte.');
+        return;
+      }
+    }
     // Bloqueia Vendas Online se plano não inclui
     if (['catalogo', 'pedidos-online'].includes(pg) && !temVendasOnline()) {
       const nomeRecurso = pg === 'catalogo' ? 'Catálogo Público' : 'Pedidos Online';
@@ -4886,6 +4957,7 @@ https://sistema.glinformatica.com.br
     // Carrega usuários sob demanda
     if(pg === 'usuarios') carregarUsuarios();
     if(pg === 'servicos') carregarServicos();
+    if(pg === 'ambientes') carregarAmbientes();
     if(pg === 'orcamentos') carregarOrcamentos();
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
@@ -4916,6 +4988,7 @@ https://sistema.glinformatica.com.br
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
+      if (typeof atualizarVisibilidadeAmbientes === 'function') atualizarVisibilidadeAmbientes();
       // Mostra botão "Trocar Empresa" se cliente tem multi-empresa
       if (localStorage.getItem('multiEmpresa') === '1') {
         const btnTrocar = document.getElementById('btn-trocar-empresa');
@@ -5014,6 +5087,7 @@ https://sistema.glinformatica.com.br
       aplicarBloqueioPorPlano();
       // Re-aplica visibilidade do menu fiscal AGORA com dados frescos
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
+      if (typeof atualizarVisibilidadeAmbientes === 'function') atualizarVisibilidadeAmbientes();
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
     renderGraficosDashboard();
   });
@@ -10083,6 +10157,108 @@ ${conteudo}
     alert('Histórico de fechamentos pode ser visto em Relatórios → (em breve).\n\nPor enquanto, você pode acompanhar pelo backend.');
   }
 
+  // ====== AMBIENTES ======
+  let _ambientesCache = [];
+
+  async function carregarAmbientes() {
+    try {
+      _ambientesCache = await api('GET', '/api/ambientes/todos');
+      renderAmbientes();
+    } catch (err) {
+      // Se der 403, é porque a empresa não tem usa_ambientes ativo
+      if (err.message && err.message.toLowerCase().includes('não está ativo')) {
+        _ambientesCache = [];
+        renderAmbientes();
+        return;
+      }
+      alert(err.message);
+    }
+  }
+
+  function renderAmbientes() {
+    const tbody = document.getElementById('tbody-ambientes');
+    if (!tbody) return;
+    const filtro = (document.getElementById('filtro-ambientes')?.value || '').toLowerCase();
+    let lista = _ambientesCache;
+    if (filtro) lista = lista.filter(a => (a.nome || '').toLowerCase().includes(filtro));
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:20px;">Nenhum ambiente cadastrado. Clique em "+ Novo Ambiente" pra começar.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(a => `
+      <tr>
+        <td><b>${escapeHtml(a.nome)}</b></td>
+        <td style="text-align:center;color:#64748b;">${a.ordem || 0}</td>
+        <td style="text-align:center;">
+          <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;background:${a.ativo ? '#dcfce7' : '#fee2e2'};color:${a.ativo ? '#166534' : '#991b1b'};">${a.ativo ? 'Ativo' : 'Inativo'}</span>
+        </td>
+        <td class="acoes">
+          <button class="btn-editar" onclick="editarAmbiente(${a.id})" title="Editar">✏️</button>
+          <button class="btn-excluir" onclick="excluirAmbiente(${a.id})" title="${a.ativo ? 'Desativar/Excluir' : 'Excluir'}">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openNovoAmbiente() {
+    document.getElementById('amb-id').value = '';
+    document.getElementById('amb-nome').value = '';
+    document.getElementById('amb-ordem').value = 0;
+    document.getElementById('amb-erro').style.display = 'none';
+    document.getElementById('titulo-modal-ambiente').textContent = '🏠 Novo Ambiente';
+    document.getElementById('modal-ambiente').style.display = 'flex';
+    setTimeout(() => document.getElementById('amb-nome').focus(), 100);
+  }
+
+  function editarAmbiente(id) {
+    const a = _ambientesCache.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('amb-id').value = a.id;
+    document.getElementById('amb-nome').value = a.nome;
+    document.getElementById('amb-ordem').value = a.ordem || 0;
+    document.getElementById('amb-erro').style.display = 'none';
+    document.getElementById('titulo-modal-ambiente').textContent = '🏠 Editar Ambiente';
+    document.getElementById('modal-ambiente').style.display = 'flex';
+  }
+
+  function fecharAmbiente() {
+    document.getElementById('modal-ambiente').style.display = 'none';
+  }
+
+  async function salvarAmbiente() {
+    const id = document.getElementById('amb-id').value;
+    const nome = document.getElementById('amb-nome').value.trim();
+    const ordem = parseInt(document.getElementById('amb-ordem').value) || 0;
+    const erro = document.getElementById('amb-erro');
+    erro.style.display = 'none';
+    if (!nome) { erro.textContent = 'Nome é obrigatório.'; erro.style.display = 'block'; return; }
+    try {
+      if (id) {
+        await api('PATCH', `/api/ambientes/${id}`, { nome, ordem });
+      } else {
+        await api('POST', '/api/ambientes', { nome, ordem });
+      }
+      fecharAmbiente();
+      await carregarAmbientes();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirAmbiente(id) {
+    const a = _ambientesCache.find(x => x.id === id);
+    if (!a) return;
+    if (!confirm(`Confirmar exclusão do ambiente "${a.nome}"?\n\n(Se tiver orçamentos vinculados, será apenas desativado.)`)) return;
+    try {
+      const r = await api('DELETE', `/api/ambientes/${id}`);
+      if (r.inativado) alert(`Ambiente "${a.nome}" desativado (havia orçamentos vinculados).`);
+      await carregarAmbientes();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
   // ====== SERVIÇOS ======
   async function carregarServicos() {
     try {
@@ -10167,6 +10343,61 @@ ${conteudo}
   // ====== ORÇAMENTOS ======
   let _orcamentosCache = [];
   let _orcItensTemp = [];
+  let _orcAmbienteAtivo = null; // null = mostra todos; 'geral' = sem ambiente; ID = ambiente específico
+
+  // Renderiza abas de ambientes do orçamento
+  function renderOrcAbasAmbientes() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const box = document.getElementById('orc-ambientes-tabs');
+    const list = document.getElementById('orc-tabs-list');
+    if (!box || !list) return;
+    if (!empresa.usaAmbientes) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = '';
+
+    // Conta itens por ambiente
+    const contadores = { geral: 0 };
+    _orcItensTemp.forEach(it => {
+      const k = it.ambiente_id || 'geral';
+      contadores[k] = (contadores[k] || 0) + 1;
+    });
+
+    // Aba "Todos" - mostra tudo
+    let html = `
+      <button type="button" onclick="setOrcAmbiente(null)"
+        style="padding:6px 12px;border:2px solid ${_orcAmbienteAtivo === null ? '#0891b2' : '#e2e8f0'};background:${_orcAmbienteAtivo === null ? '#0891b2' : '#fff'};color:${_orcAmbienteAtivo === null ? '#fff' : '#334155'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+        📋 Todos <span style="opacity:0.7;">(${_orcItensTemp.length})</span>
+      </button>
+    `;
+
+    // Aba "Geral" (sem ambiente)
+    html += `
+      <button type="button" onclick="setOrcAmbiente('geral')"
+        style="padding:6px 12px;border:2px solid ${_orcAmbienteAtivo === 'geral' ? '#64748b' : '#e2e8f0'};background:${_orcAmbienteAtivo === 'geral' ? '#64748b' : '#fff'};color:${_orcAmbienteAtivo === 'geral' ? '#fff' : '#334155'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+        Sem ambiente <span style="opacity:0.7;">(${contadores.geral || 0})</span>
+      </button>
+    `;
+
+    // Uma aba pra cada ambiente cadastrado
+    _ambientesCache.filter(a => a.ativo).forEach(a => {
+      const ativo = _orcAmbienteAtivo == a.id;
+      html += `
+        <button type="button" onclick="setOrcAmbiente(${a.id})"
+          style="padding:6px 12px;border:2px solid ${ativo ? '#f59e0b' : '#fde68a'};background:${ativo ? '#f59e0b' : '#fffbeb'};color:${ativo ? '#fff' : '#92400e'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+          🏠 ${escapeHtml(a.nome)} <span style="opacity:0.7;">(${contadores[a.id] || 0})</span>
+        </button>
+      `;
+    });
+
+    list.innerHTML = html;
+  }
+
+  function setOrcAmbiente(id) {
+    _orcAmbienteAtivo = id;
+    renderItensOrc();
+  }
   let _produtosCacheLocal = [];
 
   async function carregarOrcamentos() {
@@ -10248,10 +10479,16 @@ ${conteudo}
     document.getElementById('orc-desconto').value = 0;
     document.getElementById('orc-erro').style.display = 'none';
     _orcItensTemp = [];
+    _orcAmbienteAtivo = null;
     await carregarClientesParaOrc();
     if (_servicosCache.length === 0) await carregarServicos();
     if (_produtosCacheLocal.length === 0) {
       try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
+    }
+    // Carrega ambientes se recurso ativo
+    const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_emp.usaAmbientes && _ambientesCache.length === 0) {
+      try { _ambientesCache = await api('GET', '/api/ambientes'); } catch(e) { _ambientesCache = []; }
     }
     renderItensOrc();
     document.getElementById('modal-orcamento').style.display = 'flex';
@@ -10269,9 +10506,15 @@ ${conteudo}
       document.getElementById('orc-condicoes').value = orc.condicoes_pagamento || '';
       document.getElementById('orc-desconto').value = orc.desconto || 0;
       _orcItensTemp = (orc.itens || []).map(it => ({ ...it }));
+      _orcAmbienteAtivo = null;
       if (_servicosCache.length === 0) await carregarServicos();
       if (_produtosCacheLocal.length === 0) {
         try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
+      }
+      // Carrega ambientes se recurso ativo
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (_emp.usaAmbientes && _ambientesCache.length === 0) {
+        try { _ambientesCache = await api('GET', '/api/ambientes'); } catch(e) { _ambientesCache = []; }
       }
       // Preenche preco_custo nos itens que vieram do banco (não armazenamos custo nas tabelas de itens)
       _orcItensTemp.forEach(it => {
@@ -10352,13 +10595,17 @@ ${conteudo}
   function selecionarProduto(id) {
     const p = _produtosCacheLocal.find(x => x.id === id);
     if (!p) return;
+    // Se está numa aba de ambiente específico, vincula automaticamente
+    const ambId = (_orcAmbienteAtivo && _orcAmbienteAtivo !== 'geral' && _orcAmbienteAtivo !== null)
+      ? _orcAmbienteAtivo : null;
     _orcItensTemp.push({
       tipo: 'produto', produto_id: p.id, servico_id: null,
       descricao: p.nome,
       quantidade: 1,
       valor_unitario: parseFloat(p.precoVenda) || 0,
       preco_custo: parseFloat(p.precoCusto) || 0,  // Guarda custo pra cálculo de margem
-      desconto_item: 0
+      desconto_item: 0,
+      ambiente_id: ambId
     });
     document.getElementById('busca-produto').value = '';
     document.getElementById('orc-lista-produtos').style.display = 'none';
@@ -10586,19 +10833,38 @@ ${conteudo}
       el.style.display = ehAdmin ? '' : 'none';
     });
 
+    // Renderiza abas de ambientes (se recurso ativo)
+    renderOrcAbasAmbientes();
+
     // Mostra botão "Atualizar preços" só se tiver produtos
     const temProduto = _orcItensTemp.some(it => it.tipo === 'produto' && it.produto_id);
     const boxAtu = document.getElementById('orc-atualizar-precos-box');
     if (boxAtu) boxAtu.style.display = temProduto ? '' : 'none';
 
+    // Filtra itens pelo ambiente ativo (se recurso está ativo)
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const usaAmb = !!empresa.usaAmbientes;
+    let itensParaExibir = _orcItensTemp.map((it, i) => ({ ...it, _idx: i }));
+    if (usaAmb) {
+      if (_orcAmbienteAtivo === 'geral') {
+        itensParaExibir = itensParaExibir.filter(it => !it.ambiente_id);
+      } else if (_orcAmbienteAtivo) {
+        itensParaExibir = itensParaExibir.filter(it => it.ambiente_id == _orcAmbienteAtivo);
+      }
+    }
+
     const colspan = ehAdmin ? 8 : 6;
-    if (_orcItensTemp.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#889;padding:20px;">Nenhum item ainda. Use as buscas acima pra adicionar produtos ou serviços.</td></tr>`;
+    if (itensParaExibir.length === 0) {
+      const msg = usaAmb && _orcAmbienteAtivo
+        ? `Nenhum item neste ambiente ainda. Adicione produtos ou serviços — eles serão vinculados a este ambiente automaticamente.`
+        : 'Nenhum item ainda. Use as buscas acima pra adicionar produtos ou serviços.';
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#889;padding:20px;">${msg}</td></tr>`;
       recalcularOrc();
       return;
     }
     const tipoLabels = { 'produto': '📦', 'servico': '🔧', 'avulso': '✏️' };
-    tbody.innerHTML = _orcItensTemp.map((it, i) => {
+    tbody.innerHTML = itensParaExibir.map((it) => {
+      const i = it._idx;
       const valorTotal = (it.quantidade || 1) * (it.valor_unitario || 0) - (it.desconto_item || 0);
       // Calcula margem (só pra produtos com custo)
       const temCusto = it.tipo === 'produto' && it.preco_custo > 0;
@@ -10762,7 +11028,18 @@ ${conteudo}
       const orc = await api('GET', '/api/orcamentos/' + id);
       _orcVisualizando = orc;
       const tipoLabels = { 'produto': 'Produto', 'servico': 'Serviço', 'avulso': 'Item' };
-      const itensHtml = (orc.itens || []).map(it => `
+
+      // Se empresa usa ambientes E tem itens com ambiente_id, agrupa por ambiente
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const usaAmb = !!empresa.usaAmbientes;
+      const temAmbientes = usaAmb && (orc.itens || []).some(it => it.ambiente_id);
+
+      // Garante cache de ambientes
+      if (usaAmb && _ambientesCache.length === 0) {
+        try { _ambientesCache = await api('GET', '/api/ambientes/todos'); } catch(e) { _ambientesCache = []; }
+      }
+
+      const linhaItem = (it) => `
         <tr>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${tipoLabels[it.tipo] || ''}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(it.descricao)}</td>
@@ -10770,7 +11047,45 @@ ${conteudo}
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(it.total)}</td>
         </tr>
-      `).join('');
+      `;
+
+      let itensHtml;
+      if (temAmbientes) {
+        // Agrupa por ambiente_id
+        const grupos = new Map();
+        (orc.itens || []).forEach(it => {
+          const k = it.ambiente_id || 'geral';
+          if (!grupos.has(k)) grupos.set(k, []);
+          grupos.get(k).push(it);
+        });
+        // Ordena: ambientes conhecidos por ordem, depois 'geral' no final
+        const chaves = Array.from(grupos.keys()).sort((a, b) => {
+          if (a === 'geral') return 1;
+          if (b === 'geral') return -1;
+          const oa = (_ambientesCache.find(x => x.id == a) || {}).ordem || 999;
+          const ob = (_ambientesCache.find(x => x.id == b) || {}).ordem || 999;
+          return oa - ob;
+        });
+        itensHtml = chaves.map(k => {
+          const grupo = grupos.get(k);
+          const amb = k === 'geral' ? null : _ambientesCache.find(x => x.id == k);
+          const nomeAmb = amb ? amb.nome : (k === 'geral' ? 'GERAL / SEM AMBIENTE' : 'AMBIENTE');
+          const subtotal = grupo.reduce((s, it) => s + parseFloat(it.total || 0), 0);
+          return `
+            <tr style="background:#fef3c7;">
+              <td colspan="4" style="padding:8px 10px;font-weight:700;color:#92400e;font-size:14px;">
+                🏠 ${escapeHtml(nomeAmb)} <span style="color:#78716c;font-weight:400;font-size:12px;">(${grupo.length} ${grupo.length === 1 ? 'item' : 'itens'})</span>
+              </td>
+              <td style="padding:8px 10px;text-align:right;font-weight:700;color:#92400e;">
+                Subtotal: ${formatarBRL(subtotal)}
+              </td>
+            </tr>
+            ${grupo.map(linhaItem).join('')}
+          `;
+        }).join('');
+      } else {
+        itensHtml = (orc.itens || []).map(linhaItem).join('');
+      }
       document.getElementById('orc-view-conteudo').innerHTML = `
         ${cabecalhoEmpresaParaRecibo()}
         <div style="text-align:center;margin-bottom:18px;">
@@ -11216,6 +11531,14 @@ ${conteudo}
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const ativo = !!empresa.moduloFiscalAtivo;
     document.querySelectorAll('.fiscal-only').forEach(el => {
+      el.style.display = ativo ? '' : 'none';
+    });
+  }
+
+  function atualizarVisibilidadeAmbientes() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const ativo = !!empresa.usaAmbientes;
+    document.querySelectorAll('.feature-ambientes').forEach(el => {
       el.style.display = ativo ? '' : 'none';
     });
   }
