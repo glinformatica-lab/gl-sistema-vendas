@@ -6,7 +6,7 @@ const db = require('../db');
 // Middleware: verifica se empresa usa ambientes
 async function requerAmbientes(req, res, next) {
   try {
-    const r = await db.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.usuario.empresa_id]);
+    const r = await db.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.user.empresaId]);
     if (r.rows.length === 0 || !r.rows[0].usa_ambientes) {
       return res.status(403).json({ error: 'Recurso de ambientes não está ativo pra sua empresa.' });
     }
@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
   try {
     const r = await db.query(
       'SELECT id, nome, ordem, ativo FROM ambientes WHERE empresa_id = $1 AND ativo = true ORDER BY ordem, nome',
-      [req.usuario.empresa_id]
+      [req.user.empresaId]
     );
     res.json(r.rows);
   } catch (e) {
@@ -36,7 +36,7 @@ router.get('/todos', requerAmbientes, async (req, res) => {
   try {
     const r = await db.query(
       'SELECT id, nome, ordem, ativo FROM ambientes WHERE empresa_id = $1 ORDER BY ordem, nome',
-      [req.usuario.empresa_id]
+      [req.user.empresaId]
     );
     res.json(r.rows);
   } catch (e) {
@@ -52,7 +52,7 @@ router.post('/', requerAmbientes, async (req, res) => {
   try {
     const r = await db.query(
       'INSERT INTO ambientes (empresa_id, nome, ordem) VALUES ($1, $2, $3) RETURNING *',
-      [req.usuario.empresa_id, nomeUp, ordem || 0]
+      [req.user.empresaId, nomeUp, ordem || 0]
     );
     res.status(201).json(r.rows[0]);
   } catch (e) {
@@ -75,7 +75,7 @@ router.patch('/:id', requerAmbientes, async (req, res) => {
            ativo = COALESCE($3, ativo)
        WHERE id = $4 AND empresa_id = $5
        RETURNING *`,
-      [nomeUp, ordem, ativo, id, req.usuario.empresa_id]
+      [nomeUp, ordem, ativo, id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Ambiente não encontrado.' });
     res.json(r.rows[0]);
@@ -98,11 +98,11 @@ router.delete('/:id', requerAmbientes, async (req, res) => {
       // Não deleta — só marca como inativo
       await db.query(
         'UPDATE ambientes SET ativo = false WHERE id = $1 AND empresa_id = $2',
-        [id, req.usuario.empresa_id]
+        [id, req.user.empresaId]
       );
       return res.json({ ok: true, inativado: true });
     }
-    await db.query('DELETE FROM ambientes WHERE id = $1 AND empresa_id = $2', [id, req.usuario.empresa_id]);
+    await db.query('DELETE FROM ambientes WHERE id = $1 AND empresa_id = $2', [id, req.user.empresaId]);
     res.json({ ok: true, removido: true });
   } catch (e) {
     console.error('[ambientes/delete]', e);
