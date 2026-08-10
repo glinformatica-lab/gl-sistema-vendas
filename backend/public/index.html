@@ -11295,7 +11295,7 @@ ${conteudo}
       const produto = it.tipo === 'produto' && it.produto_id
         ? _produtosCacheLocal.find(p => p.id === it.produto_id)
         : null;
-      const fotoUrl = produto && produto.foto_url ? produto.foto_url : null;
+      const fotoUrl = produto && produto.fotoUrl ? produto.fotoUrl : null;
       const imgHtml = fotoUrl
         ? `<img src="${escapeAttr(fotoUrl)}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;" alt="${escapeAttr(it.descricao)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
            <div style="display:none;width:120px;height:120px;border-radius:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;font-size:11px;align-items:center;justify-content:center;text-align:center;padding:6px;">Foto indisponível</div>`
