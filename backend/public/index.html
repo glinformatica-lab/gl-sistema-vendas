@@ -2078,6 +2078,7 @@
         <h2 style="color:var(--azul);margin:0;font-size:18px;">Visualizar Orçamento</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="imprimirOrcamento()" style="background:#16a34a;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">🖨️ Imprimir/PDF</button>
+          <button id="btn-imprimir-com-fotos" class="feature-ambientes" onclick="imprimirOrcamentoComFotos()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:none;" title="Versão visual com fotos dos produtos">🖼️ Com Fotos</button>
           <button id="btn-imprimir-com-custos" class="admin-only" onclick="imprimirOrcamentoComCustos()" style="background:#f59e0b;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:none;" title="Versão admin com custos e margens (não envie ao cliente)">🔒 Com Custos</button>
           <button onclick="fecharOrcView()" style="background:#eceef2;color:var(--azul);border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Fechar</button>
         </div>
@@ -11134,6 +11135,12 @@ ${conteudo}
       if (btnCustos) {
         btnCustos.style.display = (window._papelAtual === 'admin') ? '' : 'none';
       }
+      // Mostra botão "Com Fotos" só se empresa usa ambientes
+      const btnFotos = document.getElementById('btn-imprimir-com-fotos');
+      if (btnFotos) {
+        const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+        btnFotos.style.display = empresa.usaAmbientes ? '' : 'none';
+      }
     } catch (err) { alert(err.message); }
   }
   function fecharOrcView() {
@@ -11266,6 +11273,140 @@ ${conteudo}
       </head><body>${conteudoAdmin}</body></html>`);
     w.document.close();
     setTimeout(() => w.print(), 300);
+  }
+
+  // ====== IMPRIMIR ORÇAMENTO COM FOTOS (versão visual - catálogo) ======
+  async function imprimirOrcamentoComFotos() {
+    if (!_orcVisualizando) return;
+    const orc = _orcVisualizando;
+    // Garante cache de produtos e ambientes
+    if (_produtosCacheLocal.length === 0) {
+      try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
+    }
+    if (_ambientesCache.length === 0) {
+      try { _ambientesCache = await api('GET', '/api/ambientes/todos'); } catch(e) { _ambientesCache = []; }
+    }
+
+    // Verifica se orçamento tem itens com ambiente
+    const temAmbientes = (orc.itens || []).some(it => it.ambiente_id);
+
+    // Função pra renderizar 1 item com foto
+    const renderItemComFoto = (it) => {
+      const produto = it.tipo === 'produto' && it.produto_id
+        ? _produtosCacheLocal.find(p => p.id === it.produto_id)
+        : null;
+      const fotoUrl = produto && produto.foto_url ? produto.foto_url : null;
+      const imgHtml = fotoUrl
+        ? `<img src="${escapeAttr(fotoUrl)}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;" alt="${escapeAttr(it.descricao)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+           <div style="display:none;width:120px;height:120px;border-radius:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;font-size:11px;align-items:center;justify-content:center;text-align:center;padding:6px;">Foto indisponível</div>`
+        : `<div style="width:120px;height:120px;border-radius:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px;">SEM IMAGEM</div>`;
+
+      return `
+        <div style="display:flex;gap:14px;padding:12px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;background:#fff;page-break-inside:avoid;">
+          <div style="flex-shrink:0;">${imgHtml}</div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div style="font-weight:700;font-size:15px;color:#1e3a8a;margin-bottom:6px;">${escapeHtml(it.descricao)}</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">
+              ${it.tipo === 'produto' ? '📦 Produto' : it.tipo === 'servico' ? '🔧 Serviço' : '✏️ Item'}
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+              <div style="font-size:13px;color:#475569;">
+                <div><strong>Quantidade:</strong> ${it.quantidade}</div>
+                <div><strong>Valor Unit:</strong> ${formatarBRL(it.valor_unitario)}</div>
+              </div>
+              <div style="font-size:18px;font-weight:700;color:#16a34a;">
+                ${formatarBRL(it.total)}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    // Monta HTML dos itens (agrupado por ambiente se aplicável)
+    let corpoHtml;
+    if (temAmbientes) {
+      const grupos = new Map();
+      (orc.itens || []).forEach(it => {
+        const k = it.ambiente_id || 'geral';
+        if (!grupos.has(k)) grupos.set(k, []);
+        grupos.get(k).push(it);
+      });
+      const chaves = Array.from(grupos.keys()).sort((a, b) => {
+        if (a === 'geral') return 1;
+        if (b === 'geral') return -1;
+        const oa = (_ambientesCache.find(x => x.id == a) || {}).ordem || 999;
+        const ob = (_ambientesCache.find(x => x.id == b) || {}).ordem || 999;
+        return oa - ob;
+      });
+      corpoHtml = chaves.map(k => {
+        const grupo = grupos.get(k);
+        const amb = k === 'geral' ? null : _ambientesCache.find(x => x.id == k);
+        const nomeAmb = amb ? amb.nome : 'GERAL / SEM AMBIENTE';
+        const subtotal = grupo.reduce((s, it) => s + parseFloat(it.total || 0), 0);
+        return `
+          <div style="margin-top:20px;margin-bottom:8px;page-break-inside:avoid;">
+            <div style="background:linear-gradient(90deg,#fef3c7,#fffbeb);border-left:5px solid #f59e0b;padding:10px 16px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-weight:800;color:#92400e;font-size:16px;">
+                🏠 ${escapeHtml(nomeAmb)}
+                <span style="color:#78716c;font-weight:400;font-size:12px;margin-left:6px;">(${grupo.length} ${grupo.length === 1 ? 'item' : 'itens'})</span>
+              </div>
+              <div style="font-weight:700;color:#92400e;font-size:15px;">
+                Subtotal: ${formatarBRL(subtotal)}
+              </div>
+            </div>
+          </div>
+          ${grupo.map(renderItemComFoto).join('')}
+        `;
+      }).join('');
+    } else {
+      corpoHtml = (orc.itens || []).map(renderItemComFoto).join('');
+    }
+
+    const conteudoFotos = `
+      ${cabecalhoEmpresaParaRecibo()}
+      <div style="text-align:center;margin-bottom:18px;">
+        <h2 style="color:#1e3a8a;margin:0;font-size:22px;letter-spacing:1px;">ORÇAMENTO Nº ${orc.numero}</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:14px;">
+        <div>
+          <strong>Cliente:</strong> ${escapeHtml(orc.cliente_nome || '—')}<br>
+          ${orc.cliente_telefone ? `<strong>Telefone:</strong> ${escapeHtml(orc.cliente_telefone)}<br>` : ''}
+          ${orc.cliente_doc ? `<strong>CPF/CNPJ:</strong> ${escapeHtml(orc.cliente_doc)}<br>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <strong>Data:</strong> ${formatarDataBR(orc.data_orcamento)}<br>
+          <strong>Validade:</strong> ${formatarDataBR(orc.data_validade)}<br>
+          <strong>Vendedor:</strong> ${escapeHtml(orc.vendedor_nome || '—')}
+        </div>
+      </div>
+      ${corpoHtml}
+      <div style="display:flex;justify-content:flex-end;margin-top:18px;margin-bottom:14px;">
+        <table style="font-size:14px;">
+          <tr><td style="padding:4px 12px;text-align:right;">Subtotal:</td><td style="padding:4px 0;text-align:right;min-width:140px;">${formatarBRL(orc.subtotal)}</td></tr>
+          ${parseFloat(orc.desconto) > 0 ? `<tr><td style="padding:4px 12px;text-align:right;color:#16a34a;">Desconto:</td><td style="padding:4px 0;text-align:right;color:#16a34a;">- ${formatarBRL(orc.desconto)}</td></tr>` : ''}
+          <tr style="font-size:20px;font-weight:800;color:#1e3a8a;border-top:2px solid #1e3a8a;"><td style="padding:10px 12px;text-align:right;">TOTAL:</td><td style="padding:10px 0;text-align:right;">${formatarBRL(orc.total)}</td></tr>
+        </table>
+      </div>
+      ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
+      ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
+      <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
+        Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
+      </div>
+    `;
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orçamento ${orc.numero} - Visual</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 900px; margin: 0 auto; background:#fff; }
+        .empresa-header .lbl { color:#666; font-weight:600; }
+        img { max-width: 100%; }
+        @media print { body { padding: 10px; } @page { margin: 10mm; } }
+      </style>
+      </head><body>${conteudoFotos}</body></html>`);
+    w.document.close();
+    // Aguarda um pouco pra imagens carregarem antes de imprimir
+    setTimeout(() => w.print(), 800);
   }
 
   function escapeAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
