@@ -1996,6 +1996,7 @@
             <tr>
               <th style="padding:8px;text-align:center;width:50px;">Tipo</th>
               <th style="padding:8px;text-align:left;">Descrição</th>
+              <th class="orc-th-ambiente feature-ambientes" style="padding:8px;text-align:center;width:140px;background:#fffbeb;display:none;">🏠 Ambiente</th>
               <th style="padding:8px;text-align:center;width:90px;">Qtd</th>
               <th style="padding:8px;text-align:right;width:120px;">Vlr Unit</th>
               <th class="orc-th-custo admin-only" style="padding:8px;text-align:right;width:100px;background:#fef3c7;display:none;">Custo</th>
@@ -10824,6 +10825,13 @@ ${conteudo}
     }
     recalcularOrc();
   }
+
+  // Atualiza ambiente do item (dispara re-render pra atualizar abas/contadores)
+  function atualizarAmbienteItem(idx, valor) {
+    if (!_orcItensTemp[idx]) return;
+    _orcItensTemp[idx].ambiente_id = valor ? parseInt(valor) : null;
+    renderItensOrc();
+  }
   function renderItensOrc() {
     const tbody = document.getElementById('orc-itens-tbody');
     if (!tbody) return;
@@ -10845,6 +10853,12 @@ ${conteudo}
     // Filtra itens pelo ambiente ativo (se recurso está ativo)
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const usaAmb = !!empresa.usaAmbientes;
+
+    // Mostra/esconde coluna de Ambiente
+    document.querySelectorAll('.orc-th-ambiente').forEach(el => {
+      el.style.display = usaAmb ? '' : 'none';
+    });
+
     let itensParaExibir = _orcItensTemp.map((it, i) => ({ ...it, _idx: i }));
     if (usaAmb) {
       if (_orcAmbienteAtivo === 'geral') {
@@ -10854,7 +10868,8 @@ ${conteudo}
       }
     }
 
-    const colspan = ehAdmin ? 8 : 6;
+    // Colspan: base 6 (tipo, desc, qtd, valor, total, ações) + custo+margem se admin + ambiente se ativo
+    const colspan = 6 + (ehAdmin ? 2 : 0) + (usaAmb ? 1 : 0);
     if (itensParaExibir.length === 0) {
       const msg = usaAmb && _orcAmbienteAtivo
         ? `Nenhum item neste ambiente ainda. Adicione produtos ou serviços — eles serão vinculados a este ambiente automaticamente.`
@@ -10888,12 +10903,37 @@ ${conteudo}
           ${margemPercent !== null ? margemPercent.toFixed(1) + '%' : '<span style="color:#94a3b8;font-weight:400;">—</span>'}
         </td>` : '';
 
+      // Coluna Ambiente (só se recurso ativo)
+      let colAmbiente = '';
+      if (usaAmb) {
+        // Serviço NÃO recebe ambiente (regra do cliente)
+        if (it.tipo === 'servico') {
+          colAmbiente = `
+            <td class="orc-td-ambiente" style="padding:6px;text-align:center;background:#f8fafc;">
+              <span style="font-size:11px;color:#94a3b8;font-style:italic;">—</span>
+            </td>`;
+        } else {
+          const opcoesAmb = ['<option value="">-- sem ambiente --</option>']
+            .concat(_ambientesCache.filter(a => a.ativo).map(a =>
+              `<option value="${a.id}" ${it.ambiente_id == a.id ? 'selected' : ''}>${escapeHtml(a.nome)}</option>`
+            )).join('');
+          colAmbiente = `
+            <td class="orc-td-ambiente" style="padding:6px;background:#fffbeb;">
+              <select onchange="atualizarAmbienteItem(${i}, this.value)"
+                style="width:100%;padding:5px 6px;border:1px solid #fde68a;border-radius:4px;font-size:12px;background:#fff;">
+                ${opcoesAmb}
+              </select>
+            </td>`;
+        }
+      }
+
       return `
       <tr>
         <td style="padding:6px;text-align:center;font-size:18px;">${tipoLabels[it.tipo] || ''}</td>
         <td style="padding:6px;">
           <input type="text" value="${escapeAttr(it.descricao)}" oninput="atualizarItemOrc(${i},'descricao',this.value)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;" placeholder="Descrição do item">
         </td>
+        ${colAmbiente}
         <td style="padding:6px;">
           <input type="number" step="0.001" min="0.001" value="${it.quantidade}" oninput="atualizarItemOrc(${i},'quantidade',parseFloat(this.value)||1)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;font-size:13px;">
         </td>
