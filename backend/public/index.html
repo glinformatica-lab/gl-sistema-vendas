@@ -1870,6 +1870,42 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Duplicar item em outros ambientes -->
+  <div id="modal-duplicar-amb" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;">
+      <h2 style="color:var(--azul);margin:0 0 6px 0;font-size:20px;">📋 Duplicar em outros ambientes</h2>
+      <div id="dup-produto-info" style="font-size:14px;color:#475569;margin-bottom:16px;padding:10px;background:#f0f9ff;border-left:3px solid #0891b2;border-radius:4px;"></div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:10px;">Marque os ambientes onde quer duplicar e defina a quantidade em cada:</div>
+      <div id="dup-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;"></div>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:12px;">
+        💡 O item original permanece no ambiente atual. Cada duplicata é independente (pode alterar preço, quantidade, remover).
+      </div>
+      <div id="dup-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" onclick="confirmarDuplicar()" style="flex:1;">Duplicar</button>
+        <button class="btn" onclick="fecharDuplicar()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Multiplicar aba inteira em outros ambientes -->
+  <div id="modal-multiplicar-aba" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:500px;width:92%;max-height:90vh;overflow-y:auto;">
+      <h2 style="color:var(--azul);margin:0 0 6px 0;font-size:20px;">🔄 Multiplicar aba</h2>
+      <div id="mult-info" style="font-size:14px;color:#475569;margin-bottom:16px;padding:10px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:4px;"></div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:10px;">Marque os ambientes de DESTINO (todos os itens da aba atual serão copiados pra cada um):</div>
+      <div id="mult-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;"></div>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:12px;">
+        💡 Todos os itens (com quantidade e preço originais) serão duplicados nos ambientes marcados. Depois você pode ajustar cada linha individualmente.
+      </div>
+      <div id="mult-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" onclick="confirmarMultiplicar()" style="flex:1;background:#16a34a;">Multiplicar</button>
+        <button class="btn" onclick="fecharMultiplicar()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Ambiente -->
   <div id="modal-ambiente" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:28px;border-radius:14px;max-width:440px;width:92%;max-height:92vh;overflow-y:auto;">
@@ -10393,6 +10429,16 @@ ${conteudo}
       `;
     });
 
+    // Botão "Multiplicar aba" — só aparece se uma aba de ambiente específico está ativa E tem itens nela
+    if (_orcAmbienteAtivo && _orcAmbienteAtivo !== 'geral' && (contadores[_orcAmbienteAtivo] || 0) > 0) {
+      html += `
+        <button type="button" onclick="abrirMultiplicarAba()"
+          style="margin-left:auto;padding:6px 12px;border:2px dashed #16a34a;background:#f0fdf4;color:#166534;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">
+          🔄 Copiar esta aba pra outros ambientes
+        </button>
+      `;
+    }
+
     list.innerHTML = html;
   }
 
@@ -10832,6 +10878,137 @@ ${conteudo}
     _orcItensTemp[idx].ambiente_id = valor ? parseInt(valor) : null;
     renderItensOrc();
   }
+
+  // ====== DUPLICAR ITEM EM OUTROS AMBIENTES ======
+  let _dupItemIdx = null;
+  function abrirDuplicarAmbientes(idx) {
+    const it = _orcItensTemp[idx];
+    if (!it) return;
+    _dupItemIdx = idx;
+    document.getElementById('dup-produto-info').innerHTML = `
+      <strong>Item:</strong> ${escapeHtml(it.descricao)}<br>
+      <strong>Valor unit:</strong> ${formatarBRL(it.valor_unitario)} · <strong>Qtd atual:</strong> ${it.quantidade}
+    `;
+    // Lista todos os ambientes (menos o atual)
+    const lista = document.getElementById('dup-lista-ambientes');
+    const ambientes = _ambientesCache.filter(a => a.ativo && a.id != it.ambiente_id);
+    if (ambientes.length === 0) {
+      lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">Nenhum outro ambiente disponível. Cadastre mais ambientes primeiro.</div>';
+    } else {
+      lista.innerHTML = ambientes.map(a => `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
+          onmouseover="this.style.background='#fffbeb';this.style.borderColor='#fbbf24';"
+          onmouseout="this.style.background='#fff';this.style.borderColor='#e2e8f0';">
+          <input type="checkbox" data-amb-id="${a.id}" style="width:18px;height:18px;cursor:pointer;">
+          <div style="flex:1;font-weight:600;color:#334155;">🏠 ${escapeHtml(a.nome)}</div>
+          <label style="font-size:11px;color:#64748b;">Qtd:</label>
+          <input type="number" step="0.001" min="0.001" value="${it.quantidade}" data-amb-qtd="${a.id}"
+            style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;text-align:center;">
+        </label>
+      `).join('');
+    }
+    document.getElementById('dup-erro').style.display = 'none';
+    document.getElementById('modal-duplicar-amb').style.display = 'flex';
+  }
+
+  function fecharDuplicar() {
+    document.getElementById('modal-duplicar-amb').style.display = 'none';
+    _dupItemIdx = null;
+  }
+
+  function confirmarDuplicar() {
+    if (_dupItemIdx === null) return fecharDuplicar();
+    const original = _orcItensTemp[_dupItemIdx];
+    if (!original) return fecharDuplicar();
+    const erro = document.getElementById('dup-erro');
+    erro.style.display = 'none';
+    const checks = document.querySelectorAll('#dup-lista-ambientes input[type="checkbox"]:checked');
+    if (checks.length === 0) {
+      erro.textContent = 'Marque pelo menos 1 ambiente pra duplicar.';
+      erro.style.display = 'block';
+      return;
+    }
+    let criados = 0;
+    checks.forEach(cb => {
+      const ambId = parseInt(cb.dataset.ambId);
+      const qtdInput = document.querySelector(`#dup-lista-ambientes input[data-amb-qtd="${ambId}"]`);
+      const qtd = parseFloat(qtdInput.value) || original.quantidade;
+      _orcItensTemp.push({
+        ...original,
+        quantidade: qtd,
+        ambiente_id: ambId
+      });
+      criados++;
+    });
+    fecharDuplicar();
+    renderItensOrc();
+    // Feedback visual leve
+    if (criados > 0) {
+      // Poderia mostrar um toast — por ora, um alert simples opcional
+      // alert(`Item duplicado em ${criados} ${criados === 1 ? 'ambiente' : 'ambientes'}.`);
+    }
+  }
+
+  // ====== MULTIPLICAR ABA INTEIRA EM OUTROS AMBIENTES ======
+  function abrirMultiplicarAba() {
+    if (!_orcAmbienteAtivo || _orcAmbienteAtivo === 'geral') return;
+    const ambOrigem = _ambientesCache.find(a => a.id == _orcAmbienteAtivo);
+    if (!ambOrigem) return;
+    const itensAba = _orcItensTemp.filter(it => it.ambiente_id == _orcAmbienteAtivo);
+    if (itensAba.length === 0) {
+      alert('Esta aba não tem itens pra multiplicar.');
+      return;
+    }
+    document.getElementById('mult-info').innerHTML = `
+      <strong>Ambiente de origem:</strong> 🏠 ${escapeHtml(ambOrigem.nome)}<br>
+      <strong>Itens a duplicar:</strong> ${itensAba.length} ${itensAba.length === 1 ? 'item' : 'itens'}
+    `;
+    const lista = document.getElementById('mult-lista-ambientes');
+    const ambientes = _ambientesCache.filter(a => a.ativo && a.id != _orcAmbienteAtivo);
+    if (ambientes.length === 0) {
+      lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">Nenhum outro ambiente disponível. Cadastre mais ambientes primeiro.</div>';
+    } else {
+      lista.innerHTML = ambientes.map(a => `
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
+          onmouseover="this.style.background='#f0fdf4';this.style.borderColor='#16a34a';"
+          onmouseout="this.style.background='#fff';this.style.borderColor='#e2e8f0';">
+          <input type="checkbox" data-mult-amb-id="${a.id}" style="width:18px;height:18px;cursor:pointer;">
+          <div style="flex:1;font-weight:600;color:#334155;">🏠 ${escapeHtml(a.nome)}</div>
+        </label>
+      `).join('');
+    }
+    document.getElementById('mult-erro').style.display = 'none';
+    document.getElementById('modal-multiplicar-aba').style.display = 'flex';
+  }
+
+  function fecharMultiplicar() {
+    document.getElementById('modal-multiplicar-aba').style.display = 'none';
+  }
+
+  function confirmarMultiplicar() {
+    const erro = document.getElementById('mult-erro');
+    erro.style.display = 'none';
+    const checks = document.querySelectorAll('#mult-lista-ambientes input[type="checkbox"]:checked');
+    if (checks.length === 0) {
+      erro.textContent = 'Marque pelo menos 1 ambiente de destino.';
+      erro.style.display = 'block';
+      return;
+    }
+    const itensAba = _orcItensTemp.filter(it => it.ambiente_id == _orcAmbienteAtivo);
+    if (itensAba.length === 0) return fecharMultiplicar();
+    let totalCriados = 0;
+    checks.forEach(cb => {
+      const ambId = parseInt(cb.dataset.multAmbId);
+      itensAba.forEach(orig => {
+        _orcItensTemp.push({ ...orig, ambiente_id: ambId });
+        totalCriados++;
+      });
+    });
+    fecharMultiplicar();
+    renderItensOrc();
+    // Feedback opcional
+    // alert(`${totalCriados} ${totalCriados === 1 ? 'item duplicado' : 'itens duplicados'} em ${checks.length} ${checks.length === 1 ? 'ambiente' : 'ambientes'}.`);
+  }
   function renderItensOrc() {
     const tbody = document.getElementById('orc-itens-tbody');
     if (!tbody) return;
@@ -10942,8 +11119,9 @@ ${conteudo}
         </td>
         ${colCusto}${colMargem}
         <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(valorTotal)}</td>
-        <td style="padding:6px;text-align:center;">
-          <button onclick="removerItemOrc(${i})" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">🗑️</button>
+        <td style="padding:6px;text-align:center;white-space:nowrap;">
+          ${usaAmb && it.tipo !== 'servico' ? `<button onclick="abrirDuplicarAmbientes(${i})" title="Duplicar em outros ambientes" style="background:#fef3c7;color:#92400e;border:none;padding:4px 6px;border-radius:4px;cursor:pointer;margin-right:2px;">📋</button>` : ''}
+          <button onclick="removerItemOrc(${i})" title="Remover" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">🗑️</button>
         </td>
       </tr>`;
     }).join('');
