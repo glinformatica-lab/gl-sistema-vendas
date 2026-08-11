@@ -1871,12 +1871,21 @@
 
   <!-- Modal de Serviço -->
   <!-- Modal: Duplicar item em outros ambientes -->
-  <div id="modal-duplicar-amb" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+  <div id="modal-duplicar-amb" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10001;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;">
       <h2 style="color:var(--azul);margin:0 0 6px 0;font-size:20px;">📋 Duplicar em outros ambientes</h2>
       <div id="dup-produto-info" style="font-size:14px;color:#475569;margin-bottom:16px;padding:10px;background:#f0f9ff;border-left:3px solid #0891b2;border-radius:4px;"></div>
-      <div style="font-size:13px;color:#64748b;margin-bottom:10px;">Marque os ambientes onde quer duplicar e defina a quantidade em cada:</div>
-      <div id="dup-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;"></div>
+
+      <!-- Busca + Ações rápidas -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="dup-busca" placeholder="🔎 Buscar ambiente..." oninput="filtrarAmbientesDup()"
+          style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <button type="button" onclick="dupMarcarTodos(true)" style="background:#f0f9ff;color:#0891b2;border:1px solid #0891b2;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">✓ Todos</button>
+        <button type="button" onclick="dupMarcarTodos(false)" style="background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">✗ Nenhum</button>
+      </div>
+
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Marque os ambientes e defina a quantidade em cada:</div>
+      <div id="dup-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;padding-right:4px;"></div>
       <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:12px;">
         💡 O item original permanece no ambiente atual. Cada duplicata é independente (pode alterar preço, quantidade, remover).
       </div>
@@ -1889,12 +1898,21 @@
   </div>
 
   <!-- Modal: Multiplicar aba inteira em outros ambientes -->
-  <div id="modal-multiplicar-aba" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+  <div id="modal-multiplicar-aba" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10001;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:500px;width:92%;max-height:90vh;overflow-y:auto;">
       <h2 style="color:var(--azul);margin:0 0 6px 0;font-size:20px;">🔄 Multiplicar aba</h2>
       <div id="mult-info" style="font-size:14px;color:#475569;margin-bottom:16px;padding:10px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:4px;"></div>
-      <div style="font-size:13px;color:#64748b;margin-bottom:10px;">Marque os ambientes de DESTINO (todos os itens da aba atual serão copiados pra cada um):</div>
-      <div id="mult-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;"></div>
+
+      <!-- Busca + Ações rápidas -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="mult-busca" placeholder="🔎 Buscar ambiente..." oninput="filtrarAmbientesMult()"
+          style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <button type="button" onclick="multMarcarTodos(true)" style="background:#f0fdf4;color:#16a34a;border:1px solid #16a34a;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">✓ Todos</button>
+        <button type="button" onclick="multMarcarTodos(false)" style="background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">✗ Nenhum</button>
+      </div>
+
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Marque os ambientes de DESTINO (todos os itens da aba atual serão copiados pra cada um):</div>
+      <div id="mult-lista-ambientes" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px;"></div>
       <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:12px;">
         💡 Todos os itens (com quantidade e preço originais) serão duplicados nos ambientes marcados. Depois você pode ajustar cada linha individualmente.
       </div>
@@ -10889,6 +10907,9 @@ ${conteudo}
       <strong>Item:</strong> ${escapeHtml(it.descricao)}<br>
       <strong>Valor unit:</strong> ${formatarBRL(it.valor_unitario)} · <strong>Qtd atual:</strong> ${it.quantidade}
     `;
+    // Limpa busca
+    const buscaEl = document.getElementById('dup-busca');
+    if (buscaEl) buscaEl.value = '';
     // Lista todos os ambientes (menos o atual)
     const lista = document.getElementById('dup-lista-ambientes');
     const ambientes = _ambientesCache.filter(a => a.ativo && a.id != it.ambiente_id);
@@ -10896,7 +10917,7 @@ ${conteudo}
       lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">Nenhum outro ambiente disponível. Cadastre mais ambientes primeiro.</div>';
     } else {
       lista.innerHTML = ambientes.map(a => `
-        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
+        <label class="dup-item" data-nome="${escapeAttr((a.nome || '').toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
           onmouseover="this.style.background='#fffbeb';this.style.borderColor='#fbbf24';"
           onmouseout="this.style.background='#fff';this.style.borderColor='#e2e8f0';">
           <input type="checkbox" data-amb-id="${a.id}" style="width:18px;height:18px;cursor:pointer;">
@@ -10909,6 +10930,26 @@ ${conteudo}
     }
     document.getElementById('dup-erro').style.display = 'none';
     document.getElementById('modal-duplicar-amb').style.display = 'flex';
+    // Foca a busca pra facilitar
+    setTimeout(() => { if (buscaEl) buscaEl.focus(); }, 100);
+  }
+
+  // Filtra ambientes por nome
+  function filtrarAmbientesDup() {
+    const termo = (document.getElementById('dup-busca').value || '').toLowerCase();
+    document.querySelectorAll('#dup-lista-ambientes .dup-item').forEach(el => {
+      const nome = el.dataset.nome || '';
+      el.style.display = nome.includes(termo) ? '' : 'none';
+    });
+  }
+
+  // Marca/desmarca todos os VISÍVEIS
+  function dupMarcarTodos(marcar) {
+    document.querySelectorAll('#dup-lista-ambientes .dup-item').forEach(el => {
+      if (el.style.display === 'none') return;
+      const cb = el.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = marcar;
+    });
   }
 
   function fecharDuplicar() {
@@ -10963,13 +11004,16 @@ ${conteudo}
       <strong>Ambiente de origem:</strong> 🏠 ${escapeHtml(ambOrigem.nome)}<br>
       <strong>Itens a duplicar:</strong> ${itensAba.length} ${itensAba.length === 1 ? 'item' : 'itens'}
     `;
+    // Limpa busca
+    const buscaEl = document.getElementById('mult-busca');
+    if (buscaEl) buscaEl.value = '';
     const lista = document.getElementById('mult-lista-ambientes');
     const ambientes = _ambientesCache.filter(a => a.ativo && a.id != _orcAmbienteAtivo);
     if (ambientes.length === 0) {
       lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">Nenhum outro ambiente disponível. Cadastre mais ambientes primeiro.</div>';
     } else {
       lista.innerHTML = ambientes.map(a => `
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
+        <label class="mult-item" data-nome="${escapeAttr((a.nome || '').toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;transition:all 0.15s;"
           onmouseover="this.style.background='#f0fdf4';this.style.borderColor='#16a34a';"
           onmouseout="this.style.background='#fff';this.style.borderColor='#e2e8f0';">
           <input type="checkbox" data-mult-amb-id="${a.id}" style="width:18px;height:18px;cursor:pointer;">
@@ -10979,6 +11023,26 @@ ${conteudo}
     }
     document.getElementById('mult-erro').style.display = 'none';
     document.getElementById('modal-multiplicar-aba').style.display = 'flex';
+    // Foca busca
+    setTimeout(() => { if (buscaEl) buscaEl.focus(); }, 100);
+  }
+
+  // Filtra ambientes por nome (Multiplicar)
+  function filtrarAmbientesMult() {
+    const termo = (document.getElementById('mult-busca').value || '').toLowerCase();
+    document.querySelectorAll('#mult-lista-ambientes .mult-item').forEach(el => {
+      const nome = el.dataset.nome || '';
+      el.style.display = nome.includes(termo) ? '' : 'none';
+    });
+  }
+
+  // Marca/desmarca todos os VISÍVEIS (Multiplicar)
+  function multMarcarTodos(marcar) {
+    document.querySelectorAll('#mult-lista-ambientes .mult-item').forEach(el => {
+      if (el.style.display === 'none') return;
+      const cb = el.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = marcar;
+    });
   }
 
   function fecharMultiplicar() {
