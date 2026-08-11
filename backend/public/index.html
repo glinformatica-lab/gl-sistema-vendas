@@ -1870,6 +1870,41 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Detalhes do item (descrições) -->
+  <div id="modal-detalhes-item" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10001;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:92%;max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <h2 style="color:var(--azul);margin:0;font-size:19px;">📝 Detalhes do Item</h2>
+        <button onclick="fecharDetalhesItem()" style="background:none;border:none;font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div id="di-produto-nome" style="font-weight:700;color:#1e3a8a;font-size:15px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;"></div>
+
+      <div id="di-descricao-impressao-box" style="margin-bottom:16px;display:none;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#0891b2;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;">📄 IMPRESSÃO</span>
+          <span style="font-size:11px;color:#64748b;">Aparece no orçamento pro cliente</span>
+        </div>
+        <div id="di-descricao-impressao" style="background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #0891b2;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;white-space:pre-wrap;color:#0c4a6e;"></div>
+      </div>
+
+      <div id="di-observacao-interna-box" style="margin-bottom:16px;display:none;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#dc2626;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;">🔒 INTERNA</span>
+          <span style="font-size:11px;color:#64748b;">Só uso interno · NÃO sai na impressão</span>
+        </div>
+        <div id="di-observacao-interna" style="background:#fef2f2;border:1px solid #fca5a5;border-left:3px solid #dc2626;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;white-space:pre-wrap;color:#991b1b;"></div>
+      </div>
+
+      <div style="background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:8px;">
+        💡 Essas descrições são gerenciadas no cadastro do produto. Pra alterar, vá em Cadastros → Produtos.
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" onclick="fecharDetalhesItem()" style="flex:1;background:#eceef2;color:var(--azul);">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Duplicar item em outros ambientes -->
   <div id="modal-duplicar-amb" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10001;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;">
@@ -3042,6 +3077,21 @@
             <div id="npr-foto-status" style="font-size:11px;color:#64748b;"></div>
             <button type="button" id="npr-foto-remover" onclick="removerFotoProduto()" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;width:fit-content;">🗑️ Remover foto</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Descrição Impressão + Observação Interna (só empresas com ambientes ativos) -->
+      <div class="feature-ambientes" style="display:none;margin-top:16px;border:1px solid #fbbf24;border-radius:8px;background:#fffbeb;padding:14px;">
+        <div style="font-weight:700;color:#92400e;font-size:13px;margin-bottom:10px;">📝 Descrições avançadas (só empresas com ambientes)</div>
+
+        <div class="form-field" style="margin-bottom:12px;">
+          <label style="color:#0891b2;">📄 Descrição pra Impressão <span style="color:#778;font-weight:normal;font-size:11px;">(aparece no orçamento pro cliente)</span></label>
+          <textarea id="npr-descricao-impressao" rows="3" placeholder="Ex: Lustre em cristal K9 legítimo, com 4 lâmpadas E14, dimmerizável. Base em metal cromado, altura ajustável." style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+        </div>
+
+        <div class="form-field" style="margin-bottom:0;">
+          <label style="color:#dc2626;">🔒 Observação Interna <span style="color:#778;font-weight:normal;font-size:11px;">(NUNCA sai na impressão - só uso interno)</span></label>
+          <textarea id="npr-observacao-interna" rows="3" placeholder="Ex: Fornecedor: Iluminação SP. Prazo: 15 dias. Margem mínima: 40%. Substituto: Modelo ZY-123." style="width:100%;padding:8px 10px;border:1px solid #fca5a5;border-radius:6px;font-size:13px;background:#fef2f2;resize:vertical;"></textarea>
         </div>
       </div>
 
@@ -5728,6 +5778,11 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-estoque').value    = p.estoque || 0;
     // Preenche a foto se houver
     preencherFotoEdicao(p.fotoUrl || '');
+    // Preenche descrições novas (recurso ambientes)
+    const dImp = document.getElementById('npr-descricao-impressao');
+    const oInt = document.getElementById('npr-observacao-interna');
+    if (dImp) dImp.value = p.descricaoImpressao || '';
+    if (oInt) oInt.value = p.observacaoInterna || '';
     // Preenche campos fiscais (só relevante pra Pro, mas preenche sempre)
     const setVal = (id, val) => { const el=document.getElementById(id); if(el) el.value = val || ''; };
     setVal('npr-ncm',      p.ncm);
@@ -6581,6 +6636,11 @@ https://sistema.glinformatica.com.br
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    // Reset das descrições novas (recurso ambientes)
+    ['npr-descricao-impressao','npr-observacao-interna'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     // Colapsa a seção fiscal de volta
     const _sec = document.getElementById('npr-fiscal-content');
     const _arrow = document.getElementById('npr-fiscal-arrow');
@@ -6642,13 +6702,20 @@ https://sistema.glinformatica.com.br
       // Pega URL da foto (vazio se removeu ou não tem)
       const fotoUrl = document.getElementById('npr-foto-url')?.value.trim() || null;
 
+      // Descrições novas (só se recurso ambientes ativo)
+      const camposAmbientes = empresa.usaAmbientes ? {
+        descricaoImpressao: document.getElementById('npr-descricao-impressao')?.value.trim() || null,
+        observacaoInterna: document.getElementById('npr-observacao-interna')?.value.trim() || null
+      } : {};
+
       // ===== MODO EDIÇÃO =====
       if(_produtoEditandoIdx !== null) {
         const p = dbProdutos[_produtoEditandoIdx];
         const atualizado = await api('PUT', `/api/produtos/${p.id}`, {
           nome, categoria, fornecedor, precoCusto, precoVenda,
           fotoUrl,
-          ...camposFiscais
+          ...camposFiscais,
+          ...camposAmbientes
         });
         dbProdutos[_produtoEditandoIdx] = atualizado;
         renderListaProdutos();
@@ -6661,7 +6728,8 @@ https://sistema.glinformatica.com.br
       const novo = await api('POST', '/api/produtos', {
         codigo: codigoInput, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
         fotoUrl,
-        ...camposFiscais
+        ...camposFiscais,
+        ...camposAmbientes
       });
       dbProdutos.push(novo);
       renderListaProdutos();
@@ -10584,9 +10652,16 @@ ${conteudo}
       }
       // Preenche preco_custo nos itens que vieram do banco (não armazenamos custo nas tabelas de itens)
       _orcItensTemp.forEach(it => {
-        if (it.tipo === 'produto' && it.produto_id && (it.preco_custo === undefined || it.preco_custo === null)) {
+        if (it.tipo === 'produto' && it.produto_id) {
           const p = _produtosCacheLocal.find(x => x.id === it.produto_id);
-          it.preco_custo = p ? (parseFloat(p.precoCusto) || 0) : 0;
+          if (p) {
+            if (it.preco_custo === undefined || it.preco_custo === null) {
+              it.preco_custo = parseFloat(p.precoCusto) || 0;
+            }
+            // Restaura descrições avançadas do produto
+            it._descricao_impressao = p.descricaoImpressao || '';
+            it._observacao_interna = p.observacaoInterna || '';
+          }
         }
       });
       renderItensOrc();
@@ -10671,7 +10746,10 @@ ${conteudo}
       valor_unitario: parseFloat(p.precoVenda) || 0,
       preco_custo: parseFloat(p.precoCusto) || 0,  // Guarda custo pra cálculo de margem
       desconto_item: 0,
-      ambiente_id: ambId
+      ambiente_id: ambId,
+      // Descrições avançadas (recurso ambientes)
+      _descricao_impressao: p.descricaoImpressao || '',
+      _observacao_interna: p.observacaoInterna || ''
     });
     document.getElementById('busca-produto').value = '';
     document.getElementById('orc-lista-produtos').style.display = 'none';
@@ -10895,6 +10973,32 @@ ${conteudo}
     if (!_orcItensTemp[idx]) return;
     _orcItensTemp[idx].ambiente_id = valor ? parseInt(valor) : null;
     renderItensOrc();
+  }
+
+  // ====== VER DESCRIÇÕES DO PRODUTO (impressão + interna) ======
+  function abrirDetalhesItem(idx) {
+    const it = _orcItensTemp[idx];
+    if (!it) return;
+    document.getElementById('di-produto-nome').textContent = it.descricao || '';
+    const boxImp = document.getElementById('di-descricao-impressao-box');
+    const boxObs = document.getElementById('di-observacao-interna-box');
+    if (it._descricao_impressao) {
+      document.getElementById('di-descricao-impressao').textContent = it._descricao_impressao;
+      boxImp.style.display = '';
+    } else {
+      boxImp.style.display = 'none';
+    }
+    if (it._observacao_interna) {
+      document.getElementById('di-observacao-interna').textContent = it._observacao_interna;
+      boxObs.style.display = '';
+    } else {
+      boxObs.style.display = 'none';
+    }
+    document.getElementById('modal-detalhes-item').style.display = 'flex';
+  }
+
+  function fecharDetalhesItem() {
+    document.getElementById('modal-detalhes-item').style.display = 'none';
   }
 
   // ====== DUPLICAR ITEM EM OUTROS AMBIENTES ======
@@ -11184,6 +11288,7 @@ ${conteudo}
         ${colCusto}${colMargem}
         <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(valorTotal)}</td>
         <td style="padding:6px;text-align:center;white-space:nowrap;">
+          ${usaAmb && it.tipo === 'produto' && (it._descricao_impressao || it._observacao_interna) ? `<button onclick="abrirDetalhesItem(${i})" title="Ver descrição pra impressão e observação interna" style="background:#dbeafe;color:#1e40af;border:none;padding:4px 6px;border-radius:4px;cursor:pointer;margin-right:2px;">📝</button>` : ''}
           ${usaAmb && it.tipo !== 'servico' ? `<button onclick="abrirDuplicarAmbientes(${i})" title="Duplicar em outros ambientes" style="background:#fef3c7;color:#92400e;border:none;padding:4px 6px;border-radius:4px;cursor:pointer;margin-right:2px;">📋</button>` : ''}
           <button onclick="removerItemOrc(${i})" title="Remover" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">🗑️</button>
         </td>
@@ -11321,16 +11426,33 @@ ${conteudo}
       if (usaAmb && _ambientesCache.length === 0) {
         try { _ambientesCache = await api('GET', '/api/ambientes/todos'); } catch(e) { _ambientesCache = []; }
       }
+      // Garante cache de produtos (pra pegar descricaoImpressao)
+      if (usaAmb && _produtosCacheLocal.length === 0) {
+        try { _produtosCacheLocal = await api('GET', '/api/produtos'); } catch(e) { _produtosCacheLocal = []; }
+      }
 
-      const linhaItem = (it) => `
+      const linhaItem = (it) => {
+        // Descrição pública (só produtos com descricao_impressao E se empresa usa ambientes)
+        let descImp = '';
+        if (usaAmb && it.tipo === 'produto' && it.produto_id) {
+          const p = _produtosCacheLocal.find(x => x.id === it.produto_id);
+          if (p && p.descricaoImpressao) {
+            descImp = `<div style="font-size:11px;color:#475569;margin-top:4px;font-style:italic;line-height:1.4;white-space:pre-wrap;">${escapeHtml(p.descricaoImpressao)}</div>`;
+          }
+        }
+        return `
         <tr>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${tipoLabels[it.tipo] || ''}</td>
-          <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(it.descricao)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e2e8f0;">
+            <div style="font-weight:600;">${escapeHtml(it.descricao)}</div>
+            ${descImp}
+          </td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${it.quantidade}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(it.total)}</td>
         </tr>
-      `;
+        `;
+      };
 
       let itensHtml;
       if (temAmbientes) {
@@ -11588,6 +11710,7 @@ ${conteudo}
           <div style="flex-shrink:0;">${imgHtml}</div>
           <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
             <div style="font-weight:700;font-size:15px;color:#1e3a8a;margin-bottom:6px;">${escapeHtml(it.descricao)}</div>
+            ${produto && produto.descricaoImpressao ? `<div style="font-size:12px;color:#475569;margin-bottom:8px;font-style:italic;line-height:1.5;white-space:pre-wrap;">${escapeHtml(produto.descricaoImpressao)}</div>` : ''}
             <div style="font-size:12px;color:#64748b;margin-bottom:8px;">
               ${it.tipo === 'produto' ? '📦 Produto' : it.tipo === 'servico' ? '🔧 Serviço' : '✏️ Item'}
             </div>

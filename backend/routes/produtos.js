@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
   const {
     codigo, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
     ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
-    fotoUrl
+    fotoUrl, descricaoImpressao, observacaoInterna
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -69,8 +69,9 @@ router.post('/', async (req, res) => {
     const ins = await db.query(
       `INSERT INTO produtos (
          empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda,
-         ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+         ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url,
+         descricao_impressao, observacao_interna
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, fornecedor.trim(),
        Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
@@ -80,7 +81,9 @@ router.post('/', async (req, res) => {
        csosn || null,
        cst || null,
        unidadeTributavel || null,
-       fotoUrl || null]
+       fotoUrl || null,
+       descricaoImpressao ? String(descricaoImpressao).trim() : null,
+       observacaoInterna ? String(observacaoInterna).trim() : null]
     );
     const p = ins.rows[0];
     if (Number(estoque) > 0) {
@@ -108,7 +111,7 @@ router.put('/:id', async (req, res) => {
   const {
     nome, categoria, fornecedor, precoCusto, precoVenda,
     ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
-    fotoUrl
+    fotoUrl, descricaoImpressao, observacaoInterna
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -125,8 +128,9 @@ router.put('/:id', async (req, res) => {
       `UPDATE produtos SET
          nome=$1, categoria=$2, fornecedor=$3, preco_custo=$4, preco_venda=$5,
          ncm=$6, cest=$7, cfop_padrao=$8, origem_mercadoria=$9,
-         csosn=$10, cst=$11, unidade_tributavel=$12, foto_url=$13
-       WHERE id=$14 AND empresa_id=$15 RETURNING *`,
+         csosn=$10, cst=$11, unidade_tributavel=$12, foto_url=$13,
+         descricao_impressao=$14, observacao_interna=$15
+       WHERE id=$16 AND empresa_id=$17 RETURNING *`,
       [nome.trim(), categoria || null, fornecedor.trim(), Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
        cest ? String(cest).replace(/\D/g, '') : null,
@@ -136,6 +140,8 @@ router.put('/:id', async (req, res) => {
        cst || null,
        unidadeTributavel || null,
        fotoUrl || null,
+       descricaoImpressao ? String(descricaoImpressao).trim() : null,
+       observacaoInterna ? String(observacaoInterna).trim() : null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
