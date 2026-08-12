@@ -2176,8 +2176,8 @@
 
   <!-- Modal de Serviço -->
   <!-- Modal: Aprovar Financeiro -->
-  <div id="modal-aprovar-fin" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:center;padding:20px;">
-    <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:100%;">
+  <div id="modal-aprovar-fin" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
         <div>
           <h2 style="color:#0891b2;margin:0;font-size:20px;">💚 Aprovar Pagamento</h2>
@@ -2189,15 +2189,57 @@
       <!-- Resumo do pedido -->
       <div id="afin-resumo" style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:#334155;"></div>
 
+      <!-- Forma de pagamento (financeiro pode ajustar) -->
+      <div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">💳 Confirmar Forma de Pagamento</div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Forma de pagamento:</label>
+          <select id="afin-pagamento" onchange="afinTogglePagamento()" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <option value="Dinheiro">💵 Dinheiro (À vista)</option>
+            <option value="PIX">📱 PIX (À vista)</option>
+            <option value="Cartão de Débito">💳 Cartão de Débito (À vista)</option>
+            <option value="Cartão de Crédito">💳 Cartão de Crédito (À vista)</option>
+            <option value="Cartão Crédito Parcelado">💳 Cartão Crédito PARCELADO</option>
+            <option value="A Prazo">📅 A Prazo (Boleto/Carnê)</option>
+            <option value="Cheque">📝 Cheque</option>
+            <option value="Transferência">🏦 Transferência</option>
+          </select>
+        </div>
+
+        <!-- Bloco parcelamento (aparece só se A Prazo ou Cartão Parcelado) -->
+        <div id="afin-parcelas-bloco" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+            <div>
+              <label style="font-weight:600;font-size:12px;color:#334155;display:block;margin-bottom:4px;">Nº parcelas</label>
+              <input type="number" id="afin-parcelas-n" min="1" max="24" value="1" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:12px;color:#334155;display:block;margin-bottom:4px;">Data 1ª</label>
+              <input type="date" id="afin-parcelas-data" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:12px;color:#334155;display:block;margin-bottom:4px;">Intervalo (dias)</label>
+              <input type="number" id="afin-parcelas-intervalo" min="1" value="30" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style="background:#dcfce7;border:1px solid #16a34a;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px;color:#166534;">
-        <strong>✅ Ao aprovar:</strong> O pedido segue pro Estoque separar. Se houver produtos sem estoque, serão adicionados automaticamente à <strong>Lista de Compras</strong>.
+        <strong>✅ Ao aprovar:</strong><br>
+        • Uma VENDA é criada automaticamente (data de hoje)<br>
+        • Contas a receber são geradas conforme o pagamento<br>
+        • Pedido vai pro Estoque separar<br>
+        • Produtos sem estoque vão pra Lista de Compras<br>
+        <em style="font-size:11px;">Estoque só é baixado quando a separação for concluída</em>
       </div>
 
       <div id="afin-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
 
       <div style="display:flex;gap:10px;">
         <button type="button" onclick="fecharAprovarFin()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Voltar</button>
-        <button type="button" onclick="confirmarAprovarFin()" style="flex:2;padding:12px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💚 Aprovar Pagamento</button>
+        <button type="button" onclick="confirmarAprovarFin()" style="flex:2;padding:12px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💚 Aprovar e Criar Venda</button>
       </div>
     </div>
   </div>
@@ -8156,14 +8198,15 @@ https://sistema.glinformatica.com.br
       const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
       const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
       const cancelada = v.status === 'cancelada';
+      const emSeparacao = v.status === 'em_separacao';
       // Linha riscada + cinza pra venda cancelada
       const estiloLinha = cancelada
         ? 'background:#fef2f2;color:#9ca3af;text-decoration:line-through;'
-        : '';
+        : (emSeparacao ? 'background:#faf5ff;' : '');
       // Badge "CANCELADA" ao lado do nome do cliente
       const badgeCancelada = cancelada
         ? `<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;text-decoration:none;display:inline-block;" title="${escapeAttr(v.motivoCancelamento || '')}\nPor: ${escapeAttr(v.canceladaPorNome || '')}\nEm: ${v.canceladaEm ? new Date(v.canceladaEm).toLocaleString('pt-BR') : ''}">❌ CANCELADA</span>`
-        : '';
+        : (emSeparacao ? `<span style="background:#f3e8ff;color:#6b21a8;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px;display:inline-block;" title="Venda criada pela aprovação financeira. Estoque em separação.">📦 EM SEPARAÇÃO</span>` : '');
       // Botões: venda cancelada só pode imprimir; venda ativa tem todas opções
       const acoes = cancelada
         ? `<button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>`
@@ -11670,12 +11713,41 @@ ${conteudo}
         <span><strong>Valor:</strong> ${formatarBRL(o.total)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;">
-        <span><strong>Pagamento:</strong> ${escapeHtml(o.condicoes_pagamento || '—')}</span>
+        <span><strong>Cond. Pagto (vendedor):</strong> ${escapeHtml(o.condicoes_pagamento || '—')}</span>
         <span><strong>Itens:</strong> ${o.itens_total || 0}</span>
       </div>
     `;
+    // Pré-seleciona forma de pagamento (tenta advinhar da observação do vendedor)
+    const cond = (o.condicoes_pagamento || '').toLowerCase();
+    let padrao = 'Dinheiro';
+    if (cond.includes('pix')) padrao = 'PIX';
+    else if (cond.includes('prazo') || cond.includes('boleto') || cond.includes('carnê') || cond.includes('carne')) padrao = 'A Prazo';
+    else if (cond.includes('parcel')) padrao = 'Cartão Crédito Parcelado';
+    else if (cond.includes('crédito') || cond.includes('credito')) padrao = 'Cartão de Crédito';
+    else if (cond.includes('débito') || cond.includes('debito')) padrao = 'Cartão de Débito';
+    else if (cond.includes('cheque')) padrao = 'Cheque';
+    document.getElementById('afin-pagamento').value = padrao;
+    document.getElementById('afin-parcelas-n').value = '1';
+    // Data 1ª parcela: +30 dias
+    const d30 = new Date();
+    d30.setDate(d30.getDate() + 30);
+    document.getElementById('afin-parcelas-data').value = d30.toISOString().slice(0, 10);
+    document.getElementById('afin-parcelas-intervalo').value = '30';
+    afinTogglePagamento();
     document.getElementById('afin-erro').style.display = 'none';
     document.getElementById('modal-aprovar-fin').style.display = 'flex';
+  }
+
+  function afinTogglePagamento() {
+    const pag = document.getElementById('afin-pagamento').value;
+    const bloco = document.getElementById('afin-parcelas-bloco');
+    const parcelar = ['A Prazo', 'Cartão Crédito Parcelado', 'Cheque'].includes(pag);
+    bloco.style.display = parcelar ? '' : 'none';
+    if (!parcelar) {
+      document.getElementById('afin-parcelas-n').value = '1';
+    } else if (document.getElementById('afin-parcelas-n').value === '1') {
+      document.getElementById('afin-parcelas-n').value = '3';
+    }
   }
 
   function fecharAprovarFin() {
@@ -11687,10 +11759,27 @@ ${conteudo}
     if (!_afOrcAtivo) return;
     const erro = document.getElementById('afin-erro');
     erro.style.display = 'none';
+    const formaPagamento = document.getElementById('afin-pagamento').value;
+    const nParcelas = parseInt(document.getElementById('afin-parcelas-n').value) || 1;
+    const dataParcela = document.getElementById('afin-parcelas-data').value;
+    const intervalo = parseInt(document.getElementById('afin-parcelas-intervalo').value) || 30;
+
+    const body = { formaPagamento };
+    if (nParcelas > 1) {
+      if (!dataParcela) {
+        erro.textContent = 'Informe a data da 1ª parcela.';
+        erro.style.display = 'block';
+        return;
+      }
+      body.parcelamento = { n: nParcelas, dataPrimeira: dataParcela, intervalo };
+    }
+
     try {
-      const r = await api('POST', `/api/orcamentos/${_afOrcAtivo}/aprovar-financeiro`);
+      const r = await api('POST', `/api/orcamentos/${_afOrcAtivo}/aprovar-financeiro`, body);
       fecharAprovarFin();
-      let msg = `✅ Pedido aprovado!\n\nAprovado por: ${r.aprovadoPor || '—'}`;
+      let msg = `✅ Pedido aprovado!\n\nVenda #${r.vendaId} criada.\nAprovado por: ${r.aprovadoPor || '—'}`;
+      if (r.parcelasGeradas > 0) msg += `\n\n💳 ${r.parcelasGeradas} parcela(s) geradas em Contas a Receber.`;
+      else msg += `\n\n💰 Recebimento à vista lançado em Contas a Receber.`;
       if (r.itensAguardandoCompra && r.itensAguardandoCompra.length > 0) {
         msg += `\n\n🛒 ${r.itensAguardandoCompra.length} item(ns) foram adicionados à Lista de Compras:`;
         r.itensAguardandoCompra.forEach(it => {
@@ -11700,6 +11789,7 @@ ${conteudo}
       alert(msg);
       await carregarAprovacoes();
       if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+      if (typeof atualizarTela === 'function') atualizarTela();
     } catch (e) {
       erro.textContent = e.message || 'Erro ao aprovar.';
       erro.style.display = 'block';
@@ -13973,6 +14063,7 @@ ${conteudo}
           <div style="background:#dcfce7;border:1px solid #16a34a;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#166534;">
             💚 <strong>Pagamento aprovado</strong> por ${escapeHtml(orc.financeiro_aprovado_por_nome)}
             ${orc.financeiro_aprovado_em ? ` em ${new Date(orc.financeiro_aprovado_em).toLocaleString('pt-BR')}` : ''}
+            ${orc.venda_id ? `<br><strong>📦 Venda gerada: #${orc.venda_id}</strong> (em separação pelo estoque)` : ''}
           </div>
         ` : ''}
         ${orc.status === 'cancelado' && orc.cancelado_por_nome ? `

@@ -358,8 +358,38 @@ router.post('/:id/status', async (req, res) => {
 
 // POST /:id/aprovar-financeiro — Financeiro aprova pagamento
 // Só admin ou financeiro. Gera lista_compras aqui!
+// Helper: calcula parcelas iguais (mesma lógica do vendas.js)
+function calcularParcelasHelper(total, n, dataPrimeira, intervaloDias) {
+  const parcelas = [];
+  const valorParcela = Math.round((total / n) * 100) / 100;
+  let acumulado = 0;
+  for (let i = 0; i < n; i++) {
+    let valor = valorParcela;
+    if (i === n - 1) {
+      // Ajusta última pra fechar centavos
+      valor = Math.round((total - acumulado) * 100) / 100;
+    }
+    acumulado += valor;
+    const venc = new Date(dataPrimeira + 'T12:00:00');
+    venc.setDate(venc.getDate() + (i * (intervaloDias || 30)));
+    parcelas.push({
+      numero: i + 1,
+      total: n,
+      valor: valor,
+      vencimento: venc.toISOString().slice(0, 10)
+    });
+  }
+  return parcelas;
+}
+
+// POST /:id/aprovar-financeiro — Financeiro aprova pagamento
+// AGORA cria a VENDA junto (com status 'em_separacao')
+// Gera contas a receber, mas NÃO baixa estoque (estoque só quando Separação concluir)
 router.post('/:id/aprovar-financeiro', async (req, res) => {
   const id = parseInt(req.params.id);
+  // Opcional: financeiro pode ajustar parcelamento antes de aprovar
+  // Body: { formaPagamento?, parcelamento?: { n, dataPrimeira, intervalo } }
+  const { formaPagamento, parcelamento } = req.body || {};
 
   if (!['admin', 'financeiro'].includes(req.user.papel)) {
     return res.status(403).json({ error: 'Apenas admin ou financeiro pode aprovar.' });
@@ -369,7 +399,7 @@ router.post('/:id/aprovar-financeiro', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Verifica orçamento
+    // 1. Verifica orçamento
     const rOrc = await client.query(
       'SELECT * FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
       [id, req.user.empresaId]
@@ -378,49 +408,124 @@ router.post('/:id/aprovar-financeiro', async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Orçamento não encontrado.' });
     }
-    if (rOrc.rows[0].status !== 'aguardando_financeiro') {
+    const orc = rOrc.rows[0];
+    if (orc.status !== 'aguardando_financeiro') {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: `Orçamento não está aguardando financeiro (está em "${rOrc.rows[0].status}").` });
+      return res.status(400).json({ error: `Orçamento não está aguardando financeiro (está em "${orc.status}").` });
     }
 
-    // Pega nome do usuário
+    // 2. Pega itens do orçamento
+    const rItens = await client.query(
+      `SELECT * FROM orcamento_itens WHERE orcamento_id=$1 ORDER BY ordem, id`,
+      [id]
+    );
+    if (rItens.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Orçamento sem itens.' });
+    }
+
+    // 3. Pega nome do usuário
     const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
     const nomeUsuario = rUser.rows[0]?.nome || null;
 
-    // Atualiza orçamento → aprovado_financeiro
+    // 4. Monta dados da venda a partir do orçamento
+    const hoje = new Date().toISOString().slice(0, 10);
+    const clienteNome = orc.cliente_nome || 'Cliente';
+    const pagamento = formaPagamento || orc.condicoes_pagamento || 'A definir';
+    const subtotal = Number(orc.subtotal) || 0;
+    const desconto = Number(orc.desconto) || 0;
+    const total = Number(orc.total) || 0;
+
+    // Monta lista de itens no formato da venda
+    const itensVenda = rItens.rows.map(it => ({
+      produto: it.descricao,
+      qtd: Number(it.quantidade),
+      preco: Number(it.valor_unitario),
+      subtotal: Number(it.total)
+    }));
+
+    // Calcula parcelas se aplicável
+    let parcelas = [];
+    if (parcelamento && parcelamento.n && parcelamento.dataPrimeira && Number(parcelamento.n) > 1) {
+      parcelas = calcularParcelasHelper(
+        total,
+        Number(parcelamento.n),
+        parcelamento.dataPrimeira,
+        Number(parcelamento.intervalo) || 30
+      );
+    }
+
+    // 5. CRIA A VENDA (com status 'em_separacao')
+    const vendaIns = await client.query(
+      `INSERT INTO vendas
+        (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento,
+         parcelas, obs, criado_por, transportadora_id, orcamento_id, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'em_separacao')
+       RETURNING *`,
+      [req.user.empresaId, hoje, clienteNome, JSON.stringify(itensVenda),
+       subtotal, desconto, total, pagamento,
+       JSON.stringify(parcelas),
+       `Orçamento #${orc.numero} · Aprovado por ${nomeUsuario}`,
+       req.user.userId, orc.transportadora_id, id]
+    );
+    const venda = vendaIns.rows[0];
+
+    // 6. GERA CONTAS A RECEBER (não depende de separação!)
+    if (parcelas.length > 0) {
+      // Parcelado
+      for (const par of parcelas) {
+        await client.query(
+          `INSERT INTO contas_receber (empresa_id, cliente, descricao, valor, vencimento, status, venda_id)
+           VALUES ($1,$2,$3,$4,$5,'Pendente',$6)`,
+          [req.user.empresaId, clienteNome, `Venda #${venda.id} Parcela ${par.numero}/${par.total}`,
+           par.valor, par.vencimento, venda.id]
+        );
+      }
+    } else if (total > 0) {
+      // À vista → já registra como recebida na data de hoje
+      await client.query(
+        `INSERT INTO contas_receber (empresa_id, cliente, descricao, valor, vencimento, status, data_recebimento, venda_id)
+         VALUES ($1,$2,$3,$4,$5,'Recebida',$5,$6)`,
+        [req.user.empresaId, clienteNome, `Venda #${venda.id} - ${pagamento}`,
+         total, hoje, venda.id]
+      );
+    }
+
+    // 7. IMPORTANTE: NÃO baixa estoque nem cria movimentações
+    // Isso será feito pelo Estoque quando marcar itens como separados (LOTE 3)
+
+    // 8. Atualiza orçamento → aprovado_financeiro + vincula à venda
     await client.query(
       `UPDATE orcamentos
        SET status='aprovado_financeiro',
            financeiro_aprovado_por=$1, financeiro_aprovado_por_nome=$2,
-           financeiro_aprovado_em=NOW(), atualizado_em=NOW()
-       WHERE id=$3`,
-      [req.user.userId, nomeUsuario, id]
+           financeiro_aprovado_em=NOW(),
+           venda_id=$3,
+           atualizado_em=NOW()
+       WHERE id=$4`,
+      [req.user.userId, nomeUsuario, venda.id, id]
     );
 
-    // AGORA gera lista_compras pra itens sem estoque suficiente
-    // E marca itens com status_separacao adequado
+    // 9. Gera lista_compras pra itens sem estoque suficiente
     let itensCriados = [];
-    const rItens = await client.query(
-      `SELECT oi.id AS item_id, oi.produto_id, oi.quantidade,
-              p.nome, p.codigo, p.referencia, p.estoque
-       FROM orcamento_itens oi
-       LEFT JOIN produtos p ON p.id = oi.produto_id
-       WHERE oi.orcamento_id = $1 AND oi.tipo = 'produto' AND oi.produto_id IS NOT NULL`,
-      [id]
-    );
-
     for (const item of rItens.rows) {
-      const estoque = Number(item.estoque) || 0;
+      if (item.tipo !== 'produto' || !item.produto_id) continue;
+      // Busca dados do produto
+      const rProd = await client.query(
+        'SELECT nome, codigo, referencia, estoque FROM produtos WHERE id=$1',
+        [item.produto_id]
+      );
+      if (rProd.rows.length === 0) continue;
+      const p = rProd.rows[0];
+      const estoque = Number(p.estoque) || 0;
       const qtdOrc = Number(item.quantidade) || 0;
       const faltando = qtdOrc - estoque;
 
       if (faltando > 0) {
-        // Marca item como aguardando compra
         await client.query(
           `UPDATE orcamento_itens SET status_separacao='aguardando_compra' WHERE id=$1`,
-          [item.item_id]
+          [item.id]
         );
-        // Cria item na lista_compras (evita duplicata)
         const jaExiste = await client.query(
           `SELECT id FROM lista_compras
            WHERE empresa_id=$1 AND orcamento_id=$2 AND produto_id=$3`,
@@ -432,8 +537,8 @@ router.post('/:id/aprovar-financeiro', async (req, res) => {
                                         produto_codigo, referencia, quantidade, status, criado_por)
              VALUES ($1,$2,$3,$4,$5,$6,$7,'pendente',$8)
              RETURNING produto_nome, quantidade`,
-            [req.user.empresaId, id, item.produto_id, item.nome,
-             item.codigo, item.referencia, faltando, req.user.userId]
+            [req.user.empresaId, id, item.produto_id, p.nome,
+             p.codigo, p.referencia, faltando, req.user.userId]
           );
           itensCriados.push({
             produto: ins.rows[0].produto_nome,
@@ -443,16 +548,27 @@ router.post('/:id/aprovar-financeiro', async (req, res) => {
       }
     }
 
+    // 10. Cria cliente se não existir (mesma lógica de venda direta)
+    const cliExist = await client.query(
+      'SELECT id FROM clientes WHERE empresa_id=$1 AND LOWER(nome)=LOWER($2)',
+      [req.user.empresaId, clienteNome]
+    );
+    if (cliExist.rows.length === 0) {
+      await client.query('INSERT INTO clientes (empresa_id, nome) VALUES ($1,$2)', [req.user.empresaId, clienteNome]);
+    }
+
     await client.query('COMMIT');
     res.json({
       ok: true,
       aprovadoPor: nomeUsuario,
-      itensAguardandoCompra: itensCriados
+      vendaId: venda.id,
+      itensAguardandoCompra: itensCriados,
+      parcelasGeradas: parcelas.length
     });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[orcamentos] aprovar-financeiro', err);
-    res.status(500).json({ error: 'Erro ao aprovar financeiramente.' });
+    res.status(500).json({ error: 'Erro ao aprovar financeiramente: ' + err.message });
   } finally {
     client.release();
   }
