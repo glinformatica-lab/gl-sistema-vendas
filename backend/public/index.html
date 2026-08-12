@@ -567,8 +567,16 @@
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
       <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('aprovacoes-financeiras')" style="display:none;">&#128176; Aprovações Financeiras <span id="badge-aprovacoes-fin" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
-      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('separacao')" style="display:none;">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
-      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('lista-compras')" style="display:none;">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+    </div>
+
+    <!-- Estoque (Módulo Iluminação) -->
+    <button class="menu-btn menu-grupo feature-ambientes" onclick="toggleGrupoMenu('estoque')" data-grupo="estoque" type="button" style="display:none;">
+      <span>&#128230; Estoque <span id="badge-estoque-grupo" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></span>
+      <span class="grupo-seta" id="seta-estoque">▼</span>
+    </button>
+    <div class="submenu feature-ambientes" id="submenu-estoque" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
     <!-- Vendas Online (admin-only) -->
@@ -5778,9 +5786,9 @@ https://sistema.glinformatica.com.br
     'transportadoras': 'cadastros',
     'vendas': 'vendas',
     'orcamentos': 'vendas',
-    'lista-compras': 'vendas',
     'aprovacoes-financeiras': 'vendas',
-    'separacao': 'vendas',
+    'lista-compras': 'estoque',
+    'separacao': 'estoque',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -11734,7 +11742,31 @@ ${conteudo}
           badge.style.display = 'none';
         }
       }
+      // Atualiza badge do GRUPO Estoque (soma separação + lista de compras)
+      atualizarBadgeGrupoEstoque();
     } catch (e) { /* silencioso */ }
+  }
+
+  // Soma badges de separação + lista de compras no grupo Estoque
+  function atualizarBadgeGrupoEstoque() {
+    const badgeGrupo = document.getElementById('badge-estoque-grupo');
+    if (!badgeGrupo) return;
+    const papel = window._papelAtual;
+    if (!['admin', 'estoque'].includes(papel)) {
+      badgeGrupo.style.display = 'none';
+      return;
+    }
+    const sepBadge = document.getElementById('badge-separacao');
+    const lcBadge = document.getElementById('badge-lista-compras');
+    const sepQtd = (sepBadge && sepBadge.style.display !== 'none') ? parseInt(sepBadge.textContent) || 0 : 0;
+    const lcQtd = (lcBadge && lcBadge.style.display !== 'none') ? parseInt(lcBadge.textContent) || 0 : 0;
+    const total = sepQtd + lcQtd;
+    if (total > 0) {
+      badgeGrupo.textContent = total;
+      badgeGrupo.style.display = '';
+    } else {
+      badgeGrupo.style.display = 'none';
+    }
   }
 
   function filtrarSeparacao(status) {
@@ -12359,6 +12391,8 @@ ${conteudo}
           badge.style.display = 'none';
         }
       }
+      // Atualiza badge do grupo Estoque
+      if (typeof atualizarBadgeGrupoEstoque === 'function') atualizarBadgeGrupoEstoque();
     } catch(e) { /* silencioso */ }
   }
 
