@@ -869,7 +869,7 @@
         <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
         <button class="btn" style="background:#16a34a;" onclick="openImportarProdutos()">📥 Importar Planilha</button>
         <button class="btn feature-ambientes" style="background:#7c3aed;display:none;" onclick="abrirEtiquetas()">🏷️ Etiquetas</button>
-        <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria ou fornecedor"
+        <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria, fornecedor, referência ou código de barras"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="renderProdutos()">
         <span id="contador-produtos" style="color:#668;font-size:13px;"></span>
@@ -6002,7 +6002,9 @@ https://sistema.glinformatica.com.br
         (p.codigo && String(p.codigo).toLowerCase().includes(termo)) ||
         (p.nome && p.nome.toLowerCase().includes(termo)) ||
         (p.categoria && p.categoria.toLowerCase().includes(termo)) ||
-        (p.fornecedor && p.fornecedor.toLowerCase().includes(termo))
+        (p.fornecedor && p.fornecedor.toLowerCase().includes(termo)) ||
+        (p.referencia && p.referencia.toLowerCase().includes(termo)) ||
+        (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termo))
       ));
     }
     const contador = document.getElementById('contador-produtos');
@@ -6151,6 +6153,9 @@ https://sistema.glinformatica.com.br
     if (p) return p;
     // 3) Busca exato por código de barras
     p = dbProdutos.find(p => (p.codigoBarras || '').toLowerCase() === n);
+    if (p) return p;
+    // 3b) Busca exato por referência do fabricante
+    p = dbProdutos.find(p => (p.referencia || '').toLowerCase() === n);
     if (p) return p;
     // 4) Se o valor for "código - nome" (formato gerado pelo autocomplete com código),
     //    separa pela primeira ocorrência de " - " e tenta achar pelo código OU nome
@@ -8072,7 +8077,10 @@ https://sistema.glinformatica.com.br
     const tbody = document.getElementById('tbody-itens-venda');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input type="text" class="nv-item-produto" list="lista-produtos" placeholder="Nome do produto" value="${d.produto || ''}" required></td>
+      <td style="position:relative;">
+        <input type="text" class="nv-item-produto" list="lista-produtos" placeholder="Nome, referência ou código" value="${d.produto || ''}" autocomplete="off" required>
+        <div class="nv-item-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #7c3aed;border-radius:0 0 6px 6px;max-height:220px;overflow-y:auto;z-index:150;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+      </td>
       <td class="nv-item-estoque" style="text-align:center;"><span style="color:#94a3b8;font-size:12px;">—</span></td>
       <td><input type="number" class="nv-item-qtd" min="1" step="1" value="${d.qtd || 1}" required></td>
       <td><input type="number" class="nv-item-preco" min="0.01" step="0.01" value="${d.preco != null ? d.preco : ''}" placeholder="0,00" required></td>
@@ -8082,8 +8090,81 @@ https://sistema.glinformatica.com.br
     tbody.appendChild(tr);
     tr.querySelector('.nv-item-qtd').addEventListener('input', () => recalcularLinhaVenda(tr));
     tr.querySelector('.nv-item-preco').addEventListener('input', () => recalcularLinhaVenda(tr));
-    tr.querySelector('.nv-item-produto').addEventListener('change', () => {
-      const inputProd = tr.querySelector('.nv-item-produto');
+
+    // Autocomplete customizado (busca por nome/código/referência)
+    const inputProd = tr.querySelector('.nv-item-produto');
+    const sugest = tr.querySelector('.nv-item-suggest');
+    const emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const usaAmb = !!emp.usaAmbientes;
+    // Remove datalist se módulo ativo (usa autocomplete customizado)
+    if (usaAmb) inputProd.removeAttribute('list');
+
+    function renderSugestoes(termo) {
+      const t = (termo || '').toLowerCase().trim();
+      if (!t || t.length < 1) {
+        sugest.style.display = 'none';
+        return;
+      }
+      const resultados = (dbProdutos || []).filter(p =>
+        (p.nome || '').toLowerCase().includes(t) ||
+        (p.codigo || '').toLowerCase().includes(t) ||
+        (p.codigoBarras || '').toLowerCase().includes(t) ||
+        (p.referencia || '').toLowerCase().includes(t)
+      ).slice(0, 15);
+      if (resultados.length === 0) {
+        sugest.style.display = 'none';
+        return;
+      }
+      sugest.innerHTML = resultados.map(p => {
+        const est = Number(p.estoque) || 0;
+        const semEst = est <= 0;
+        return `
+          <div class="nv-suggest-item" data-nome="${escapeAttr(p.nome)}" data-preco="${p.precoVenda || 0}"
+               style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;${semEst ? 'opacity:0.6;' : ''}"
+               onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:13px;color:#1e293b;">${escapeHtml(p.nome)}</div>
+              <div style="font-size:11px;color:#64748b;">
+                ${p.codigo ? 'Cód: ' + escapeHtml(p.codigo) + ' · ' : ''}
+                ${p.referencia ? '<span style="color:#7c3aed;font-weight:600;">Ref: ' + escapeHtml(p.referencia) + '</span> · ' : ''}
+                Estoque: <strong style="color:${semEst ? '#dc2626' : '#16a34a'};">${est}</strong>
+              </div>
+            </div>
+            <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:8px;font-size:13px;">${formatarBRL(p.precoVenda || 0)}</div>
+          </div>
+        `;
+      }).join('');
+      // Click handler
+      sugest.querySelectorAll('.nv-suggest-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          inputProd.value = el.dataset.nome;
+          sugest.style.display = 'none';
+          // Preenche preço se estiver vazio
+          const precoInp = tr.querySelector('.nv-item-preco');
+          if (!precoInp.value && el.dataset.preco) {
+            precoInp.value = parseFloat(el.dataset.preco).toFixed(2);
+          }
+          atualizarEstoqueLinha(tr);
+          recalcularLinhaVenda(tr);
+        });
+      });
+      sugest.style.display = 'block';
+    }
+
+    inputProd.addEventListener('input', () => {
+      if (usaAmb) renderSugestoes(inputProd.value);
+      atualizarEstoqueLinha(tr);
+    });
+    inputProd.addEventListener('focus', () => {
+      if (usaAmb) renderSugestoes(inputProd.value);
+    });
+    inputProd.addEventListener('blur', () => {
+      // Delay pra permitir click no item
+      setTimeout(() => { sugest.style.display = 'none'; }, 200);
+    });
+
+    inputProd.addEventListener('change', () => {
       const p = getProduto(inputProd.value);
       if (p) {
         // Se o valor digitado/selecionado NÃO é exatamente o nome (ex: vem como "código - nome"),
@@ -8096,8 +8177,6 @@ https://sistema.glinformatica.com.br
       }
       atualizarEstoqueLinha(tr);
     });
-    // Também atualiza ao digitar (sem precisar sair do campo)
-    tr.querySelector('.nv-item-produto').addEventListener('input', () => atualizarEstoqueLinha(tr));
     // Se já veio com produto preenchido (ex: vindo de orçamento), atualiza na hora
     if (d.produto) atualizarEstoqueLinha(tr);
     recalcularLinhaVenda(tr);
