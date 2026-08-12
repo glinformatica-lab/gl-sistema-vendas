@@ -33,10 +33,12 @@ router.get('/', async (req, res) => {
     const r = await db.query(
       `SELECT v.*,
               uc.nome AS criado_por_nome,
-              ucan.nome AS cancelada_por_nome
+              ucan.nome AS cancelada_por_nome,
+              t.nome AS transportadora_nome
        FROM vendas v
        LEFT JOIN usuarios uc ON uc.id = v.criado_por
        LEFT JOIN usuarios ucan ON ucan.id = v.cancelada_por
+       LEFT JOIN transportadoras t ON t.id = v.transportadora_id
        WHERE v.empresa_id=$1 ORDER BY v.data DESC, v.id DESC`,
       [req.user.empresaId]
     );
@@ -53,7 +55,7 @@ router.get('/', async (req, res) => {
 
 // Criar venda — transação: dá baixa no estoque, cria movimentações, gera contas a receber
 router.post('/', async (req, res) => {
-  const { data, cliente, itens, desconto, pagamento, parcelamento, obs } = req.body || {};
+  const { data, cliente, itens, desconto, pagamento, parcelamento, obs, transportadora_id } = req.body || {};
   if (!cliente) return res.status(400).json({ error: 'Cliente é obrigatório.' });
   if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'Adicione ao menos um item.' });
@@ -108,9 +110,9 @@ router.post('/', async (req, res) => {
 
     // Cria a venda
     const vendaIns = await client.query(
-      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs, criado_por)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null, req.user.userId]
+      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs, criado_por, transportadora_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null, req.user.userId, transportadora_id || null]
     );
     const venda = vendaIns.rows[0];
 

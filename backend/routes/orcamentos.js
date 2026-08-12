@@ -24,12 +24,14 @@ router.get('/', async (req, res) => {
     }
     const r = await db.query(
       `SELECT o.*, c.nome AS cliente_nome_real,
+              t.nome AS transportadora_nome,
               (SELECT COUNT(*) FROM lista_compras lc
                WHERE lc.orcamento_id = o.id AND lc.status IN ('pendente','pedido'))::int AS compras_abertas,
               (SELECT COUNT(*) FROM lista_compras lc
                WHERE lc.orcamento_id = o.id AND lc.status = 'pendente')::int AS compras_pendentes
        FROM orcamentos o
        LEFT JOIN clientes c ON c.id = o.cliente_id
+       LEFT JOIN transportadoras t ON t.id = o.transportadora_id
        ${where}
        ORDER BY o.numero DESC LIMIT 200`,
       params
@@ -48,9 +50,11 @@ router.get('/:id', async (req, res) => {
     const rOrc = await db.query(
       `SELECT o.*, c.nome AS cliente_nome_real, c.telefone AS cliente_telefone,
               c.doc AS cliente_doc, c.endereco AS cliente_endereco,
-              c.cidade AS cliente_cidade, c.uf AS cliente_uf
+              c.cidade AS cliente_cidade, c.uf AS cliente_uf,
+              t.nome AS transportadora_nome, t.telefone AS transportadora_telefone
        FROM orcamentos o
        LEFT JOIN clientes c ON c.id = o.cliente_id
+       LEFT JOIN transportadoras t ON t.id = o.transportadora_id
        WHERE o.id = $1 AND o.empresa_id = $2 LIMIT 1`,
       [id, req.user.empresaId]
     );
@@ -77,7 +81,7 @@ router.post('/', async (req, res) => {
   const {
     cliente_id, cliente_nome,
     validade_dias, observacoes, condicoes_pagamento,
-    desconto, itens
+    desconto, itens, transportadora_id
   } = req.body || {};
 
   if (!Array.isArray(itens) || itens.length === 0) {
@@ -125,13 +129,13 @@ router.post('/', async (req, res) => {
       `INSERT INTO orcamentos
        (empresa_id, numero, cliente_id, cliente_nome, validade_dias, data_validade,
         subtotal, desconto, total, observacoes, condicoes_pagamento,
-        vendedor_id, vendedor_nome)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        vendedor_id, vendedor_nome, transportadora_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [req.user.empresaId, numero, cliente_id || null, cliente_nome.trim(),
        validadeDias, dataValidadeIso,
        subtotal, descontoNum, total, observacoes || null, condicoes_pagamento || null,
-       req.user.userId, vendedorNome]
+       req.user.userId, vendedorNome, transportadora_id || null]
     );
     const orcamento = rOrc.rows[0];
 
@@ -184,7 +188,7 @@ router.put('/:id', async (req, res) => {
   const {
     cliente_id, cliente_nome,
     validade_dias, observacoes, condicoes_pagamento,
-    desconto, itens
+    desconto, itens, transportadora_id
   } = req.body || {};
 
   // Verifica se o vendedor é dono do orçamento
@@ -233,11 +237,11 @@ router.put('/:id', async (req, res) => {
       `UPDATE orcamentos SET
        cliente_id=$1, cliente_nome=$2, validade_dias=$3, data_validade=$4,
        subtotal=$5, desconto=$6, total=$7,
-       observacoes=$8, condicoes_pagamento=$9, atualizado_em=NOW()
-       WHERE id=$10`,
+       observacoes=$8, condicoes_pagamento=$9, transportadora_id=$10, atualizado_em=NOW()
+       WHERE id=$11`,
       [cliente_id || null, (cliente_nome || '').trim(), validadeDias, dataValidadeIso,
        subtotal, descontoNum, total,
-       observacoes || null, condicoes_pagamento || null, id]
+       observacoes || null, condicoes_pagamento || null, transportadora_id || null, id]
     );
 
     // Recria itens

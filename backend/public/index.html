@@ -555,6 +555,7 @@
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('clientes')">&#128100; Clientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
+      <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('transportadoras')" style="display:none;">&#128666; Transportadoras</button>
     </div>
 
     <!-- Vendas -->
@@ -871,6 +872,37 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
+    </div>
+
+    <!-- Transportadoras (Módulo Iluminação) -->
+    <div id="page-transportadoras" style="display:none;">
+      <div class="page-title">🚚 Transportadoras</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Cadastre transportadoras para vincular a orçamentos e vendas.</div>
+
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn" onclick="openNovaTransportadora()">+ Nova Transportadora</button>
+        <input type="text" id="busca-transportadoras" placeholder="🔍 Buscar por nome, CNPJ ou cidade"
+               oninput="renderTransportadoras()"
+               style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;">
+        <span id="contador-transportadoras" style="color:#668;font-size:13px;"></span>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Nome</th>
+              <th style="padding:10px;text-align:left;width:150px;">CNPJ</th>
+              <th style="padding:10px;text-align:left;width:130px;">Telefone</th>
+              <th style="padding:10px;text-align:left;">Cidade/UF</th>
+              <th style="padding:10px;text-align:left;width:150px;">Contato</th>
+              <th style="padding:10px;text-align:center;width:80px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-transportadoras">
+            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Produtos -->
@@ -2083,6 +2115,93 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Cadastrar/Editar Transportadora -->
+  <div id="modal-transportadora" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:26px 32px;border-radius:16px;max-width:640px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9;">
+        <h2 id="modal-transp-titulo" style="color:var(--azul);margin:0;font-size:22px;">🚚 Nova Transportadora</h2>
+        <button onclick="fecharTransportadora()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <input type="hidden" id="transp-id">
+
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid #e2e8f0;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📋 Informações Básicas</div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Nome / Razão Social*</label>
+          <input type="text" id="transp-nome" required style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">CNPJ</label>
+            <input type="text" id="transp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCnpjTransp(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Telefone</label>
+            <input type="text" id="transp-telefone" placeholder="(00) 00000-0000" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid #e2e8f0;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📍 Endereço</div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Endereço</label>
+          <input type="text" id="transp-endereco" placeholder="Rua, número" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.5fr 1.5fr 0.6fr 1fr;gap:12px;">
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Bairro</label>
+            <input type="text" id="transp-bairro" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Cidade</label>
+            <input type="text" id="transp-cidade" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">UF</label>
+            <input type="text" id="transp-uf" maxlength="2" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">CEP</label>
+            <input type="text" id="transp-cep" placeholder="00000-000" maxlength="9" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid #e2e8f0;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📞 Contato</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Pessoa de Contato</label>
+            <input type="text" id="transp-contato" placeholder="Nome do responsável" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;text-transform:uppercase;">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">E-mail</label>
+            <input type="email" id="transp-email" placeholder="contato@transp.com.br" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:4px;">Observação</label>
+          <textarea id="transp-observacao" rows="2" placeholder="Anotações internas: rotas atendidas, prazos, valores..." style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <div id="transp-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <button type="button" onclick="fecharTransportadora()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="salvarTransportadora()" style="flex:2;padding:12px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Status de Compras por Orçamento -->
   <div id="modal-compras-orc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:24px;border-radius:14px;max-width:700px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -2529,6 +2648,12 @@
           <div>
             <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">Condições de pagamento</label>
             <input type="text" id="orc-condicoes" placeholder="Ex: À vista 5% desc. ou 3x s/ juros" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+          </div>
+          <div class="feature-ambientes" style="display:none;">
+            <label style="display:block;font-weight:600;color:#444;font-size:13px;margin-bottom:4px;">🚚 Transportadora</label>
+            <select id="orc-transportadora" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+              <option value="">— Nenhuma —</option>
+            </select>
           </div>
         </div>
         <div style="background:#f6f8fc;padding:16px;border-radius:8px;height:fit-content;">
@@ -3346,6 +3471,12 @@
         <div class="form-field" style="flex:2;">
           <label>Observações</label>
           <textarea id="nv-obs" rows="2" placeholder="Opcional"></textarea>
+        </div>
+        <div class="form-field feature-ambientes" style="flex:1;display:none;">
+          <label>🚚 Transportadora</label>
+          <select id="nv-transportadora">
+            <option value="">— Nenhuma —</option>
+          </select>
         </div>
       </div>
 
@@ -5352,6 +5483,7 @@ https://sistema.glinformatica.com.br
     'ambientes': 'cadastros',
     'clientes': 'cadastros',
     'fornecedores': 'cadastros',
+    'transportadoras': 'cadastros',
     'vendas': 'vendas',
     'orcamentos': 'vendas',
     'lista-compras': 'vendas',
@@ -5538,6 +5670,15 @@ https://sistema.glinformatica.com.br
         return;
       }
       carregarListaCompras();
+    }
+    if(pg === 'transportadoras') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      carregarTransportadoras();
     }
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
@@ -8212,7 +8353,7 @@ https://sistema.glinformatica.com.br
   }
 
   // ====== NOVA VENDA ======
-  function openNovaVenda() {
+  async function openNovaVenda() {
     document.getElementById('modal-nova-venda').style.display = 'flex';
     const hoje = new Date().toISOString().slice(0,10);
     if(!document.getElementById('nv-data').value) document.getElementById('nv-data').value = hoje;
@@ -8222,6 +8363,14 @@ https://sistema.glinformatica.com.br
     renderListaProdutos();
     atualizarTotaisVenda();
     toggleParcelasVenda();
+    // Carrega transportadoras se módulo iluminação ativo
+    const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_emp.usaAmbientes) {
+      try { _transportadorasCache = await api('GET', '/api/transportadoras'); } catch(e) { _transportadorasCache = []; }
+      atualizarSelectTransportadoras();
+      const selTransp = document.getElementById('nv-transportadora');
+      if (selTransp) selTransp.value = '';
+    }
   }
   function closeNovaVenda() {
     document.getElementById('modal-nova-venda').style.display = 'none';
@@ -8552,7 +8701,8 @@ https://sistema.glinformatica.com.br
       const venda = await api('POST', '/api/vendas', {
         data, cliente, itens, desconto,
         pagamento, parcelamento,
-        obs: document.getElementById('nv-obs').value.trim()
+        obs: document.getElementById('nv-obs').value.trim(),
+        transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null
       });
 
       // Se essa venda veio de uma conversão de orçamento, marca o orçamento como convertido
@@ -8599,17 +8749,20 @@ https://sistema.glinformatica.com.br
   });
 
   // ====== EDITAR / IMPRIMIR VENDA ======
-  function editarVenda(id) {
+  async function editarVenda(id) {
     const v = dbVendas.find(x => x.id === id);
     if(!v) { alert('Venda não encontrada.'); return; }
     _vendaEditandoId = id;
-    openNovaVenda();
+    await openNovaVenda();
     document.getElementById('nv-cliente').value = v.cliente || '';
     document.getElementById('nv-data').value    = v.data || '';
     document.getElementById('nv-desconto').value = (v.desconto || 0).toFixed(2);
     document.getElementById('nv-tipo-desconto').value = 'valor'; // edição sempre em valor (já está calculado)
     document.getElementById('nv-pagamento').value = v.pagamento || 'A Vista';
     document.getElementById('nv-obs').value = v.obs || '';
+    // Pré-seleciona transportadora
+    const selTransp = document.getElementById('nv-transportadora');
+    if (selTransp) selTransp.value = v.transportadoraId || '';
     // Itens
     document.getElementById('tbody-itens-venda').innerHTML = '';
     if(v.itens && v.itens.length > 0) {
@@ -11020,6 +11173,172 @@ ${conteudo}
     document.getElementById('modal-leitor-camera').style.display = 'none';
   }
 
+  // ====== TRANSPORTADORAS (Módulo Iluminação) ======
+  let _transportadorasCache = [];
+
+  async function carregarTransportadoras() {
+    try {
+      _transportadorasCache = await api('GET', '/api/transportadoras');
+      renderTransportadoras();
+      atualizarSelectTransportadoras();
+    } catch (e) {
+      console.error('[transportadoras]', e);
+      const tbody = document.getElementById('tbody-transportadoras');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function renderTransportadoras() {
+    const tbody = document.getElementById('tbody-transportadoras');
+    if (!tbody) return;
+    const termo = (document.getElementById('busca-transportadoras')?.value || '').toLowerCase().trim();
+    let lista = _transportadorasCache;
+    if (termo) {
+      lista = lista.filter(t =>
+        (t.nome || '').toLowerCase().includes(termo) ||
+        (t.cnpj || '').toLowerCase().includes(termo) ||
+        (t.cidade || '').toLowerCase().includes(termo)
+      );
+    }
+    const contador = document.getElementById('contador-transportadoras');
+    if (contador) {
+      contador.textContent = termo
+        ? `${lista.length} de ${_transportadorasCache.length} transportadora(s)`
+        : `${_transportadorasCache.length} transportadora(s)`;
+    }
+    if (_transportadorasCache.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:30px;">Nenhuma transportadora cadastrada. Clique em <strong>+ Nova Transportadora</strong>.</td></tr>';
+      return;
+    }
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:30px;">Nenhuma transportadora encontrada com esse filtro.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(t => `
+      <tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:10px;">
+          <div style="font-weight:600;">${escapeHtml(t.nome)}</div>
+          ${t.contato ? `<div style="font-size:11px;color:#64748b;">Contato: ${escapeHtml(t.contato)}</div>` : ''}
+        </td>
+        <td style="padding:10px;font-family:monospace;font-size:12px;color:#64748b;">${escapeHtml(t.cnpj || '—')}</td>
+        <td style="padding:10px;font-size:12px;">${escapeHtml(t.telefone || '—')}</td>
+        <td style="padding:10px;font-size:12px;">${escapeHtml(t.cidade || '—')}${t.uf ? '/' + escapeHtml(t.uf) : ''}</td>
+        <td style="padding:10px;font-size:12px;">${escapeHtml(t.email || '—')}</td>
+        <td style="padding:10px;text-align:center;">
+          <button onclick="editarTransportadora(${t.id})" title="Editar" style="background:none;border:none;font-size:16px;cursor:pointer;">✏️</button>
+          <button onclick="excluirTransportadora(${t.id})" title="Excluir" style="background:none;border:none;font-size:16px;cursor:pointer;color:#dc2626;">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openNovaTransportadora() {
+    document.getElementById('modal-transp-titulo').textContent = '🚚 Nova Transportadora';
+    document.getElementById('transp-id').value = '';
+    ['nome','cnpj','telefone','email','endereco','bairro','cidade','uf','cep','contato','observacao'].forEach(f => {
+      const el = document.getElementById('transp-' + f);
+      if (el) el.value = '';
+    });
+    document.getElementById('transp-erro').style.display = 'none';
+    document.getElementById('modal-transportadora').style.display = 'flex';
+    setTimeout(() => document.getElementById('transp-nome').focus(), 100);
+  }
+
+  function editarTransportadora(id) {
+    const t = _transportadorasCache.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('modal-transp-titulo').textContent = '🚚 Editar Transportadora';
+    document.getElementById('transp-id').value = t.id;
+    document.getElementById('transp-nome').value = t.nome || '';
+    document.getElementById('transp-cnpj').value = t.cnpj || '';
+    document.getElementById('transp-telefone').value = t.telefone || '';
+    document.getElementById('transp-email').value = t.email || '';
+    document.getElementById('transp-endereco').value = t.endereco || '';
+    document.getElementById('transp-bairro').value = t.bairro || '';
+    document.getElementById('transp-cidade').value = t.cidade || '';
+    document.getElementById('transp-uf').value = t.uf || '';
+    document.getElementById('transp-cep').value = t.cep || '';
+    document.getElementById('transp-contato').value = t.contato || '';
+    document.getElementById('transp-observacao').value = t.observacao || '';
+    document.getElementById('transp-erro').style.display = 'none';
+    document.getElementById('modal-transportadora').style.display = 'flex';
+  }
+
+  function fecharTransportadora() {
+    document.getElementById('modal-transportadora').style.display = 'none';
+  }
+
+  async function salvarTransportadora() {
+    const id = document.getElementById('transp-id').value;
+    const nome = document.getElementById('transp-nome').value.trim();
+    const erro = document.getElementById('transp-erro');
+    erro.style.display = 'none';
+    if (!nome) {
+      erro.textContent = 'Nome é obrigatório.';
+      erro.style.display = 'block';
+      return;
+    }
+    const dados = {
+      nome,
+      cnpj: document.getElementById('transp-cnpj').value.trim(),
+      telefone: document.getElementById('transp-telefone').value.trim(),
+      email: document.getElementById('transp-email').value.trim(),
+      endereco: document.getElementById('transp-endereco').value.trim(),
+      bairro: document.getElementById('transp-bairro').value.trim(),
+      cidade: document.getElementById('transp-cidade').value.trim(),
+      uf: document.getElementById('transp-uf').value.trim(),
+      cep: document.getElementById('transp-cep').value.trim(),
+      contato: document.getElementById('transp-contato').value.trim(),
+      observacao: document.getElementById('transp-observacao').value.trim()
+    };
+    try {
+      if (id) {
+        await api('PUT', '/api/transportadoras/' + id, dados);
+      } else {
+        await api('POST', '/api/transportadoras', dados);
+      }
+      fecharTransportadora();
+      await carregarTransportadoras();
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao salvar.';
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirTransportadora(id) {
+    const t = _transportadorasCache.find(x => x.id === id);
+    if (!t) return;
+    if (!confirm(`Excluir a transportadora "${t.nome}"?\n\nOrçamentos e vendas antigos manterão o histórico, mas ela não aparecerá mais nos seletores.`)) return;
+    try {
+      await api('DELETE', '/api/transportadoras/' + id);
+      await carregarTransportadoras();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  function mascaraCnpjTransp(input) {
+    let v = input.value.replace(/\D/g, '').slice(0, 14);
+    if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2}).*/, '$1.$2.$3/$4-$5');
+    else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4}).*/, '$1.$2.$3/$4');
+    else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d{0,3}).*/, '$1.$2.$3');
+    else if (v.length > 2) v = v.replace(/^(\d{2})(\d{0,3}).*/, '$1.$2');
+    input.value = v;
+  }
+
+  // Atualiza os selects de transportadora nos modais de orçamento e venda
+  function atualizarSelectTransportadoras() {
+    const selects = ['orc-transportadora', 'nv-transportadora'];
+    selects.forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const valorAtual = sel.value;
+      sel.innerHTML = '<option value="">— Nenhuma —</option>' +
+        _transportadorasCache.map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+      sel.value = valorAtual;
+    });
+  }
+
   // ====== LISTA DE COMPRAS (Módulo Iluminação) ======
   let _listaComprasCache = [];
   let _lcFiltroStatus = 'todos';
@@ -12195,6 +12514,13 @@ ${conteudo}
     if (_emp.usaAmbientes && _ambientesCache.length === 0) {
       try { _ambientesCache = await api('GET', '/api/ambientes'); } catch(e) { _ambientesCache = []; }
     }
+    // Carrega transportadoras se recurso ativo
+    if (_emp.usaAmbientes) {
+      try { _transportadorasCache = await api('GET', '/api/transportadoras'); } catch(e) { _transportadorasCache = []; }
+      atualizarSelectTransportadoras();
+      const selTransp = document.getElementById('orc-transportadora');
+      if (selTransp) selTransp.value = '';
+    }
     renderItensOrc();
     document.getElementById('modal-orcamento').style.display = 'flex';
   }
@@ -12220,6 +12546,13 @@ ${conteudo}
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (_emp.usaAmbientes && _ambientesCache.length === 0) {
         try { _ambientesCache = await api('GET', '/api/ambientes'); } catch(e) { _ambientesCache = []; }
+      }
+      // Carrega transportadoras e pré-seleciona a atual
+      if (_emp.usaAmbientes) {
+        try { _transportadorasCache = await api('GET', '/api/transportadoras'); } catch(e) { _transportadorasCache = []; }
+        atualizarSelectTransportadoras();
+        const selTransp = document.getElementById('orc-transportadora');
+        if (selTransp) selTransp.value = orc.transportadora_id || '';
       }
       // Preenche preco_custo nos itens que vieram do banco (não armazenamos custo nas tabelas de itens)
       _orcItensTemp.forEach(it => {
@@ -12890,6 +13223,7 @@ ${conteudo}
       validade_dias: parseInt(document.getElementById('orc-validade').value) || 7,
       observacoes: document.getElementById('orc-observacoes').value.trim(),
       condicoes_pagamento: document.getElementById('orc-condicoes').value.trim(),
+      transportadora_id: parseInt(document.getElementById('orc-transportadora')?.value) || null,
       desconto: parseFloat(document.getElementById('orc-desconto').value) || 0,
       itens: _orcItensTemp
     };
@@ -13107,6 +13441,7 @@ ${conteudo}
         </div>
         ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
         ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
+        ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
         <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
           Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
         </div>
@@ -13373,6 +13708,7 @@ ${conteudo}
       </div>
       ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
       ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
+      ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
       <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
         Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
       </div>
