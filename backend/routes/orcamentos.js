@@ -78,6 +78,10 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Verifica se empresa usa ambientes — se não, ignora ambiente_id dos itens (defesa)
+    const empRes = await client.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.user.empresaId]);
+    const usaAmbientes = empRes.rows.length > 0 && empRes.rows[0].usa_ambientes;
+
     // Próximo número
     const rNum = await client.query(`SELECT proximo_numero_orcamento($1) AS num`, [req.user.empresaId]);
     const numero = rNum.rows[0].num;
@@ -132,7 +136,7 @@ router.post('/', async (req, res) => {
          parseFloat(it.quantidade) || 1,
          parseFloat(it.valor_unitario) || 0,
          parseFloat(it.desconto_item) || 0,
-         it.total, i, it.ambiente_id ? parseInt(it.ambiente_id) : null]
+         it.total, i, (usaAmbientes && it.ambiente_id) ? parseInt(it.ambiente_id) : null]
       );
     }
 
@@ -159,6 +163,10 @@ router.put('/:id', async (req, res) => {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Verifica se empresa usa ambientes — se não, ignora ambiente_id dos itens (defesa)
+    const empRes = await client.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.user.empresaId]);
+    const usaAmbientes = empRes.rows.length > 0 && empRes.rows[0].usa_ambientes;
 
     // Verifica se existe e não foi convertido
     const rExist = await client.query(
@@ -216,7 +224,7 @@ router.put('/:id', async (req, res) => {
          parseFloat(it.quantidade) || 1,
          parseFloat(it.valor_unitario) || 0,
          parseFloat(it.desconto_item) || 0,
-         it.total, i, it.ambiente_id ? parseInt(it.ambiente_id) : null]
+         it.total, i, (usaAmbientes && it.ambiente_id) ? parseInt(it.ambiente_id) : null]
       );
     }
 
@@ -239,20 +247,81 @@ router.post('/:id/status', async (req, res) => {
   if (!validos.includes(status)) {
     return res.status(400).json({ error: 'Status inválido.' });
   }
+  const client = await db.pool.connect();
   try {
-    const r = await db.query(
+    await client.query('BEGIN');
+    const r = await client.query(
       `UPDATE orcamentos SET status=$1, atualizado_em=NOW()
        WHERE id=$2 AND empresa_id=$3 AND status NOT IN ('convertido')
        RETURNING *`,
       [status, id, req.user.empresaId]
     );
     if (r.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Orçamento não encontrado ou já convertido.' });
     }
-    res.json(r.rows[0]);
+    const orcamento = r.rows[0];
+
+    // Ao APROVAR: verifica se empresa usa iluminação e gera itens de compra pra produtos sem estoque
+    let itensCriados = [];
+    if (status === 'aprovado') {
+      const empChk = await client.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.user.empresaId]);
+      const usaAmbientes = empChk.rows[0]?.usa_ambientes;
+
+      if (usaAmbientes) {
+        // Busca itens do orçamento com produto vinculado
+        const rItens = await client.query(
+          `SELECT oi.produto_id, oi.quantidade,
+                  p.nome, p.codigo, p.referencia, p.estoque
+           FROM orcamento_itens oi
+           JOIN produtos p ON p.id = oi.produto_id
+           WHERE oi.orcamento_id = $1 AND oi.tipo = 'produto' AND oi.produto_id IS NOT NULL`,
+          [id]
+        );
+
+        for (const item of rItens.rows) {
+          const estoque = Number(item.estoque) || 0;
+          const qtdOrc = Number(item.quantidade) || 0;
+          const faltando = qtdOrc - estoque;
+
+          if (faltando > 0) {
+            // Verifica se já existe item na lista pra esse orçamento+produto (evita duplicata)
+            const jaExiste = await client.query(
+              `SELECT id FROM lista_compras
+               WHERE empresa_id = $1 AND orcamento_id = $2 AND produto_id = $3`,
+              [req.user.empresaId, id, item.produto_id]
+            );
+            if (jaExiste.rows.length === 0) {
+              const ins = await client.query(
+                `INSERT INTO lista_compras (empresa_id, orcamento_id, produto_id, produto_nome,
+                                            produto_codigo, referencia, quantidade, status, criado_por)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendente', $8)
+                 RETURNING id, produto_nome, quantidade`,
+                [req.user.empresaId, id, item.produto_id, item.nome,
+                 item.codigo, item.referencia, faltando, req.user.userId]
+              );
+              itensCriados.push({
+                produto: ins.rows[0].produto_nome,
+                quantidade: Number(ins.rows[0].quantidade)
+              });
+            }
+          }
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    // Retorna orçamento + info dos itens criados (pra frontend mostrar alerta)
+    res.json({
+      ...orcamento,
+      _listaComprasCriados: itensCriados
+    });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('[orcamentos] status', err);
     res.status(500).json({ error: 'Erro ao alterar status.' });
+  } finally {
+    client.release();
   }
 });
 
