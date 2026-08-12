@@ -566,6 +566,7 @@
     <div class="submenu" id="submenu-vendas" style="display:none;">
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
       <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
+      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('aprovacoes-financeiras')" style="display:none;">&#128176; Aprovações Financeiras <span id="badge-aprovacoes-fin" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('lista-compras')" style="display:none;">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
@@ -1000,6 +1001,60 @@
         </thead>
         <tbody id="tbody-orcamentos"></tbody>
       </table>
+    </div>
+
+    <!-- Aprovações Financeiras (Módulo Iluminação) -->
+    <div id="page-aprovacoes-financeiras" style="display:none;">
+      <div class="page-title">💰 Aprovações Financeiras</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Pedidos aprovados pelos vendedores aguardando aprovação de pagamento.</div>
+
+      <!-- Cards de resumo -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+        <div style="background:#fef3c7;border-radius:10px;padding:14px;border:1px solid #fbbf24;">
+          <div style="font-size:11px;color:#92400e;font-weight:700;">⏳ AGUARDANDO</div>
+          <div id="af-cnt-aguardando" style="font-size:26px;font-weight:800;color:#92400e;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#92400e;">pedidos aguardando</div>
+        </div>
+        <div style="background:#cffafe;border-radius:10px;padding:14px;border:1px solid #0891b2;">
+          <div style="font-size:11px;color:#0e7490;font-weight:700;">💚 APROVADOS HOJE</div>
+          <div id="af-cnt-aprovado-hoje" style="font-size:26px;font-weight:800;color:#0e7490;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#0e7490;">liberados hoje</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:10px;padding:14px;border:1px solid #dc2626;">
+          <div style="font-size:11px;color:#991b1b;font-weight:700;">⚠️ REJEITADOS</div>
+          <div id="af-cnt-rejeitado" style="font-size:26px;font-weight:800;color:#991b1b;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#991b1b;">devolvidos ao vendedor</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="af-busca" oninput="renderAprovacoes()" placeholder="🔎 Buscar por cliente ou número"
+               style="flex:1;min-width:220px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+        <button type="button" id="af-filtro-aguardando" onclick="filtrarAprovacoes('aguardando_financeiro')" style="padding:8px 14px;border:2px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;">⏳ Aguardando</button>
+        <button type="button" id="af-filtro-aprovado" onclick="filtrarAprovacoes('aprovado_financeiro')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">💚 Aprovados</button>
+        <button type="button" id="af-filtro-rejeitado" onclick="filtrarAprovacoes('rejeitado_financeiro')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">⚠️ Rejeitados</button>
+      </div>
+
+      <!-- Tabela -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;width:80px;">Nº</th>
+              <th style="padding:10px;text-align:left;">Cliente</th>
+              <th style="padding:10px;text-align:left;width:130px;">Vendedor</th>
+              <th style="padding:10px;text-align:right;width:110px;">Valor</th>
+              <th style="padding:10px;text-align:left;width:140px;">Pagamento</th>
+              <th style="padding:10px;text-align:left;width:120px;">Data envio</th>
+              <th style="padding:10px;text-align:center;width:200px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-aprovacoes">
+            <tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Lista de Compras (Módulo Iluminação) -->
@@ -2120,6 +2175,62 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Aprovar Financeiro -->
+  <div id="modal-aprovar-fin" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:#0891b2;margin:0;font-size:20px;">💚 Aprovar Pagamento</h2>
+          <div id="afin-info" style="font-size:13px;color:#64748b;margin-top:4px;"></div>
+        </div>
+        <button onclick="fecharAprovarFin()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Resumo do pedido -->
+      <div id="afin-resumo" style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:#334155;"></div>
+
+      <div style="background:#dcfce7;border:1px solid #16a34a;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px;color:#166534;">
+        <strong>✅ Ao aprovar:</strong> O pedido segue pro Estoque separar. Se houver produtos sem estoque, serão adicionados automaticamente à <strong>Lista de Compras</strong>.
+      </div>
+
+      <div id="afin-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharAprovarFin()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Voltar</button>
+        <button type="button" onclick="confirmarAprovarFin()" style="flex:2;padding:12px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💚 Aprovar Pagamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Rejeitar Financeiro -->
+  <div id="modal-rejeitar-fin" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:520px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:#dc2626;margin:0;font-size:20px;">⚠️ Rejeitar Pedido</h2>
+          <div id="rfin-info" style="font-size:13px;color:#64748b;margin-top:4px;"></div>
+        </div>
+        <button onclick="fecharRejeitarFin()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#991b1b;">
+        <strong>⚠️ Atenção:</strong> O pedido voltará ao vendedor com o motivo. Ele poderá editar e reenviar.
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">Motivo da rejeição* <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(mín 5 caracteres)</span></label>
+        <textarea id="rfin-motivo" rows="4" placeholder="Ex: Cliente sem crédito aprovado, forma de pagamento inadequada, valor divergente..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+      </div>
+
+      <div id="rfin-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharRejeitarFin()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Voltar</button>
+        <button type="button" onclick="confirmarRejeitarFin()" style="flex:2;padding:12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">⚠️ Rejeitar Pedido</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Cancelar Orçamento (com senha admin) -->
   <div id="modal-cancelar-orc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:center;padding:20px;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:500px;width:100%;">
@@ -5528,6 +5639,7 @@ https://sistema.glinformatica.com.br
     'vendas': 'vendas',
     'orcamentos': 'vendas',
     'lista-compras': 'vendas',
+    'aprovacoes-financeiras': 'vendas',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -5656,6 +5768,8 @@ https://sistema.glinformatica.com.br
   // Matriz de permissões por papel
   // Estoque: acessa cadastros básicos, orçamentos (leitura), lista de compras e entradas (que ficam em Fornecedores)
   const _paginasEstoque = ['dashboard', 'produtos', 'fornecedores', 'orcamentos', 'lista-compras', 'minha-conta'];
+  // Financeiro: acessa dashboard, orçamentos (leitura pra ver o que vai aprovar) e aprovações
+  const _paginasFinanceiro = ['dashboard', 'orcamentos', 'aprovacoes-financeiras', 'minha-conta'];
   const _paginasAdminOnly = ['financeiro', 'contas-pagar', 'contas-receber', 'relatorios', 'usuarios', 'configuracoes', 'configuracoes-fiscais', 'catalogo', 'pedidos-online', 'caixa'];
 
   function podeAcessarPagina(pg) {
@@ -5663,6 +5777,9 @@ https://sistema.glinformatica.com.br
     if (papel === 'admin') return true;
     if (papel === 'estoque') {
       return _paginasEstoque.includes(pg);
+    }
+    if (papel === 'financeiro') {
+      return _paginasFinanceiro.includes(pg);
     }
     // Vendedor: bloqueia páginas admin
     return !_paginasAdminOnly.includes(pg);
@@ -5712,6 +5829,21 @@ https://sistema.glinformatica.com.br
       }
       carregarListaCompras();
     }
+    if(pg === 'aprovacoes-financeiras') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      // Só admin ou financeiro
+      if (!['admin', 'financeiro'].includes(window._papelAtual)) {
+        alert('Apenas admin ou financeiro pode acessar aprovações.');
+        showPage('dashboard');
+        return;
+      }
+      carregarAprovacoes();
+    }
     if(pg === 'transportadoras') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.usaAmbientes) {
@@ -5754,6 +5886,18 @@ https://sistema.glinformatica.com.br
       // Esconde itens específicos pro papel ESTOQUE
       if(papelAtual === 'estoque') {
         document.querySelectorAll('.estoque-hide').forEach(el => el.style.display = 'none');
+      }
+      // Esconde itens específicos pro papel FINANCEIRO
+      if(papelAtual === 'financeiro') {
+        // Financeiro só vê: Dashboard, Orçamentos, Aprovações Financeiras, Minha Conta
+        // Esconde: Cadastros, Vendas Online, Financeiro (grupo), Relatórios, Config
+        // Reaproveita .estoque-hide (mesma restrição) e esconde mais coisas
+        document.querySelectorAll('.estoque-hide').forEach(el => el.style.display = 'none');
+        // Esconde os itens que estoque vê mas financeiro não deve ver
+        document.querySelectorAll('[onclick*="showPage(\'produtos\')"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('[onclick*="showPage(\'fornecedores\')"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('[onclick*="showPage(\'transportadoras\')"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('[onclick*="showPage(\'lista-compras\')"]').forEach(el => el.style.display = 'none');
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
@@ -11382,6 +11526,236 @@ ${conteudo}
     });
   }
 
+  // ====== APROVAÇÕES FINANCEIRAS (Módulo Iluminação) ======
+  let _aprovacoesCache = [];
+  let _afFiltro = 'aguardando_financeiro';
+  let _afOrcAtivo = null;
+
+  async function carregarAprovacoes() {
+    try {
+      // Busca todos os orçamentos relacionados ao fluxo financeiro
+      const todos = await api('GET', '/api/orcamentos');
+      _aprovacoesCache = (todos || []).filter(o =>
+        ['aguardando_financeiro', 'aprovado_financeiro', 'rejeitado_financeiro'].includes(o.status)
+      );
+      await carregarResumoAprovacoes();
+      renderAprovacoes();
+    } catch (e) {
+      console.error('[aprovacoes]', e);
+      const tbody = document.getElementById('tbody-aprovacoes');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  async function carregarResumoAprovacoes() {
+    try {
+      const todos = await api('GET', '/api/orcamentos');
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const aguardando = todos.filter(o => o.status === 'aguardando_financeiro').length;
+      const aprovadoHoje = todos.filter(o =>
+        o.status === 'aprovado_financeiro' &&
+        o.financeiro_aprovado_em &&
+        String(o.financeiro_aprovado_em).slice(0, 10) === hojeStr
+      ).length;
+      const rejeitado = todos.filter(o => o.status === 'rejeitado_financeiro').length;
+
+      const el1 = document.getElementById('af-cnt-aguardando');
+      const el2 = document.getElementById('af-cnt-aprovado-hoje');
+      const el3 = document.getElementById('af-cnt-rejeitado');
+      if (el1) el1.textContent = aguardando;
+      if (el2) el2.textContent = aprovadoHoje;
+      if (el3) el3.textContent = rejeitado;
+
+      // Badge no menu (só pra admin/financeiro)
+      const badge = document.getElementById('badge-aprovacoes-fin');
+      if (badge) {
+        const papel = window._papelAtual;
+        if (['admin', 'financeiro'].includes(papel) && aguardando > 0) {
+          badge.textContent = aguardando;
+          badge.style.display = '';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    } catch (e) { /* silencioso */ }
+  }
+
+  function filtrarAprovacoes(status) {
+    _afFiltro = status;
+    const cores = {
+      'aguardando_financeiro': { br: '#fbbf24', bg: '#fef3c7', tx: '#92400e' },
+      'aprovado_financeiro':   { br: '#0891b2', bg: '#cffafe', tx: '#0e7490' },
+      'rejeitado_financeiro':  { br: '#dc2626', bg: '#fef2f2', tx: '#991b1b' }
+    };
+    ['aguardando', 'aprovado', 'rejeitado'].forEach(s => {
+      const key = s === 'aguardando' ? 'aguardando_financeiro' :
+                  s === 'aprovado' ? 'aprovado_financeiro' : 'rejeitado_financeiro';
+      const btn = document.getElementById('af-filtro-' + s);
+      if (!btn) return;
+      if (key === status) {
+        const c = cores[key];
+        btn.style.cssText = `padding:8px 14px;border:2px solid ${c.br};background:${c.bg};color:${c.tx};border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;`;
+      } else {
+        btn.style.cssText = 'padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+      }
+    });
+    renderAprovacoes();
+  }
+
+  function renderAprovacoes() {
+    const tbody = document.getElementById('tbody-aprovacoes');
+    if (!tbody) return;
+    const termo = (document.getElementById('af-busca')?.value || '').toLowerCase().trim();
+
+    let filtrados = _aprovacoesCache.filter(o => o.status === _afFiltro);
+    if (termo) {
+      filtrados = filtrados.filter(o =>
+        (o.cliente_nome || '').toLowerCase().includes(termo) ||
+        String(o.numero || '').includes(termo)
+      );
+    }
+
+    if (filtrados.length === 0) {
+      const msg = _afFiltro === 'aguardando_financeiro'
+        ? '🎉 Nenhum pedido aguardando aprovação!'
+        : 'Nenhum pedido encontrado com esse filtro.';
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtrados.map(o => {
+      const dataEnvio = o.atualizado_em ? formatarDataBR(o.atualizado_em) : '—';
+      let acoes = '';
+      if (o.status === 'aguardando_financeiro') {
+        acoes = `
+          <button onclick="abrirVisualizarOrc(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes">👁️</button>
+          <button onclick="abrirAprovarFin(${o.id})" style="background:#0891b2;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;">💚 Aprovar</button>
+          <button onclick="abrirRejeitarFin(${o.id})" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">⚠️ Rejeitar</button>
+        `;
+      } else if (o.status === 'aprovado_financeiro') {
+        acoes = `<button onclick="abrirVisualizarOrc(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">👁️ Ver</button>
+                 <div style="font-size:10px;color:#0e7490;margin-top:4px;">${o.financeiro_aprovado_por_nome ? 'Por: ' + escapeHtml(o.financeiro_aprovado_por_nome) : ''}</div>`;
+      } else if (o.status === 'rejeitado_financeiro') {
+        acoes = `<button onclick="abrirVisualizarOrc(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">👁️ Ver motivo</button>`;
+      }
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px;"><strong>#${o.numero}</strong></td>
+          <td style="padding:10px;">
+            <div style="font-weight:600;">${escapeHtml(o.cliente_nome || o.cliente_nome_real || '—')}</div>
+          </td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(o.vendedor_nome || '—')}</td>
+          <td style="padding:10px;text-align:right;font-weight:700;">${formatarBRL(o.total)}</td>
+          <td style="padding:10px;font-size:12px;">${escapeHtml(o.condicoes_pagamento || '—')}</td>
+          <td style="padding:10px;font-size:12px;">${dataEnvio}</td>
+          <td style="padding:10px;text-align:center;">${acoes}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function abrirVisualizarOrc(id) {
+    if (typeof visualizarOrc === 'function') visualizarOrc(id);
+  }
+
+  // ===== APROVAR FINANCEIRO =====
+  async function abrirAprovarFin(id) {
+    const o = _aprovacoesCache.find(x => x.id === id);
+    if (!o) return;
+    _afOrcAtivo = id;
+    document.getElementById('afin-info').textContent = `Orçamento #${o.numero} — ${o.cliente_nome || '—'}`;
+    document.getElementById('afin-resumo').innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span><strong>Vendedor:</strong> ${escapeHtml(o.vendedor_nome || '—')}</span>
+        <span><strong>Valor:</strong> ${formatarBRL(o.total)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span><strong>Pagamento:</strong> ${escapeHtml(o.condicoes_pagamento || '—')}</span>
+        <span><strong>Itens:</strong> ${o.itens_total || 0}</span>
+      </div>
+    `;
+    document.getElementById('afin-erro').style.display = 'none';
+    document.getElementById('modal-aprovar-fin').style.display = 'flex';
+  }
+
+  function fecharAprovarFin() {
+    document.getElementById('modal-aprovar-fin').style.display = 'none';
+    _afOrcAtivo = null;
+  }
+
+  async function confirmarAprovarFin() {
+    if (!_afOrcAtivo) return;
+    const erro = document.getElementById('afin-erro');
+    erro.style.display = 'none';
+    try {
+      const r = await api('POST', `/api/orcamentos/${_afOrcAtivo}/aprovar-financeiro`);
+      fecharAprovarFin();
+      let msg = `✅ Pedido aprovado!\n\nAprovado por: ${r.aprovadoPor || '—'}`;
+      if (r.itensAguardandoCompra && r.itensAguardandoCompra.length > 0) {
+        msg += `\n\n🛒 ${r.itensAguardandoCompra.length} item(ns) foram adicionados à Lista de Compras:`;
+        r.itensAguardandoCompra.forEach(it => {
+          msg += `\n  • ${it.produto} (${it.quantidade} un)`;
+        });
+      }
+      alert(msg);
+      await carregarAprovacoes();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao aprovar.';
+      erro.style.display = 'block';
+    }
+  }
+
+  // ===== REJEITAR FINANCEIRO =====
+  async function abrirRejeitarFin(id) {
+    const o = _aprovacoesCache.find(x => x.id === id);
+    if (!o) return;
+    _afOrcAtivo = id;
+    document.getElementById('rfin-info').textContent = `Orçamento #${o.numero} — ${o.cliente_nome || '—'}`;
+    document.getElementById('rfin-motivo').value = '';
+    document.getElementById('rfin-erro').style.display = 'none';
+    document.getElementById('modal-rejeitar-fin').style.display = 'flex';
+    setTimeout(() => document.getElementById('rfin-motivo').focus(), 100);
+  }
+
+  function fecharRejeitarFin() {
+    document.getElementById('modal-rejeitar-fin').style.display = 'none';
+    _afOrcAtivo = null;
+  }
+
+  async function confirmarRejeitarFin() {
+    if (!_afOrcAtivo) return;
+    const motivo = document.getElementById('rfin-motivo').value.trim();
+    const erro = document.getElementById('rfin-erro');
+    erro.style.display = 'none';
+    if (motivo.length < 5) {
+      erro.textContent = 'Motivo deve ter pelo menos 5 caracteres.';
+      erro.style.display = 'block';
+      return;
+    }
+    try {
+      const r = await api('POST', `/api/orcamentos/${_afOrcAtivo}/rejeitar-financeiro`, { motivo });
+      fecharRejeitarFin();
+      alert(`⚠️ Pedido rejeitado e devolvido ao vendedor.\n\nRejeitado por: ${r.rejeitadoPor || '—'}`);
+      await carregarAprovacoes();
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao rejeitar.';
+      erro.style.display = 'block';
+    }
+  }
+
+  // ===== REENVIAR ORÇAMENTO REJEITADO =====
+  async function reenviarOrcamento(id) {
+    if (!confirm('Reenviar orçamento pro financeiro?\n\nEle será marcado como "Aguardando Financeiro" novamente.')) return;
+    try {
+      await api('POST', `/api/orcamentos/${id}/status`, { status: 'aprovado' });
+      alert('✅ Orçamento reenviado ao Financeiro!');
+      carregarOrcamentos();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
   // ====== LISTA DE COMPRAS (Módulo Iluminação) ======
   let _listaComprasCache = [];
   let _lcFiltroStatus = 'todos';
@@ -12488,9 +12862,23 @@ ${conteudo}
         'em_separacao': '📦 Em Separação',
         'separado': '✔️ Separado'
       };
-      const podeEditar = o.status !== 'convertido' && window._papelAtual !== 'estoque';
-      const podeAprovar = o.status === 'aberto' && window._papelAtual !== 'estoque';
-      const podeConverter = (o.status === 'aberto' || o.status === 'aprovado') && window._papelAtual !== 'estoque';
+      // Estados avançados: só admin pode editar/cancelar/excluir
+      const estadosAvancados = ['aguardando_financeiro', 'aprovado_financeiro', 'em_separacao', 'separado'];
+      const estaEmFluxo = estadosAvancados.includes(o.status);
+      const isAdminUser = window._papelAtual === 'admin';
+      const podeEditar = o.status !== 'convertido' && o.status !== 'cancelado'
+                        && window._papelAtual !== 'estoque' && window._papelAtual !== 'financeiro'
+                        && (!estaEmFluxo || isAdminUser);
+      // Aprovar (vendedor confirma): só orçamento em aberto OU rejeitado (reenviar)
+      const podeAprovar = ['aberto', 'rejeitado_financeiro'].includes(o.status)
+                        && window._papelAtual !== 'estoque' && window._papelAtual !== 'financeiro';
+      // Converter em venda: só depois de aprovado financeiro E separado (fluxo completo) OU sem fluxo (aprovado direto)
+      const podeConverter = (o.status === 'separado' || (o.status === 'aprovado' && !JSON.parse(localStorage.getItem('empresa') || '{}').usaAmbientes))
+                        && window._papelAtual !== 'estoque' && window._papelAtual !== 'financeiro';
+      const podeCancelar = !['convertido', 'cancelado'].includes(o.status)
+                        && window._papelAtual !== 'estoque' && window._papelAtual !== 'financeiro';
+      // Botão de reenviar (só rejeitado)
+      const ehRejeitado = o.status === 'rejeitado_financeiro';
       // Info de rastreamento pra ADMIN
       const isAdmin = window._papelAtual === 'admin';
       const infoUsuarioIcone = isAdmin && o.vendedor_nome
@@ -12528,14 +12916,21 @@ ${conteudo}
           <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
           <td><strong>${formatarBRL(o.total)}</strong></td>
-          <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;" ${o.status === 'cancelado' && o.cancelado_por_nome ? `title="Cancelado por ${escapeHtml(o.cancelado_por_nome)}${o.autorizado_por_nome ? ' · Autorizado por ' + escapeHtml(o.autorizado_por_nome) : ''}${o.motivo_cancelamento ? ' · Motivo: ' + escapeHtml(o.motivo_cancelamento) : ''}"` : ''}>${statusLabels[o.status] || o.status}</span>${indicadorCompras}</td>
+          <td>
+            <span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;"
+              ${o.status === 'cancelado' && o.cancelado_por_nome ? `title="Cancelado por ${escapeHtml(o.cancelado_por_nome)}${o.autorizado_por_nome ? ' · Autorizado por ' + escapeHtml(o.autorizado_por_nome) : ''}${o.motivo_cancelamento ? ' · Motivo: ' + escapeHtml(o.motivo_cancelamento) : ''}"` : ''}
+              ${o.status === 'rejeitado_financeiro' && o.financeiro_rejeitado_por_nome ? `title="Rejeitado por ${escapeHtml(o.financeiro_rejeitado_por_nome)}${o.motivo_rejeicao_financeira ? ' · Motivo: ' + escapeHtml(o.motivo_rejeicao_financeira) : ''}"` : ''}
+              ${o.status === 'aprovado_financeiro' && o.financeiro_aprovado_por_nome ? `title="Aprovado por ${escapeHtml(o.financeiro_aprovado_por_nome)}"` : ''}
+            >${statusLabels[o.status] || o.status}</span>${indicadorCompras}
+          </td>
           <td class="acoes">
             <button onclick="visualizarOrc(${o.id})" title="Visualizar/Imprimir">👁️</button>
             ${btnStatusCompras}
             ${podeEditar ? `<button onclick="editarOrc(${o.id})" title="Editar">✏️</button>` : ''}
-            ${podeAprovar ? `<button onclick="aprovarOrc(${o.id})" title="Aprovar" style="color:#16a34a;">✓</button>` : ''}
+            ${podeAprovar && !ehRejeitado ? `<button onclick="aprovarOrc(${o.id})" title="Aprovar (cliente aceitou)" style="color:#16a34a;">✓</button>` : ''}
+            ${ehRejeitado ? `<button onclick="reenviarOrcamento(${o.id})" title="Reenviar ao financeiro após ajustar" style="color:#0891b2;">🔄</button>` : ''}
             ${podeConverter ? `<button onclick="converterOrc(${o.id})" title="Converter em venda" style="color:#7c3aed;">💰</button>` : ''}
-            ${podeEditar ? `<button onclick="cancelarOrc(${o.id})" title="Cancelar">❌</button>` : ''}
+            ${podeCancelar ? `<button onclick="cancelarOrc(${o.id})" title="Cancelar">❌</button>` : ''}
             ${podeEditar ? `<button onclick="excluirOrc(${o.id})" title="Excluir">🗑️</button>` : ''}
           </td>
         </tr>
@@ -13564,6 +13959,22 @@ ${conteudo}
         ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
         ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
         ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
+        ${orc.status === 'rejeitado_financeiro' && orc.financeiro_rejeitado_por_nome ? `
+          <div style="background:#fef2f2;border:2px solid #dc2626;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
+            <strong>⚠️ REJEITADO PELO FINANCEIRO</strong><br>
+            ${orc.motivo_rejeicao_financeira ? `<div style="margin-top:4px;"><strong>Motivo:</strong> ${escapeHtml(orc.motivo_rejeicao_financeira)}</div>` : ''}
+            <div style="margin-top:6px;font-size:11px;color:#7c2d12;">
+              Rejeitado por: <strong>${escapeHtml(orc.financeiro_rejeitado_por_nome)}</strong>
+              ${orc.financeiro_rejeitado_em ? ` · Em ${new Date(orc.financeiro_rejeitado_em).toLocaleString('pt-BR')}` : ''}
+            </div>
+          </div>
+        ` : ''}
+        ${orc.status === 'aprovado_financeiro' && orc.financeiro_aprovado_por_nome ? `
+          <div style="background:#dcfce7;border:1px solid #16a34a;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#166534;">
+            💚 <strong>Pagamento aprovado</strong> por ${escapeHtml(orc.financeiro_aprovado_por_nome)}
+            ${orc.financeiro_aprovado_em ? ` em ${new Date(orc.financeiro_aprovado_em).toLocaleString('pt-BR')}` : ''}
+          </div>
+        ` : ''}
         ${orc.status === 'cancelado' && orc.cancelado_por_nome ? `
           <div style="background:#fef2f2;border:1px solid #fca5a5;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
             <strong>❌ ORÇAMENTO CANCELADO</strong><br>
@@ -13842,6 +14253,22 @@ ${conteudo}
       ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
       ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
       ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
+      ${orc.status === 'rejeitado_financeiro' && orc.financeiro_rejeitado_por_nome ? `
+        <div style="background:#fef2f2;border:2px solid #dc2626;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
+          <strong>⚠️ REJEITADO PELO FINANCEIRO</strong><br>
+          ${orc.motivo_rejeicao_financeira ? `<div style="margin-top:4px;"><strong>Motivo:</strong> ${escapeHtml(orc.motivo_rejeicao_financeira)}</div>` : ''}
+          <div style="margin-top:6px;font-size:11px;color:#7c2d12;">
+            Rejeitado por: <strong>${escapeHtml(orc.financeiro_rejeitado_por_nome)}</strong>
+            ${orc.financeiro_rejeitado_em ? ` · Em ${new Date(orc.financeiro_rejeitado_em).toLocaleString('pt-BR')}` : ''}
+          </div>
+        </div>
+      ` : ''}
+      ${orc.status === 'aprovado_financeiro' && orc.financeiro_aprovado_por_nome ? `
+        <div style="background:#dcfce7;border:1px solid #16a34a;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#166534;">
+          💚 <strong>Pagamento aprovado</strong> por ${escapeHtml(orc.financeiro_aprovado_por_nome)}
+          ${orc.financeiro_aprovado_em ? ` em ${new Date(orc.financeiro_aprovado_em).toLocaleString('pt-BR')}` : ''}
+        </div>
+      ` : ''}
       ${orc.status === 'cancelado' && orc.cancelado_por_nome ? `
         <div style="background:#fef2f2;border:1px solid #fca5a5;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
           <strong>❌ ORÇAMENTO CANCELADO</strong><br>
@@ -14148,6 +14575,10 @@ ${conteudo}
     // Se ativo, carrega resumo pra atualizar badge do menu Lista de Compras
     if (ativo && typeof carregarResumoListaCompras === 'function') {
       carregarResumoListaCompras();
+    }
+    // Atualiza badge de aprovações (só se admin ou financeiro)
+    if (ativo && ['admin', 'financeiro'].includes(window._papelAtual) && typeof carregarResumoAprovacoes === 'function') {
+      carregarResumoAprovacoes();
     }
   }
 
