@@ -1,6 +1,5 @@
 const express = require('express');
 const db = require('../db');
-const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const camelizar = (row) => {
@@ -28,17 +27,14 @@ function calcularParcelas(total, n, dataPrimeiraIso, intervaloDias) {
   return parcelas;
 }
 
-// Listar vendas (com info de orçamento vinculado, se houver)
+// Listar vendas
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
-      `SELECT v.*,
-              o.id AS orcamento_id_vinculado,
-              o.numero AS orcamento_numero_vinculado
+      `SELECT v.*, uc.nome AS criado_por_nome
        FROM vendas v
-       LEFT JOIN orcamentos o ON o.venda_id = v.id AND o.empresa_id = v.empresa_id
-       WHERE v.empresa_id=$1
-       ORDER BY v.data DESC, v.id DESC`,
+       LEFT JOIN usuarios uc ON uc.id = v.criado_por
+       WHERE v.empresa_id=$1 ORDER BY v.data DESC, v.id DESC`,
       [req.user.empresaId]
     );
     res.json(r.rows.map(v => ({
@@ -69,7 +65,7 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Busca produtos E serviços cadastrados (todo item precisa estar em um dos dois)
+    // Busca produtos cadastrados (itens livres como serviços/avulsos não precisam ter)
     const nomes = [...new Set(itens.map(i => i.produto))];
     const prodResult = await client.query(
       'SELECT * FROM produtos WHERE empresa_id=$1 AND nome = ANY($2::text[])',
@@ -77,30 +73,19 @@ router.post('/', async (req, res) => {
     );
     const produtosByNome = new Map(prodResult.rows.map(p => [p.nome, p]));
 
-    const servResult = await client.query(
-      'SELECT * FROM servicos WHERE empresa_id=$1 AND ativo=TRUE AND nome = ANY($2::text[])',
-      [req.user.empresaId, nomes]
-    );
-    const servicosByNome = new Map(servResult.rows.map(s => [s.nome, s]));
-
-    // Soma quantidades por nome (pra checar estoque dos produtos)
+    // Soma quantidades por produto (apenas dos cadastrados, pra checar estoque)
     const qtdPorNome = {};
     for (const it of itens) qtdPorNome[it.produto] = (qtdPorNome[it.produto] || 0) + Number(it.qtd);
 
-    // Valida cada item: precisa estar em produtos OU serviços. Senão bloqueia.
+    // Valida estoque APENAS para os que estão cadastrados.
+    // Itens não cadastrados (serviços/avulsos) passam livremente.
     for (const nome in qtdPorNome) {
       const p = produtosByNome.get(nome);
-      const s = servicosByNome.get(nome);
-      if (!p && !s) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: `"${nome}" não está cadastrado como produto nem como serviço. Cadastre antes de vender.` });
-      }
-      // Se for produto, valida estoque
-      if (p && toNum(p.estoque) < qtdPorNome[nome]) {
+      if (!p) continue; // item livre
+      if (toNum(p.estoque) < qtdPorNome[nome]) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `Estoque insuficiente para "${nome}". Disponível: ${toNum(p.estoque)}, solicitado: ${qtdPorNome[nome]}.` });
       }
-      // Se for serviço, passa direto (sem estoque)
     }
 
     // Calcula totais
@@ -120,16 +105,16 @@ router.post('/', async (req, res) => {
 
     // Cria a venda
     const vendaIns = await client.query(
-      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null]
+      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs, criado_por)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null, req.user.userId]
     );
     const venda = vendaIns.rows[0];
 
-    // Para cada item: produto baixa estoque + movimentação. Serviço só passa direto.
+    // Para cada item: baixa estoque + movimentação (APENAS para produtos cadastrados)
     for (const it of itens) {
       const p = produtosByNome.get(it.produto);
-      if (!p) continue; // é serviço (já foi validado lá em cima): sem estoque, sem movimentação
+      if (!p) continue; // item livre (serviço/avulso): sem estoque nem movimentação
       await client.query(
         'UPDATE produtos SET estoque = estoque - $1 WHERE id = $2 AND empresa_id = $3',
         [Number(it.qtd), p.id, req.user.empresaId]
@@ -217,181 +202,6 @@ router.delete('/:id', async (req, res) => {
     await client.query('ROLLBACK');
     console.error('[vendas/delete]', err);
     res.status(500).json({ error: 'Erro ao excluir venda.' });
-  } finally {
-    client.release();
-  }
-});
-
-// Cancelar venda (mantém histórico, marca como 'cancelada')
-// Requer: senha de QUALQUER admin da empresa + motivo
-// Faz: devolve estoque, apaga contas a receber, marca venda como cancelada
-router.post('/:id/cancelar', async (req, res) => {
-  const vendaId = parseInt(req.params.id);
-  if (isNaN(vendaId)) return res.status(400).json({ error: 'ID inválido.' });
-
-  const { senha, motivo } = req.body || {};
-  const motivoNorm = (motivo || '').trim();
-  if (!senha) return res.status(400).json({ error: 'Senha do administrador é obrigatória.' });
-  if (motivoNorm.length < 5) return res.status(400).json({ error: 'Informe um motivo (mínimo 5 caracteres).' });
-  if (motivoNorm.length > 500) return res.status(400).json({ error: 'Motivo muito longo (máx 500 caracteres).' });
-
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    // 1) Valida senha contra QUALQUER admin da empresa
-    const admins = await client.query(
-      "SELECT id, nome, senha_hash FROM usuarios WHERE empresa_id=$1 AND papel='admin'",
-      [req.user.empresaId]
-    );
-    if (admins.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Nenhum administrador cadastrado.' });
-    }
-    let adminValidado = null;
-    for (const a of admins.rows) {
-      try {
-        if (await bcrypt.compare(senha, a.senha_hash)) { adminValidado = a; break; }
-      } catch (e) {}
-    }
-    if (!adminValidado) {
-      await client.query('ROLLBACK');
-      return res.status(401).json({ error: 'Senha de administrador incorreta.' });
-    }
-
-    // 2) Confirma que a venda existe e ainda está ATIVA
-    const vQ = await client.query(
-      'SELECT id, status FROM vendas WHERE id=$1 AND empresa_id=$2',
-      [vendaId, req.user.empresaId]
-    );
-    if (vQ.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Venda não encontrada.' });
-    }
-    if (vQ.rows[0].status === 'cancelada') {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Venda já está cancelada.' });
-    }
-
-    // 3) Devolve estoque (e apaga movimentações de saída pra não duplicar)
-    const movs = await client.query(
-      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
-      [vendaId, req.user.empresaId]
-    );
-    for (const m of movs.rows) {
-      await client.query(
-        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
-        [m.qtd, req.user.empresaId, m.produto_codigo]
-      );
-    }
-    await client.query(
-      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
-      [vendaId, req.user.empresaId]
-    );
-
-    // 4) Remove contas a receber geradas pela venda
-    await client.query(
-      "DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2",
-      [vendaId, req.user.empresaId]
-    );
-
-    // 5) Marca a venda como cancelada (preserva histórico)
-    const r = await client.query(
-      `UPDATE vendas SET
-         status = 'cancelada',
-         cancelada_em = NOW(),
-         cancelada_por_id = $1,
-         cancelada_por_nome = $2,
-         motivo_cancelamento = $3
-       WHERE id=$4 AND empresa_id=$5 RETURNING id`,
-      [adminValidado.id, adminValidado.nome, motivoNorm, vendaId, req.user.empresaId]
-    );
-
-    await client.query('COMMIT');
-    res.json({
-      ok: true,
-      venda_id: vendaId,
-      cancelada_por: adminValidado.nome,
-      motivo: motivoNorm
-    });
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    console.error('[vendas/cancelar]', err);
-    res.status(500).json({ error: 'Erro ao cancelar venda: ' + err.message });
-  } finally {
-    client.release();
-  }
-});
-
-// Cancelar venda E reabrir orçamento vinculado (se houver)
-// Devolve estoque, remove contas a receber, marca orçamento de volta como 'aprovado'
-router.post('/:id/cancelar-e-reabrir-orcamento', async (req, res) => {
-  const vendaId = parseInt(req.params.id);
-  if (isNaN(vendaId)) return res.status(400).json({ error: 'ID inválido.' });
-
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    // 1) Localiza o orçamento vinculado (se houver)
-    const orcQ = await client.query(
-      "SELECT id, numero FROM orcamentos WHERE venda_id=$1 AND empresa_id=$2 LIMIT 1",
-      [vendaId, req.user.empresaId]
-    );
-    const orcamento = orcQ.rows[0];
-
-    // 2) Devolve estoque
-    const movs = await client.query(
-      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
-      [vendaId, req.user.empresaId]
-    );
-    for (const m of movs.rows) {
-      await client.query(
-        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
-        [m.qtd, req.user.empresaId, m.produto_codigo]
-      );
-    }
-    await client.query(
-      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
-      [vendaId, req.user.empresaId]
-    );
-
-    // 3) Remove contas a receber
-    await client.query(
-      "DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2",
-      [vendaId, req.user.empresaId]
-    );
-
-    // 4) Apaga a venda
-    const r = await client.query(
-      'DELETE FROM vendas WHERE id=$1 AND empresa_id=$2 RETURNING id',
-      [vendaId, req.user.empresaId]
-    );
-    if (r.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Venda não encontrada.' });
-    }
-
-    // 5) Se tinha orçamento vinculado, volta ele pra status 'aprovado' e limpa venda_id
-    let orcamentoReaberto = null;
-    if (orcamento) {
-      await client.query(
-        "UPDATE orcamentos SET status='aprovado', venda_id=NULL, atualizado_em=NOW() WHERE id=$1 AND empresa_id=$2",
-        [orcamento.id, req.user.empresaId]
-      );
-      orcamentoReaberto = { id: orcamento.id, numero: orcamento.numero };
-    }
-
-    await client.query('COMMIT');
-    res.json({
-      ok: true,
-      venda_cancelada: vendaId,
-      orcamento_reaberto: orcamentoReaberto
-    });
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    console.error('[vendas/cancelar-e-reabrir-orcamento]', err);
-    res.status(500).json({ error: 'Erro ao cancelar venda e reabrir orçamento.' });
   } finally {
     client.release();
   }

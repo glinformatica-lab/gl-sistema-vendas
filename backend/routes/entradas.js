@@ -13,7 +13,10 @@ const toNum = (v) => (v == null ? 0 : Number(v));
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
-      'SELECT * FROM entradas WHERE empresa_id=$1 ORDER BY data DESC, id DESC',
+      `SELECT e.*, uc.nome AS criado_por_nome
+       FROM entradas e
+       LEFT JOIN usuarios uc ON uc.id = e.criado_por
+       WHERE e.empresa_id=$1 ORDER BY e.data DESC, e.id DESC`,
       [req.user.empresaId]
     );
     res.json(r.rows.map(e => ({
@@ -76,8 +79,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO entradas (empresa_id, tipo, data, fornecedor, doc, numero, serie, chave,
                              data_emissao, data_entrada, natureza, cnpj, itens,
                              total_geral, total_produtos, frete, seguro, outras, desconto, total_nf,
-                             pagamento, vencimento, obs)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
+                             pagamento, vencimento, obs, criado_por)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING *`,
       [req.user.empresaId, e.tipo,
        e.data || e.dataEntrada || new Date().toISOString().slice(0,10),
        e.fornecedor, e.doc || null, e.numero || null, e.serie || null, e.chave || null,
@@ -85,7 +88,7 @@ router.post('/', async (req, res) => {
        JSON.stringify(e.itens),
        e.tipo === 'sem-nf' ? totalProdutos : totalNf,
        totalProdutos, Number(e.frete) || 0, Number(e.seguro) || 0, Number(e.outras) || 0, Number(e.desconto) || 0, totalNf,
-       e.pagamento, vencimento, e.obs || null]
+       e.pagamento, vencimento, e.obs || null, req.user.userId]
     );
     const entrada = insEntrada.rows[0];
 

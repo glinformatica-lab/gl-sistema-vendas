@@ -6354,10 +6354,15 @@ https://sistema.glinformatica.com.br
         ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
         : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
       const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
+      // Info de rastreamento pra ADMIN
+      const isAdmin = window._papelAtual === 'admin';
+      const infoUsuarioIcone = isAdmin && e.criadoPorNome
+        ? ` <span title="👤 Criada por: ${escapeAttr(e.criadoPorNome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
+        : '';
       return `
         <tr>
           <td>${formatarDataBR(e.data)}</td>
-          <td>${e.fornecedor}</td>
+          <td>${e.fornecedor}${infoUsuarioIcone}</td>
           <td>${badge}</td>
           <td>${documento}</td>
           <td>${formatarBRL(total)}</td>
@@ -7465,10 +7470,26 @@ https://sistema.glinformatica.com.br
            <button class="btn-link" style="color:#059669;font-weight:600;" onclick="repetirVenda(${v.id})" title="Criar nova venda copiando os itens desta">🔁 Repetir</button> |
            <button class="btn-link" onclick="imprimirVenda(${v.id})">Imprimir</button>${v.orcamentoIdVinculado ? ` | <button class="btn-link" style="color:#d97706;font-weight:600;" onclick="cancelarVendaEReabrirOrcamento(${v.id}, ${v.orcamentoIdVinculado}, ${v.orcamentoNumeroVinculado})" title="Cancela esta venda e reabre o orçamento Nº ${v.orcamentoNumeroVinculado} para edição">⏪ Voltar pra Orç. Nº ${v.orcamentoNumeroVinculado}</button>` : ''} |
            <button class="btn-link admin-only" style="color:#dc2626;font-weight:600;" onclick="abrirCancelarVenda(${v.id})" title="Cancelar venda (precisa senha de admin)">❌ Cancelar</button>`;
+      // Info de rastreamento pra ADMIN (tooltip com quem criou e quem cancelou)
+      const isAdmin = window._papelAtual === 'admin';
+      let tooltipUsuario = '';
+      if (isAdmin) {
+        const partes = [];
+        if (v.criadoPorNome) partes.push(`👤 Criada por: ${v.criadoPorNome}`);
+        if (cancelada) {
+          if (v.canceladaPorNome) partes.push(`❌ Cancelada por: ${v.canceladaPorNome}`);
+          if (v.canceladaEm) partes.push(`Em: ${new Date(v.canceladaEm).toLocaleString('pt-BR')}`);
+          if (v.motivoCancelamento) partes.push(`Motivo: ${v.motivoCancelamento}`);
+        }
+        if (partes.length > 0) tooltipUsuario = partes.join('\n');
+      }
+      const infoUsuarioIcone = isAdmin && (v.criadoPorNome || cancelada)
+        ? ` <span title="${escapeAttr(tooltipUsuario)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
+        : '';
       return `
         <tr style="${estiloLinha}">
           <td>${formatarDataBR(v.data)}</td>
-          <td>${v.cliente}${badgeCancelada}</td>
+          <td>${v.cliente}${badgeCancelada}${infoUsuarioIcone}</td>
           <td>${itensTxt}</td>
           <td>${formatarBRL(v.total)}</td>
           <td>${pagTxt}</td>
@@ -10972,9 +10993,14 @@ ${conteudo}
       const podeEditar = o.status !== 'convertido';
       const podeAprovar = o.status === 'aberto';
       const podeConverter = o.status === 'aberto' || o.status === 'aprovado';
+      // Info de rastreamento pra ADMIN
+      const isAdmin = window._papelAtual === 'admin';
+      const infoUsuarioIcone = isAdmin && o.vendedor_nome
+        ? ` <span title="👤 Criado por: ${escapeAttr(o.vendedor_nome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
+        : '';
       return `
         <tr>
-          <td><strong>#${o.numero}</strong></td>
+          <td><strong>#${o.numero}</strong>${infoUsuarioIcone}</td>
           <td>${escapeHtml(o.cliente_nome || o.cliente_nome_real || '—')}</td>
           <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
