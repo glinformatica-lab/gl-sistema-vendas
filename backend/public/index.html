@@ -868,6 +868,7 @@
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
         <button class="btn" style="background:#16a34a;" onclick="openImportarProdutos()">📥 Importar Planilha</button>
+        <button class="btn feature-ambientes" style="background:#7c3aed;display:none;" onclick="abrirEtiquetas()">🏷️ Etiquetas</button>
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria ou fornecedor"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="renderProdutos()">
@@ -2102,6 +2103,79 @@
       <div style="display:flex;gap:10px;margin-top:16px;">
         <button class="btn" onclick="confirmarMultiplicar()" style="flex:1;background:#16a34a;">Multiplicar</button>
         <button class="btn" onclick="fecharMultiplicar()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Impressão de Etiquetas de Código de Barras -->
+  <div id="modal-etiquetas" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <h2 style="color:var(--azul);margin:0;font-size:22px;">🏷️ Imprimir Etiquetas</h2>
+          <div style="font-size:13px;color:#64748b;margin-top:4px;">Escolha o tamanho, os produtos e quantas etiquetas de cada</div>
+        </div>
+        <button onclick="fecharEtiquetas()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Opções de tamanho -->
+      <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px;border:1px solid #e2e8f0;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📏 Tamanho da Etiqueta</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+          <label style="cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;transition:all 0.15s;" onclick="selecionarTamanhoEtiqueta('pequena')" id="et-tam-pequena-lbl">
+            <input type="radio" name="et-tamanho" value="pequena" style="display:none;">
+            <div style="font-weight:700;color:#1e293b;">Pequena</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">30×20mm</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">63 por página A4</div>
+          </label>
+          <label style="cursor:pointer;padding:12px;border:2px solid #7c3aed;border-radius:8px;background:#faf5ff;text-align:center;transition:all 0.15s;" onclick="selecionarTamanhoEtiqueta('media')" id="et-tam-media-lbl">
+            <input type="radio" name="et-tamanho" value="media" checked style="display:none;">
+            <div style="font-weight:700;color:#7c3aed;">Média ⭐</div>
+            <div style="font-size:11px;color:#7c3aed;margin-top:2px;">50×25mm</div>
+            <div style="font-size:10px;color:#a78bfa;margin-top:4px;">40 por página A4</div>
+          </label>
+          <label style="cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;transition:all 0.15s;" onclick="selecionarTamanhoEtiqueta('grande')" id="et-tam-grande-lbl">
+            <input type="radio" name="et-tamanho" value="grande" style="display:none;">
+            <div style="font-weight:700;color:#1e293b;">Grande</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">70×40mm</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">21 por página A4</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Filtro + Ações rápidas -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="et-busca" placeholder="🔎 Buscar produto por nome, código ou referência..." oninput="filtrarProdutosEtiqueta()"
+          style="flex:1;min-width:200px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+        <button type="button" onclick="etDefinirQtdTodos(1)" style="background:#f0f9ff;color:#0891b2;border:1px solid #0891b2;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">Qtd 1 em todos</button>
+        <button type="button" onclick="etDefinirQtdTodos(0)" style="background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">Zerar</button>
+      </div>
+
+      <!-- Contador -->
+      <div style="background:#eff6ff;border:1px solid #93c5fd;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;color:#1e40af;">
+        <strong id="et-total-etiquetas">0</strong> etiqueta(s) selecionada(s) · Vai gerar aproximadamente <strong id="et-total-paginas">0</strong> página(s)
+      </div>
+
+      <!-- Lista de produtos -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;max-height:400px;overflow-y:auto;">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <thead style="background:#f1f5f9;position:sticky;top:0;z-index:1;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:left;width:150px;">Código de Barras</th>
+              <th style="padding:10px;text-align:center;width:110px;">Qtd Etiquetas</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-etiquetas">
+            <tr><td colspan="3" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Ações -->
+      <div style="display:flex;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <button type="button" onclick="fecharEtiquetas()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Cancelar</button>
+        <button type="button" onclick="imprimirEtiquetas()" style="flex:2;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">🖨️ Gerar e Imprimir Etiquetas</button>
       </div>
     </div>
   </div>
@@ -10481,6 +10555,220 @@ ${conteudo}
   // ====== HISTÓRICO DE CAIXA (fechamentos) ======
   let _historicoCaixaCache = [];
   let _detalheCaixaAtual = null;
+
+  // ====== IMPRESSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS ======
+  let _etiquetasTamanho = 'media';
+  let _etiquetasProdutos = []; // Cache local com {id, nome, codigo, codigoBarras, referencia, qtd}
+
+  function abrirEtiquetas() {
+    const emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (!emp.usaAmbientes) {
+      alert('Este recurso está disponível apenas para empresas com o Módulo Iluminação ativo.');
+      return;
+    }
+    // Prepara lista com base nos produtos que TÊM código de barras
+    _etiquetasProdutos = (dbProdutos || [])
+      .filter(p => p.codigoBarras)
+      .map(p => ({
+        id: p.id,
+        nome: p.nome,
+        codigo: p.codigo || '',
+        codigoBarras: p.codigoBarras,
+        referencia: p.referencia || '',
+        qtd: 0
+      }))
+      .sort((a,b) => (a.nome || '').localeCompare(b.nome || ''));
+    _etiquetasTamanho = 'media';
+    selecionarTamanhoEtiqueta('media');
+    const busca = document.getElementById('et-busca');
+    if (busca) busca.value = '';
+    renderProdutosEtiqueta();
+    document.getElementById('modal-etiquetas').style.display = 'flex';
+  }
+
+  function fecharEtiquetas() {
+    document.getElementById('modal-etiquetas').style.display = 'none';
+  }
+
+  function selecionarTamanhoEtiqueta(tam) {
+    _etiquetasTamanho = tam;
+    // Marca visualmente qual está selecionado
+    ['pequena','media','grande'].forEach(t => {
+      const el = document.getElementById(`et-tam-${t}-lbl`);
+      const radio = el.querySelector('input[type="radio"]');
+      if (t === tam) {
+        if (t === 'pequena') el.style.cssText = 'cursor:pointer;padding:12px;border:2px solid #0891b2;border-radius:8px;background:#f0f9ff;text-align:center;transition:all 0.15s;';
+        else if (t === 'media') el.style.cssText = 'cursor:pointer;padding:12px;border:2px solid #7c3aed;border-radius:8px;background:#faf5ff;text-align:center;transition:all 0.15s;';
+        else el.style.cssText = 'cursor:pointer;padding:12px;border:2px solid #16a34a;border-radius:8px;background:#f0fdf4;text-align:center;transition:all 0.15s;';
+        if (radio) radio.checked = true;
+      } else {
+        el.style.cssText = 'cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;transition:all 0.15s;';
+      }
+    });
+    atualizarTotalEtiquetas();
+  }
+
+  function filtrarProdutosEtiqueta() {
+    renderProdutosEtiqueta();
+  }
+
+  function renderProdutosEtiqueta() {
+    const tbody = document.getElementById('tbody-etiquetas');
+    if (!tbody) return;
+    const termo = (document.getElementById('et-busca')?.value || '').toLowerCase().trim();
+    const filtrados = termo
+      ? _etiquetasProdutos.filter(p =>
+          (p.nome || '').toLowerCase().includes(termo) ||
+          (p.codigo || '').toLowerCase().includes(termo) ||
+          (p.codigoBarras || '').toLowerCase().includes(termo) ||
+          (p.referencia || '').toLowerCase().includes(termo)
+        )
+      : _etiquetasProdutos;
+
+    if (filtrados.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum produto encontrado. Cadastre produtos primeiro pra gerar os códigos de barras.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtrados.map(p => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:8px 10px;">
+          <div style="font-weight:600;color:#1e293b;">${escapeHtml(p.nome)}</div>
+          ${p.referencia ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:2px;">Ref: ${escapeHtml(p.referencia)}</div>` : ''}
+        </td>
+        <td style="padding:8px 10px;font-family:monospace;font-size:12px;color:#64748b;">${escapeHtml(p.codigoBarras)}</td>
+        <td style="padding:8px 10px;text-align:center;">
+          <input type="number" min="0" max="200" value="${p.qtd || 0}" onchange="atualizarQtdEtiqueta(${p.id}, this.value)"
+            style="width:70px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;text-align:center;">
+        </td>
+      </tr>
+    `).join('');
+    atualizarTotalEtiquetas();
+  }
+
+  function atualizarQtdEtiqueta(id, valor) {
+    const p = _etiquetasProdutos.find(x => x.id === id);
+    if (p) p.qtd = Math.max(0, Math.min(200, parseInt(valor) || 0));
+    atualizarTotalEtiquetas();
+  }
+
+  function etDefinirQtdTodos(qtd) {
+    const termo = (document.getElementById('et-busca')?.value || '').toLowerCase().trim();
+    _etiquetasProdutos.forEach(p => {
+      if (!termo ||
+          (p.nome || '').toLowerCase().includes(termo) ||
+          (p.codigo || '').toLowerCase().includes(termo) ||
+          (p.codigoBarras || '').toLowerCase().includes(termo) ||
+          (p.referencia || '').toLowerCase().includes(termo)) {
+        p.qtd = qtd;
+      }
+    });
+    renderProdutosEtiqueta();
+  }
+
+  function atualizarTotalEtiquetas() {
+    const total = _etiquetasProdutos.reduce((s, p) => s + (p.qtd || 0), 0);
+    const porPagina = { pequena: 63, media: 40, grande: 21 }[_etiquetasTamanho] || 40;
+    const paginas = Math.ceil(total / porPagina);
+    const totalEl = document.getElementById('et-total-etiquetas');
+    const pagEl = document.getElementById('et-total-paginas');
+    if (totalEl) totalEl.textContent = total;
+    if (pagEl) pagEl.textContent = paginas;
+  }
+
+  function imprimirEtiquetas() {
+    const total = _etiquetasProdutos.reduce((s, p) => s + (p.qtd || 0), 0);
+    if (total === 0) {
+      alert('Defina pelo menos 1 etiqueta pra imprimir. Use o campo "Qtd Etiquetas" na tabela.');
+      return;
+    }
+    if (total > 500) {
+      if (!confirm(`Você vai gerar ${total} etiquetas. Isso pode demorar um pouco. Continuar?`)) return;
+    }
+
+    // Configurações por tamanho (mm)
+    const configs = {
+      pequena: { largura: 30, altura: 20, colunas: 7, fonte: 6, barrasAltura: 26, barrasLargura: 0.9 },
+      media:   { largura: 50, altura: 25, colunas: 4, fonte: 8, barrasAltura: 32, barrasLargura: 1.2 },
+      grande:  { largura: 70, altura: 40, colunas: 3, fonte: 10, barrasAltura: 55, barrasLargura: 1.8 }
+    };
+    const cfg = configs[_etiquetasTamanho] || configs.media;
+
+    // Monta lista expandida (cada produto repetido pela quantidade)
+    const itens = [];
+    _etiquetasProdutos.forEach(p => {
+      for (let i = 0; i < (p.qtd || 0); i++) {
+        itens.push(p);
+      }
+    });
+
+    // Gera HTML — usa JsBarcode via CDN
+    const etiquetasHtml = itens.map((p, idx) => `
+      <div style="width:${cfg.largura}mm;height:${cfg.altura}mm;border:0.5px dashed #ccc;padding:1.5mm;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;page-break-inside:avoid;">
+        <div style="font-size:${cfg.fonte}pt;font-weight:700;text-align:center;line-height:1.1;max-height:${cfg.altura * 0.25}mm;overflow:hidden;text-overflow:ellipsis;width:100%;white-space:nowrap;">
+          ${escapeHtml((p.nome || '').substring(0, 40))}
+        </div>
+        <svg class="jsbarcode" data-value="${escapeAttr(p.codigoBarras)}" data-height="${cfg.barrasAltura}" data-width="${cfg.barrasLargura}" data-fontsize="${cfg.fonte + 1}" style="max-width:100%;"></svg>
+      </div>
+    `).join('');
+
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Etiquetas — ${total} unidade(s)</title>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+        <style>
+          @page { size: A4; margin: 5mm; }
+          body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+          .grid-etiquetas {
+            display: grid;
+            grid-template-columns: repeat(${cfg.colunas}, ${cfg.largura}mm);
+            gap: 1mm;
+            justify-content: center;
+          }
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+          }
+          .btn-print {
+            position: fixed; top: 10px; right: 10px;
+            background: #7c3aed; color: #fff; border: none;
+            padding: 10px 18px; border-radius: 6px; font-weight: 700;
+            cursor: pointer; z-index: 999;
+          }
+        </style>
+      </head>
+      <body>
+        <button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir</button>
+        <div class="grid-etiquetas">${etiquetasHtml}</div>
+        <script>
+          window.addEventListener('load', function() {
+            // Gera todos os códigos de barras
+            document.querySelectorAll('.jsbarcode').forEach(function(el) {
+              try {
+                JsBarcode(el, el.dataset.value, {
+                  format: 'CODE128',
+                  height: parseFloat(el.dataset.height),
+                  width: parseFloat(el.dataset.width),
+                  fontSize: parseFloat(el.dataset.fontsize),
+                  margin: 0,
+                  displayValue: true
+                });
+              } catch(e) { console.error('Erro gerando barcode:', e); }
+            });
+            // Auto-imprime após 800ms pra dar tempo dos códigos renderizarem
+            setTimeout(function() { window.print(); }, 800);
+          });
+        <\/script>
+      </body>
+      </html>
+    `);
+    w.document.close();
+    fecharEtiquetas();
+  }
 
   function abrirHistoricoCaixa() {
     // Preenche selects
