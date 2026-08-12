@@ -5,13 +5,15 @@ const router = express.Router();
 const toNum = (v) => Number(v) || 0;
 
 // Helper: calcula totais (vendas à vista + movimentos) de um caixa
+// EXCLUI vendas canceladas
 async function calcularTotaisCaixa(caixaId, empresaId, data) {
-  // Vendas à vista do dia (excluindo "A Prazo")
-  // Soma todas as vendas registradas no dia desta empresa que não sejam a prazo
+  // Vendas à vista do dia (excluindo "A Prazo" e vendas CANCELADAS)
   const rVendas = await db.query(
     `SELECT pagamento, SUM(total) AS total, COUNT(*) AS qtd
      FROM vendas
-     WHERE empresa_id=$1 AND data=$2 AND pagamento != 'A Prazo'
+     WHERE empresa_id=$1 AND data=$2
+       AND pagamento != 'A Prazo'
+       AND (status IS NULL OR status != 'cancelada')
      GROUP BY pagamento`,
     [empresaId, data]
   );
@@ -273,9 +275,9 @@ router.get('/:id', async (req, res) => {
        WHERE cm.caixa_id=$1 ORDER BY cm.criado_em DESC`,
       [caixa.id]
     );
-    // Vendas detalhadas
+    // Vendas detalhadas (com status para o frontend poder marcar as canceladas)
     const rVendas = await db.query(
-      `SELECT id, cliente, total, pagamento FROM vendas
+      `SELECT id, cliente, total, pagamento, status FROM vendas
        WHERE empresa_id=$1 AND data=$2 AND pagamento != 'A Prazo'
        ORDER BY id`,
       [req.user.empresaId, dataIso]
@@ -299,7 +301,7 @@ router.get('/:id', async (req, res) => {
         categoria: m.categoria, criadoEm: m.criado_em, usuario: m.usuario
       })),
       vendas: rVendas.rows.map(v => ({
-        id: v.id, cliente: v.cliente, total: toNum(v.total), pagamento: v.pagamento
+        id: v.id, cliente: v.cliente, total: toNum(v.total), pagamento: v.pagamento, status: v.status
       }))
     });
   } catch (err) {

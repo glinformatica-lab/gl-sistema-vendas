@@ -10529,14 +10529,17 @@ ${conteudo}
               </tr>
             </thead>
             <tbody>
-              ${d.vendas.map(v => `
-                <tr style="border-bottom:1px solid #f1f5f9;">
+              ${d.vendas.map(v => {
+                const cancelada = v.status === 'cancelada';
+                return `
+                <tr style="border-bottom:1px solid #f1f5f9;${cancelada ? 'text-decoration:line-through;color:#94a3b8;background:#fef2f2;' : ''}">
                   <td style="padding:6px;">${v.id}</td>
-                  <td style="padding:6px;">${escapeHtml(v.cliente || '—')}</td>
+                  <td style="padding:6px;">${escapeHtml(v.cliente || '—')}${cancelada ? ' <span style="color:#dc2626;font-weight:700;text-decoration:none;font-size:10px;">❌ CANCELADA</span>' : ''}</td>
                   <td style="padding:6px;">${escapeHtml(v.pagamento || '—')}</td>
                   <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(v.total)}</td>
                 </tr>
-              `).join('')}
+                `;
+              }).join('')}
             </tbody>
           </table>
         `;
@@ -10593,14 +10596,17 @@ ${conteudo}
     const c = d.caixa;
     const dataFmt = formatarDataBR(c.data);
 
-    const vendasHtml = (d.vendas || []).map(v => `
-      <tr>
+    const vendasHtml = (d.vendas || []).map(v => {
+      const cancelada = v.status === 'cancelada';
+      return `
+      <tr style="${cancelada ? 'text-decoration:line-through;color:#94a3b8;' : ''}">
         <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${v.id}</td>
-        <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(v.cliente || '—')}</td>
+        <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(v.cliente || '—')}${cancelada ? ' <span style="color:#dc2626;font-size:10px;text-decoration:none;">(CANCELADA)</span>' : ''}</td>
         <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(v.pagamento || '—')}</td>
         <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(v.total)}</td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     const movHtml = (d.movimentos || []).map(m => {
       const sinal = m.tipo === 'reforco' ? '+' : '-';
