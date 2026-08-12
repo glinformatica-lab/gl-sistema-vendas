@@ -207,4 +207,164 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ==== CANCELAR VENDA (mantém no banco com status='cancelada') ====
+// Devolve estoque e remove contas a receber, mas mantém histórico
+router.post('/:id/cancelar', async (req, res) => {
+  const { motivo, senha } = req.body || {};
+  const bcrypt = require('bcryptjs');
+  if (!motivo || motivo.trim().length < 5) {
+    return res.status(400).json({ error: 'Motivo obrigatório (mínimo 5 caracteres).' });
+  }
+  if (!senha) {
+    return res.status(400).json({ error: 'Senha do admin obrigatória.' });
+  }
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    // 1. Valida se venda existe e não está cancelada
+    const rVenda = await client.query(
+      'SELECT id, status FROM vendas WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [req.params.id, req.user.empresaId]
+    );
+    if (rVenda.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Venda não encontrada.' });
+    }
+    if (rVenda.rows[0].status === 'cancelada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Venda já está cancelada.' });
+    }
+    // 2. Valida senha do usuário atual (que precisa ser admin)
+    const rUser = await client.query(
+      'SELECT id, nome, senha_hash, papel FROM usuarios WHERE id=$1 LIMIT 1',
+      [req.user.userId]
+    );
+    if (rUser.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(401).json({ error: 'Usuário não encontrado.' });
+    }
+    const usr = rUser.rows[0];
+    if (usr.papel !== 'admin') {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Apenas administradores podem cancelar vendas.' });
+    }
+    const okSenha = await bcrypt.compare(senha, usr.senha_hash);
+    if (!okSenha) {
+      await client.query('ROLLBACK');
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+    // 3. Devolve estoque (percorre movimentações de saída da venda)
+    const movs = await client.query(
+      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
+      [req.params.id, req.user.empresaId]
+    );
+    for (const m of movs.rows) {
+      await client.query(
+        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
+        [m.qtd, req.user.empresaId, m.produto_codigo]
+      );
+    }
+    // Remove movimentações
+    await client.query(
+      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
+      [req.params.id, req.user.empresaId]
+    );
+    // 4. Remove contas a receber
+    await client.query(
+      'DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2',
+      [req.params.id, req.user.empresaId]
+    );
+    // 5. Marca venda como cancelada
+    await client.query(
+      `UPDATE vendas SET status='cancelada',
+              motivo_cancelamento=$1,
+              cancelada_por=$2,
+              cancelada_em=NOW()
+       WHERE id=$3 AND empresa_id=$4`,
+      [motivo.trim(), req.user.userId, req.params.id, req.user.empresaId]
+    );
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      cancelada_por: usr.nome,
+      motivo: motivo.trim()
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[vendas/cancelar]', err);
+    res.status(500).json({ error: 'Erro ao cancelar venda.' });
+  } finally {
+    client.release();
+  }
+});
+
+// ==== CANCELAR VENDA E REABRIR ORÇAMENTO ====
+router.post('/:id/cancelar-e-reabrir-orcamento', async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Busca venda + orçamento vinculado
+    const rVenda = await client.query(
+      `SELECT v.id, v.status, o.id AS orc_id, o.numero AS orc_numero
+       FROM vendas v
+       LEFT JOIN orcamentos o ON o.venda_id = v.id
+       WHERE v.id=$1 AND v.empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rVenda.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Venda não encontrada.' });
+    }
+    const v = rVenda.rows[0];
+    if (v.status === 'cancelada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Venda já está cancelada.' });
+    }
+    if (!v.orc_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Esta venda não tem orçamento vinculado.' });
+    }
+    // Devolve estoque
+    const movs = await client.query(
+      "SELECT * FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2 AND tipo='saida'",
+      [req.params.id, req.user.empresaId]
+    );
+    for (const m of movs.rows) {
+      await client.query(
+        'UPDATE produtos SET estoque = estoque + $1 WHERE empresa_id=$2 AND codigo=$3',
+        [m.qtd, req.user.empresaId, m.produto_codigo]
+      );
+    }
+    await client.query(
+      'DELETE FROM movimentacoes WHERE venda_id=$1 AND empresa_id=$2',
+      [req.params.id, req.user.empresaId]
+    );
+    await client.query(
+      'DELETE FROM contas_receber WHERE venda_id=$1 AND empresa_id=$2',
+      [req.params.id, req.user.empresaId]
+    );
+    // Marca venda como cancelada
+    await client.query(
+      `UPDATE vendas SET status='cancelada',
+              motivo_cancelamento='Reaberto para edição do orçamento',
+              cancelada_por=$1, cancelada_em=NOW()
+       WHERE id=$2 AND empresa_id=$3`,
+      [req.user.userId, req.params.id, req.user.empresaId]
+    );
+    // Reabre orçamento (status='aberto', desvincula venda_id)
+    await client.query(
+      `UPDATE orcamentos SET status='aberto', venda_id=NULL WHERE id=$1 AND empresa_id=$2`,
+      [v.orc_id, req.user.empresaId]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true, orcamentoId: v.orc_id, orcamentoNumero: v.orc_numero });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[vendas/cancelar-reabrir]', err);
+    res.status(500).json({ error: 'Erro ao cancelar e reabrir orçamento.' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
