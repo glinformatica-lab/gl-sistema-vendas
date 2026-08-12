@@ -9,6 +9,11 @@ router.get('/', async (req, res) => {
   try {
     const params = [req.user.empresaId];
     let where = `WHERE o.empresa_id = $1`;
+    // Vendedor vê APENAS seus orçamentos. Admin e estoque veem tudo.
+    if (req.user.papel === 'vendedor') {
+      params.push(req.user.userId);
+      where += ` AND o.vendedor_id = $${params.length}`;
+    }
     if (status) {
       params.push(status);
       where += ` AND o.status = $${params.length}`;
@@ -18,7 +23,11 @@ router.get('/', async (req, res) => {
       where += ` AND (o.cliente_nome ILIKE $${params.length} OR CAST(o.numero AS TEXT) ILIKE $${params.length})`;
     }
     const r = await db.query(
-      `SELECT o.*, c.nome AS cliente_nome_real
+      `SELECT o.*, c.nome AS cliente_nome_real,
+              (SELECT COUNT(*) FROM lista_compras lc
+               WHERE lc.orcamento_id = o.id AND lc.status IN ('pendente','pedido'))::int AS compras_abertas,
+              (SELECT COUNT(*) FROM lista_compras lc
+               WHERE lc.orcamento_id = o.id AND lc.status = 'pendente')::int AS compras_pendentes
        FROM orcamentos o
        LEFT JOIN clientes c ON c.id = o.cliente_id
        ${where}
@@ -47,6 +56,10 @@ router.get('/:id', async (req, res) => {
     );
     if (rOrc.rows.length === 0) return res.status(404).json({ error: 'Orçamento não encontrado.' });
     const orcamento = rOrc.rows[0];
+    // Vendedor só acessa seus próprios orçamentos
+    if (req.user.papel === 'vendedor' && orcamento.vendedor_id && orcamento.vendedor_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Você não tem permissão para acessar este orçamento.' });
+    }
     const rIt = await db.query(
       `SELECT * FROM orcamento_itens WHERE orcamento_id = $1 ORDER BY ordem, id`,
       [id]
@@ -152,6 +165,20 @@ router.post('/', async (req, res) => {
 });
 
 // Atualizar orçamento (recria itens)
+// Helper: verifica se vendedor pode editar orçamento (é dele) ou é admin/estoque
+async function verificarDonoOrcamento(req, orcId) {
+  if (req.user.papel !== 'vendedor') return { ok: true };
+  const r = await db.query(
+    'SELECT vendedor_id FROM orcamentos WHERE id = $1 AND empresa_id = $2',
+    [orcId, req.user.empresaId]
+  );
+  if (r.rows.length === 0) return { ok: false, code: 404, msg: 'Orçamento não encontrado.' };
+  if (r.rows[0].vendedor_id && r.rows[0].vendedor_id !== req.user.userId) {
+    return { ok: false, code: 403, msg: 'Você não tem permissão para modificar este orçamento.' };
+  }
+  return { ok: true };
+}
+
 router.put('/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   const {
@@ -159,6 +186,10 @@ router.put('/:id', async (req, res) => {
     validade_dias, observacoes, condicoes_pagamento,
     desconto, itens
   } = req.body || {};
+
+  // Verifica se o vendedor é dono do orçamento
+  const verif = await verificarDonoOrcamento(req, id);
+  if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
 
   const client = await db.pool.connect();
   try {
@@ -247,6 +278,10 @@ router.post('/:id/status', async (req, res) => {
   if (!validos.includes(status)) {
     return res.status(400).json({ error: 'Status inválido.' });
   }
+  // Verifica se o vendedor é dono do orçamento
+  const verif = await verificarDonoOrcamento(req, id);
+  if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -351,6 +386,10 @@ router.post('/:id/converter', async (req, res) => {
   const { forma_pagamento } = req.body || {};
   if (!forma_pagamento) return res.status(400).json({ error: 'Informe a forma de pagamento.' });
 
+  // Verifica se o vendedor é dono do orçamento
+  const verif = await verificarDonoOrcamento(req, id);
+  if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -449,6 +488,9 @@ router.post('/:id/converter', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   try {
+    // Verifica se o vendedor é dono do orçamento
+    const verif = await verificarDonoOrcamento(req, id);
+    if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
     const r = await db.query(
       `DELETE FROM orcamentos WHERE id=$1 AND empresa_id=$2 AND status != 'convertido' RETURNING id`,
       [id, req.user.empresaId]

@@ -675,14 +675,14 @@
           <div class="card-footer" id="card-pagar-footer">0 em aberto</div>
         </div>
         <div class="card feature-ambientes" style="display:none;cursor:pointer;border-left:4px solid #f59e0b;" onclick="showPage('lista-compras')">
-          <div class="card-title">🛒 Lista de Compras</div>
+          <div class="card-title" id="card-lc-title-pend">🛒 Lista de Compras</div>
           <div class="card-value" id="card-lc-pendente" style="color:#f59e0b;">0</div>
           <div class="card-footer" id="card-lc-footer">itens pendentes de compra</div>
         </div>
         <div class="card feature-ambientes" style="display:none;cursor:pointer;border-left:4px solid #3b82f6;" onclick="showPage('lista-compras')">
-          <div class="card-title">📦 Aguardando Entrega</div>
+          <div class="card-title" id="card-lc-title-ped">📦 Aguardando Entrega</div>
           <div class="card-value" id="card-lc-pedido" style="color:#3b82f6;">0</div>
-          <div class="card-footer">produtos pedidos</div>
+          <div class="card-footer" id="card-lc-footer-ped">produtos pedidos</div>
         </div>
       </div>
       <!-- Últimas Vendas -->
@@ -11044,15 +11044,37 @@ ${conteudo}
       document.getElementById('lc-cnt-pendente').textContent = r.pendente || 0;
       document.getElementById('lc-cnt-pedido').textContent = r.pedido || 0;
       document.getElementById('lc-cnt-recebido').textContent = r.recebidoUltimos7d || 0;
-      // Cards do Dashboard
+      // Cards do Dashboard - personaliza texto conforme papel
+      const papel = window._papelAtual;
+      const ehVendedor = papel === 'vendedor';
       const cardPend = document.getElementById('card-lc-pendente');
       const cardPed = document.getElementById('card-lc-pedido');
       const cardFooter = document.getElementById('card-lc-footer');
+      const cardFooterPed = document.getElementById('card-lc-footer-ped');
+      const cardTitlePend = document.getElementById('card-lc-title-pend');
+      const cardTitlePed = document.getElementById('card-lc-title-ped');
       if (cardPend) cardPend.textContent = r.pendente || 0;
       if (cardPed) cardPed.textContent = r.pedido || 0;
-      if (cardFooter) {
-        const p = r.pendente || 0;
-        cardFooter.textContent = p === 0 ? 'nenhum item pendente' : (p === 1 ? 'item pendente de compra' : 'itens pendentes de compra');
+      // Vendedor: texto focado nele mesmo
+      if (ehVendedor) {
+        if (cardTitlePend) cardTitlePend.innerHTML = '🛒 Meus Aguardando Compra';
+        if (cardTitlePed) cardTitlePed.innerHTML = '📦 Meus Aguardando Entrega';
+        if (cardFooter) {
+          const p = r.pendente || 0;
+          cardFooter.textContent = p === 0 ? 'nenhum item pendente' : (p === 1 ? 'produto seu aguardando' : 'produtos seus aguardando');
+        }
+        if (cardFooterPed) {
+          const p = r.pedido || 0;
+          cardFooterPed.textContent = p === 0 ? 'nenhum item pedido' : (p === 1 ? 'produto seu já pedido' : 'produtos seus já pedidos');
+        }
+      } else {
+        if (cardTitlePend) cardTitlePend.innerHTML = '🛒 Lista de Compras';
+        if (cardTitlePed) cardTitlePed.innerHTML = '📦 Aguardando Entrega';
+        if (cardFooter) {
+          const p = r.pendente || 0;
+          cardFooter.textContent = p === 0 ? 'nenhum item pendente' : (p === 1 ? 'item pendente de compra' : 'itens pendentes de compra');
+        }
+        if (cardFooterPed) cardFooterPed.textContent = 'produtos pedidos';
       }
       // Badge no menu
       const badge = document.getElementById('badge-lista-compras');
@@ -12109,6 +12131,26 @@ ${conteudo}
         : '';
       const empresaAmb = JSON.parse(localStorage.getItem('empresa') || '{}');
       const mostrarStatusCompras = !!empresaAmb.usaAmbientes && (o.status === 'aprovado' || o.status === 'convertido');
+      const comprasAbertas = parseInt(o.compras_abertas) || 0;
+      const comprasPendentes = parseInt(o.compras_pendentes) || 0;
+
+      // Indicador visual ao lado do status quando tem compras em andamento
+      let indicadorCompras = '';
+      if (mostrarStatusCompras && comprasAbertas > 0) {
+        const cor = comprasPendentes > 0 ? '#f59e0b' : '#3b82f6';
+        const emoji = comprasPendentes > 0 ? '🕐' : '📦';
+        const texto = comprasPendentes > 0 ? `${comprasAbertas} aguardando` : `${comprasAbertas} pedido`;
+        indicadorCompras = `<div style="margin-top:4px;"><span style="background:${cor}22;color:${cor};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">${emoji} ${texto}</span></div>`;
+      } else if (mostrarStatusCompras && comprasAbertas === 0 && o.status === 'aprovado') {
+        indicadorCompras = `<div style="margin-top:4px;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">✅ compras OK</span></div>`;
+      }
+
+      // Botão 🛒 com badge se tem pendências
+      const badgeBtn = comprasPendentes > 0 ? `<span style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:800;line-height:1;min-width:14px;text-align:center;">${comprasPendentes}</span>` : '';
+      const btnStatusCompras = mostrarStatusCompras
+        ? `<button onclick="verComprasOrcamento(${o.id}, ${o.numero})" title="Ver status de compras" style="color:#f59e0b;position:relative;">🛒${badgeBtn}</button>`
+        : '';
+
       return `
         <tr>
           <td><strong>#${o.numero}</strong>${infoUsuarioIcone}</td>
@@ -12116,10 +12158,10 @@ ${conteudo}
           <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
           <td><strong>${formatarBRL(o.total)}</strong></td>
-          <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">${statusLabels[o.status] || o.status}</span></td>
+          <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">${statusLabels[o.status] || o.status}</span>${indicadorCompras}</td>
           <td class="acoes">
             <button onclick="visualizarOrc(${o.id})" title="Visualizar/Imprimir">👁️</button>
-            ${mostrarStatusCompras ? `<button onclick="verComprasOrcamento(${o.id}, ${o.numero})" title="Ver status de compras" style="color:#f59e0b;">🛒</button>` : ''}
+            ${btnStatusCompras}
             ${podeEditar ? `<button onclick="editarOrc(${o.id})" title="Editar">✏️</button>` : ''}
             ${podeAprovar ? `<button onclick="aprovarOrc(${o.id})" title="Aprovar" style="color:#16a34a;">✓</button>` : ''}
             ${podeConverter ? `<button onclick="converterOrc(${o.id})" title="Converter em venda" style="color:#7c3aed;">💰</button>` : ''}
