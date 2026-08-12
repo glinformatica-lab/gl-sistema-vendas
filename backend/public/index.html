@@ -565,6 +565,7 @@
     <div class="submenu" id="submenu-vendas" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('vendas')">&#128722; Vendas</button>
       <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
+      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('lista-compras')" style="display:none;">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
     <!-- Vendas Online (admin-only) -->
@@ -952,6 +953,60 @@
         </thead>
         <tbody id="tbody-orcamentos"></tbody>
       </table>
+    </div>
+
+    <!-- Lista de Compras (Módulo Iluminação) -->
+    <div id="page-lista-compras" style="display:none;">
+      <div class="page-title">🛒 Lista de Compras</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Produtos sem estoque que foram enviados automaticamente das aprovações de orçamento.</div>
+
+      <!-- Cards de resumo -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+        <div style="background:#fef3c7;border-radius:10px;padding:14px;border:1px solid #fbbf24;">
+          <div style="font-size:11px;color:#92400e;font-weight:700;">🕐 PENDENTE</div>
+          <div id="lc-cnt-pendente" style="font-size:26px;font-weight:800;color:#92400e;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#92400e;">itens aguardando</div>
+        </div>
+        <div style="background:#dbeafe;border-radius:10px;padding:14px;border:1px solid #93c5fd;">
+          <div style="font-size:11px;color:#1e40af;font-weight:700;">📦 PEDIDO</div>
+          <div id="lc-cnt-pedido" style="font-size:26px;font-weight:800;color:#1e40af;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#1e40af;">aguardando entrega</div>
+        </div>
+        <div style="background:#dcfce7;border-radius:10px;padding:14px;border:1px solid #86efac;">
+          <div style="font-size:11px;color:#166534;font-weight:700;">✅ RECEBIDO (7d)</div>
+          <div id="lc-cnt-recebido" style="font-size:26px;font-weight:800;color:#166534;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#166534;">últimos 7 dias</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="lc-busca" oninput="renderListaCompras()" placeholder="🔎 Buscar por produto, orçamento ou cliente"
+               style="flex:1;min-width:220px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+        <button type="button" id="lc-filtro-todos" onclick="filtrarListaCompras('todos')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Todos</button>
+        <button type="button" id="lc-filtro-pendente" onclick="filtrarListaCompras('pendente')" style="padding:8px 14px;border:2px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;">🕐 Pendentes</button>
+        <button type="button" id="lc-filtro-pedido" onclick="filtrarListaCompras('pedido')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">📦 Pedidos</button>
+        <button type="button" id="lc-filtro-recebido" onclick="filtrarListaCompras('recebido')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">✅ Recebidos</button>
+      </div>
+
+      <!-- Tabela -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:center;width:70px;">Qtd</th>
+              <th style="padding:10px;text-align:left;width:170px;">Orçamento</th>
+              <th style="padding:10px;text-align:left;width:130px;">Vendedor</th>
+              <th style="padding:10px;text-align:center;width:110px;">Status</th>
+              <th style="padding:10px;text-align:center;width:100px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-lista-compras">
+            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Vendas -->
@@ -2103,6 +2158,67 @@
       <div style="display:flex;gap:10px;margin-top:16px;">
         <button class="btn" onclick="confirmarMultiplicar()" style="flex:1;background:#16a34a;">Multiplicar</button>
         <button class="btn" onclick="fecharMultiplicar()" style="flex:1;background:#eceef2;color:var(--azul);">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Atualizar status Lista de Compras -->
+  <div id="modal-lc-status" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:10001;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:480px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <h2 style="color:var(--azul);margin:0;font-size:20px;">🛒 Atualizar Status</h2>
+        <button onclick="fecharModalLcStatus()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <div id="lc-status-info" style="padding:12px;background:#f8fafc;border-radius:8px;margin-bottom:16px;font-size:14px;color:#334155;"></div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;color:#334155;display:block;margin-bottom:8px;">Novo status:</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+          <label style="cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;" id="lc-opt-pendente" onclick="selecionarStatusLc('pendente')">
+            <input type="radio" name="lc-status" value="pendente" style="display:none;">
+            <div style="font-size:22px;">🕐</div>
+            <div style="font-size:12px;font-weight:700;margin-top:2px;">Pendente</div>
+          </label>
+          <label style="cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;" id="lc-opt-pedido" onclick="selecionarStatusLc('pedido')">
+            <input type="radio" name="lc-status" value="pedido" style="display:none;">
+            <div style="font-size:22px;">📦</div>
+            <div style="font-size:12px;font-weight:700;margin-top:2px;">Pedido</div>
+          </label>
+          <label style="cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;" id="lc-opt-recebido" onclick="selecionarStatusLc('recebido')">
+            <input type="radio" name="lc-status" value="recebido" style="display:none;">
+            <div style="font-size:22px;">✅</div>
+            <div style="font-size:12px;font-weight:700;margin-top:2px;">Recebido</div>
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;color:#334155;display:block;margin-bottom:6px;">Observação: <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(ex: fornecedor, prazo, número do pedido)</span></label>
+        <textarea id="lc-status-obs" rows="3" placeholder="Ex: Comprado do Fornecedor XYZ, prazo 5 dias, pedido #1234" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+      </div>
+
+      <div id="lc-status-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharModalLcStatus()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="salvarStatusLc()" style="flex:2;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Alerta ao aprovar - itens criados -->
+  <div id="modal-lc-criados" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10002;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:500px;width:100%;">
+      <div style="text-align:center;font-size:48px;margin-bottom:8px;">🛒</div>
+      <h2 style="color:#f59e0b;margin:0 0 8px 0;font-size:20px;text-align:center;">Itens enviados pra compras</h2>
+      <div style="text-align:center;font-size:13px;color:#64748b;margin-bottom:16px;">
+        Estes produtos não têm estoque suficiente e foram adicionados à <strong>Lista de Compras</strong>:
+      </div>
+      <div id="lc-criados-lista" style="max-height:280px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharAlertaLcCriados()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Fechar</button>
+        <button type="button" onclick="verListaCompras()" style="flex:2;padding:12px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">🛒 Ver Lista</button>
       </div>
     </div>
   </div>
@@ -5189,6 +5305,7 @@ https://sistema.glinformatica.com.br
     'fornecedores': 'cadastros',
     'vendas': 'vendas',
     'orcamentos': 'vendas',
+    'lista-compras': 'vendas',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -5350,6 +5467,15 @@ https://sistema.glinformatica.com.br
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
     if(pg === 'orcamentos') carregarOrcamentos();
+    if(pg === 'lista-compras') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      carregarListaCompras();
+    }
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
     if(pg === 'minha-conta') { carregarMinhaConta(); trocarAbaMc('geral'); }
@@ -10822,6 +10948,205 @@ ${conteudo}
     document.getElementById('modal-leitor-camera').style.display = 'none';
   }
 
+  // ====== LISTA DE COMPRAS (Módulo Iluminação) ======
+  let _listaComprasCache = [];
+  let _lcFiltroStatus = 'todos';
+  let _lcItemEditando = null;
+  let _lcStatusSelecionado = null;
+
+  async function carregarListaCompras() {
+    try {
+      _listaComprasCache = await api('GET', '/api/lista-compras');
+      await carregarResumoListaCompras();
+      renderListaCompras();
+    } catch (e) {
+      console.error('[lista-compras]', e);
+      const tbody = document.getElementById('tbody-lista-compras');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  async function carregarResumoListaCompras() {
+    try {
+      const r = await api('GET', '/api/lista-compras/resumo');
+      document.getElementById('lc-cnt-pendente').textContent = r.pendente || 0;
+      document.getElementById('lc-cnt-pedido').textContent = r.pedido || 0;
+      document.getElementById('lc-cnt-recebido').textContent = r.recebidoUltimos7d || 0;
+      // Badge no menu
+      const badge = document.getElementById('badge-lista-compras');
+      if (badge) {
+        const pend = r.pendente || 0;
+        if (pend > 0) {
+          badge.textContent = pend;
+          badge.style.display = '';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    } catch(e) { /* silencioso */ }
+  }
+
+  function filtrarListaCompras(status) {
+    _lcFiltroStatus = status;
+    // Atualiza visual dos botões
+    ['todos','pendente','pedido','recebido'].forEach(s => {
+      const btn = document.getElementById('lc-filtro-' + s);
+      if (!btn) return;
+      if (s === status) {
+        if (s === 'pendente') btn.style.cssText = 'padding:8px 14px;border:2px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;';
+        else if (s === 'pedido') btn.style.cssText = 'padding:8px 14px;border:2px solid #3b82f6;background:#dbeafe;color:#1e40af;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;';
+        else if (s === 'recebido') btn.style.cssText = 'padding:8px 14px;border:2px solid #16a34a;background:#dcfce7;color:#166534;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;';
+        else btn.style.cssText = 'padding:8px 14px;border:2px solid var(--azul);background:#eff6ff;color:var(--azul);border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;';
+      } else {
+        btn.style.cssText = 'padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+      }
+    });
+    renderListaCompras();
+  }
+
+  function renderListaCompras() {
+    const tbody = document.getElementById('tbody-lista-compras');
+    if (!tbody) return;
+    const termo = (document.getElementById('lc-busca')?.value || '').toLowerCase().trim();
+
+    let filtrados = _listaComprasCache;
+    if (_lcFiltroStatus !== 'todos') {
+      filtrados = filtrados.filter(x => x.status === _lcFiltroStatus);
+    }
+    if (termo) {
+      filtrados = filtrados.filter(x =>
+        (x.produtoNome || '').toLowerCase().includes(termo) ||
+        (x.referencia || '').toLowerCase().includes(termo) ||
+        (x.clienteNome || '').toLowerCase().includes(termo) ||
+        String(x.orcamentoNumero || '').includes(termo)
+      );
+    }
+
+    if (filtrados.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum item encontrado com esses filtros.</td></tr>';
+      return;
+    }
+
+    const statusBadge = {
+      pendente: '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">🕐 Pendente</span>',
+      pedido:   '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📦 Pedido</span>',
+      recebido: '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✅ Recebido</span>'
+    };
+
+    tbody.innerHTML = filtrados.map(item => {
+      const orcInfo = item.orcamentoNumero
+        ? `<div style="color:#3960f9;font-weight:600;">#${item.orcamentoNumero}</div><div style="font-size:11px;color:#64748b;">${escapeHtml(item.clienteNome || '—')}</div>`
+        : '<span style="color:#94a3b8;font-style:italic;">Avulso</span>';
+      const obsHtml = item.observacao
+        ? `<div style="font-size:11px;color:#64748b;margin-top:4px;font-style:italic;">💬 ${escapeHtml(item.observacao)}</div>`
+        : '';
+      const usuario = item.atualizadoPorNome || item.criadoPorNome || '—';
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px;">
+            <div style="font-weight:600;">${escapeHtml(item.produtoNome)}</div>
+            <div style="font-size:11px;color:#64748b;">
+              ${item.produtoCodigo ? 'Cód: ' + escapeHtml(item.produtoCodigo) + ' · ' : ''}
+              ${item.referencia ? '<span style="color:#7c3aed;font-weight:600;">Ref: ' + escapeHtml(item.referencia) + '</span>' : ''}
+            </div>
+            ${obsHtml}
+          </td>
+          <td style="padding:10px;text-align:center;font-weight:700;">${item.quantidade}</td>
+          <td style="padding:10px;">${orcInfo}</td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(usuario)}</td>
+          <td style="padding:10px;text-align:center;">${statusBadge[item.status] || item.status}</td>
+          <td style="padding:10px;text-align:center;">
+            <button onclick="abrirModalLcStatus(${item.id})" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">Atualizar</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function abrirModalLcStatus(id) {
+    const item = _listaComprasCache.find(x => x.id === id);
+    if (!item) return;
+    _lcItemEditando = item;
+    _lcStatusSelecionado = item.status;
+    document.getElementById('lc-status-info').innerHTML = `
+      <strong>${escapeHtml(item.produtoNome)}</strong> — ${item.quantidade} un<br>
+      <span style="font-size:12px;color:#64748b;">
+        ${item.orcamentoNumero ? 'Orçamento #' + item.orcamentoNumero + ' · ' : ''}
+        ${item.clienteNome ? escapeHtml(item.clienteNome) : ''}
+      </span>
+    `;
+    document.getElementById('lc-status-obs').value = item.observacao || '';
+    selecionarStatusLc(item.status);
+    document.getElementById('lc-status-erro').style.display = 'none';
+    document.getElementById('modal-lc-status').style.display = 'flex';
+  }
+
+  function selecionarStatusLc(status) {
+    _lcStatusSelecionado = status;
+    const cores = {
+      pendente: { br: '#fbbf24', bg: '#fef3c7', tx: '#92400e' },
+      pedido:   { br: '#3b82f6', bg: '#dbeafe', tx: '#1e40af' },
+      recebido: { br: '#16a34a', bg: '#dcfce7', tx: '#166534' }
+    };
+    ['pendente','pedido','recebido'].forEach(s => {
+      const el = document.getElementById('lc-opt-' + s);
+      if (!el) return;
+      const c = cores[s];
+      if (s === status) {
+        el.style.cssText = `cursor:pointer;padding:12px;border:2px solid ${c.br};border-radius:8px;background:${c.bg};text-align:center;`;
+        el.querySelector('input').checked = true;
+      } else {
+        el.style.cssText = 'cursor:pointer;padding:12px;border:2px solid #cbd5e1;border-radius:8px;background:#fff;text-align:center;';
+      }
+    });
+  }
+
+  function fecharModalLcStatus() {
+    document.getElementById('modal-lc-status').style.display = 'none';
+    _lcItemEditando = null;
+    _lcStatusSelecionado = null;
+  }
+
+  async function salvarStatusLc() {
+    if (!_lcItemEditando || !_lcStatusSelecionado) return;
+    const observacao = document.getElementById('lc-status-obs').value.trim();
+    const erro = document.getElementById('lc-status-erro');
+    erro.style.display = 'none';
+    try {
+      await api('PATCH', `/api/lista-compras/${_lcItemEditando.id}/status`, {
+        status: _lcStatusSelecionado,
+        observacao: observacao || null
+      });
+      fecharModalLcStatus();
+      await carregarListaCompras();
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao atualizar.';
+      erro.style.display = 'block';
+    }
+  }
+
+  // ===== Alerta ao aprovar orçamento =====
+  function mostrarAlertaLcCriados(itens) {
+    if (!itens || itens.length === 0) return;
+    const html = itens.map(it => `
+      <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:600;color:#334155;">${escapeHtml(it.produto)}</div>
+        <div style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;">${it.quantidade} un</div>
+      </div>
+    `).join('');
+    document.getElementById('lc-criados-lista').innerHTML = html;
+    document.getElementById('modal-lc-criados').style.display = 'flex';
+  }
+
+  function fecharAlertaLcCriados() {
+    document.getElementById('modal-lc-criados').style.display = 'none';
+  }
+
+  function verListaCompras() {
+    fecharAlertaLcCriados();
+    showPage('lista-compras');
+  }
+
   // ====== IMPRESSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS ======
   let _etiquetasTamanho = 'media';
   let _etiquetasProdutos = []; // Cache local com {id, nome, codigo, codigoBarras, referencia, qtd}
@@ -12375,8 +12700,14 @@ ${conteudo}
   }
   async function aprovarOrc(id) {
     if (!confirm('Marcar orçamento como APROVADO?')) return;
-    try { await api('POST', '/api/orcamentos/' + id + '/status', { status: 'aprovado' }); carregarOrcamentos(); }
-    catch (err) { alert(err.message); }
+    try {
+      const resp = await api('POST', '/api/orcamentos/' + id + '/status', { status: 'aprovado' });
+      carregarOrcamentos();
+      // Se veio lista de itens criados pra compras, mostra alerta
+      if (resp && resp._listaComprasCriados && resp._listaComprasCriados.length > 0) {
+        mostrarAlertaLcCriados(resp._listaComprasCriados);
+      }
+    } catch (err) { alert(err.message); }
   }
   async function cancelarOrc(id) {
     if (!confirm('Cancelar este orçamento?')) return;
@@ -13123,6 +13454,10 @@ ${conteudo}
     document.querySelectorAll('.feature-ambientes').forEach(el => {
       el.style.display = ativo ? '' : 'none';
     });
+    // Se ativo, carrega resumo pra atualizar badge do menu Lista de Compras
+    if (ativo && typeof carregarResumoListaCompras === 'function') {
+      carregarResumoListaCompras();
+    }
   }
 
   // Troca a tab ativa nas Configurações Fiscais
