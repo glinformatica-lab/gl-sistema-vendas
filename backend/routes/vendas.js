@@ -31,9 +31,12 @@ function calcularParcelas(total, n, dataPrimeiraIso, intervaloDias) {
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
-      `SELECT v.*, uc.nome AS criado_por_nome
+      `SELECT v.*,
+              uc.nome AS criado_por_nome,
+              ucan.nome AS cancelada_por_nome
        FROM vendas v
        LEFT JOIN usuarios uc ON uc.id = v.criado_por
+       LEFT JOIN usuarios ucan ON ucan.id = v.cancelada_por
        WHERE v.empresa_id=$1 ORDER BY v.data DESC, v.id DESC`,
       [req.user.empresaId]
     );

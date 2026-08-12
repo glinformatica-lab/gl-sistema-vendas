@@ -6359,10 +6359,13 @@ https://sistema.glinformatica.com.br
       const infoUsuarioIcone = isAdmin && e.criadoPorNome
         ? ` <span title="👤 Criada por: ${escapeAttr(e.criadoPorNome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
         : '';
+      const linhaUsuarioCriou = isAdmin && e.criadoPorNome
+        ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
+        : '';
       return `
         <tr>
           <td>${formatarDataBR(e.data)}</td>
-          <td>${e.fornecedor}${infoUsuarioIcone}</td>
+          <td>${e.fornecedor}${infoUsuarioIcone}${linhaUsuarioCriou}</td>
           <td>${badge}</td>
           <td>${documento}</td>
           <td>${formatarBRL(total)}</td>
@@ -7486,10 +7489,14 @@ https://sistema.glinformatica.com.br
       const infoUsuarioIcone = isAdmin && (v.criadoPorNome || cancelada)
         ? ` <span title="${escapeAttr(tooltipUsuario)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
         : '';
+      // Nome visível de quem criou (sempre pro admin, embaixo do cliente)
+      const linhaUsuarioCriou = isAdmin && v.criadoPorNome
+        ? `<div style="font-size:10px;color:#64748b;text-decoration:none;margin-top:2px;font-weight:400;">👤 ${escapeHtml(v.criadoPorNome)}${cancelada && v.canceladaPorNome ? ` · ❌ cancelado por ${escapeHtml(v.canceladaPorNome)}` : ''}</div>`
+        : '';
       return `
         <tr style="${estiloLinha}">
           <td>${formatarDataBR(v.data)}</td>
-          <td>${v.cliente}${badgeCancelada}${infoUsuarioIcone}</td>
+          <td>${v.cliente}${badgeCancelada}${infoUsuarioIcone}${linhaUsuarioCriou}</td>
           <td>${itensTxt}</td>
           <td>${formatarBRL(v.total)}</td>
           <td>${pagTxt}</td>
@@ -10998,10 +11005,13 @@ ${conteudo}
       const infoUsuarioIcone = isAdmin && o.vendedor_nome
         ? ` <span title="👤 Criado por: ${escapeAttr(o.vendedor_nome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
         : '';
+      const linhaUsuarioCriou = isAdmin && o.vendedor_nome
+        ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(o.vendedor_nome)}</div>`
+        : '';
       return `
         <tr>
           <td><strong>#${o.numero}</strong>${infoUsuarioIcone}</td>
-          <td>${escapeHtml(o.cliente_nome || o.cliente_nome_real || '—')}</td>
+          <td>${escapeHtml(o.cliente_nome || o.cliente_nome_real || '—')}${linhaUsuarioCriou}</td>
           <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
           <td><strong>${formatarBRL(o.total)}</strong></td>
