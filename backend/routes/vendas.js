@@ -292,7 +292,11 @@ router.post('/:id/cancelar', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[vendas/cancelar]', err);
-    res.status(500).json({ error: 'Erro ao cancelar venda.' });
+    // Detecta erros comuns de estrutura de banco
+    if (err.code === '42703') {
+      return res.status(500).json({ error: 'Erro: coluna faltando no banco. Rode a migration v27.' });
+    }
+    res.status(500).json({ error: 'Erro ao cancelar venda: ' + (err.message || 'desconhecido') });
   } finally {
     client.release();
   }
