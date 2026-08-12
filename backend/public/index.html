@@ -551,9 +551,9 @@
     </button>
     <div class="submenu" id="submenu-cadastros" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
-      <button class="menu-btn submenu-item" onclick="showPage('servicos')">&#128295; Serviços</button>
-      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
-      <button class="menu-btn submenu-item" onclick="showPage('clientes')">&#128100; Clientes</button>
+      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('servicos')">&#128295; Serviços</button>
+      <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
+      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('clientes')">&#128100; Clientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
     </div>
 
@@ -563,7 +563,7 @@
       <span class="grupo-seta" id="seta-vendas">▼</span>
     </button>
     <div class="submenu" id="submenu-vendas" style="display:none;">
-      <button class="menu-btn submenu-item" onclick="showPage('vendas')">&#128722; Vendas</button>
+      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
       <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('lista-compras')" style="display:none;">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
@@ -579,11 +579,11 @@
     </div>
 
     <!-- Financeiro -->
-    <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('financeiro')" data-grupo="financeiro" type="button">
+    <button class="menu-btn menu-grupo estoque-hide" onclick="toggleGrupoMenu('financeiro')" data-grupo="financeiro" type="button">
       <span>&#128176; Financeiro</span>
       <span class="grupo-seta" id="seta-financeiro">▼</span>
     </button>
-    <div class="submenu" id="submenu-financeiro" style="display:none;">
+    <div class="submenu estoque-hide" id="submenu-financeiro" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('caixa')">&#128181; Caixa Diário</button>
       <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128202; Resumo Financeiro</button>
       <button class="menu-btn submenu-item admin-only" onclick="showPage('contas-pagar')">&#128184; Contas a Pagar</button>
@@ -673,6 +673,16 @@
           <div class="card-title">Contas a Pagar</div>
           <div class="card-value red" id="card-pagar-valor">R$ 0,00</div>
           <div class="card-footer" id="card-pagar-footer">0 em aberto</div>
+        </div>
+        <div class="card feature-ambientes" style="display:none;cursor:pointer;border-left:4px solid #f59e0b;" onclick="showPage('lista-compras')">
+          <div class="card-title">🛒 Lista de Compras</div>
+          <div class="card-value" id="card-lc-pendente" style="color:#f59e0b;">0</div>
+          <div class="card-footer" id="card-lc-footer">itens pendentes de compra</div>
+        </div>
+        <div class="card feature-ambientes" style="display:none;cursor:pointer;border-left:4px solid #3b82f6;" onclick="showPage('lista-compras')">
+          <div class="card-title">📦 Aguardando Entrega</div>
+          <div class="card-value" id="card-lc-pedido" style="color:#3b82f6;">0</div>
+          <div class="card-footer">produtos pedidos</div>
         </div>
       </div>
       <!-- Últimas Vendas -->
@@ -934,7 +944,7 @@
     <div id="page-orcamentos" style="display:none;">
       <div class="page-title">Orçamentos</div>
       <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
-        <button class="btn" onclick="openNovoOrcamento()">+ Novo Orçamento</button>
+        <button class="btn estoque-hide" onclick="openNovoOrcamento()">+ Novo Orçamento</button>
         <select id="filtro-status-orc" onchange="carregarOrcamentos()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
           <option value="">Todos status</option>
           <option value="aberto">Aberto</option>
@@ -2073,6 +2083,37 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Status de Compras por Orçamento -->
+  <div id="modal-compras-orc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:700px;width:100%;max-height:92vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:var(--azul);margin:0;font-size:20px;">🛒 Status de Compras</h2>
+          <div id="mco-orc-info" style="font-size:13px;color:#64748b;margin-top:4px;">—</div>
+        </div>
+        <button onclick="fecharComprasOrc()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Resumo -->
+      <div id="mco-resumo" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+
+      <!-- Lista -->
+      <div id="mco-lista" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;"></div>
+
+      <!-- Mensagem quando não tem compras -->
+      <div id="mco-vazio" style="display:none;text-align:center;padding:40px 20px;color:#94a3b8;">
+        <div style="font-size:48px;margin-bottom:8px;">✅</div>
+        <div style="font-size:15px;font-weight:600;color:#166534;">Todos os produtos estão em estoque!</div>
+        <div style="font-size:13px;margin-top:6px;">Este orçamento não precisou de compras adicionais.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <button type="button" onclick="fecharComprasOrc()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Fechar</button>
+        <button type="button" onclick="verListaComprasComplete()" style="flex:1;padding:12px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Ver Lista Completa</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Detalhes do item (descrições) -->
   <div id="modal-detalhes-item" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10001;justify-content:center;align-items:center;">
     <div style="background:#fff;padding:24px;border-radius:14px;max-width:560px;width:92%;max-height:88vh;overflow-y:auto;">
@@ -2860,8 +2901,9 @@
         <label>E-mail*<input type="email" id="usu-email" required style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
         <label>Papel*
           <select id="usu-papel" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;">
-            <option value="vendedor">Vendedor (acesso restrito)</option>
-            <option value="admin">Admin (acesso total)</option>
+            <option value="vendedor">🛒 Vendedor (vendas + orçamentos)</option>
+            <option value="estoque" class="feature-ambientes" style="display:none;">📦 Estoque (compras + entradas)</option>
+            <option value="admin">👑 Admin (acesso total)</option>
           </select>
         </label>
         <label id="usu-label-senha">Senha* (mín. 6)<input type="password" id="usu-senha" minlength="6" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;"></label>
@@ -5167,6 +5209,13 @@ https://sistema.glinformatica.com.br
     try { if (typeof carregarOrcamentos === 'function') await carregarOrcamentos(); } catch(e) {}
     try { if (typeof carregarServicos === 'function') await carregarServicos(); } catch(e) {}
     try { if (typeof carregarCaixa === 'function') await carregarCaixa(); } catch(e) {}
+    // Atualiza cards Dashboard e badge do menu (Módulo Iluminação)
+    try {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (_emp.usaAmbientes && typeof carregarResumoListaCompras === 'function') {
+        await carregarResumoListaCompras();
+      }
+    } catch(e) {}
   }
 
   // ====== Navegação entre páginas ======
@@ -5431,10 +5480,24 @@ https://sistema.glinformatica.com.br
     div.addEventListener('click', e => { if (e.target === div) div.remove(); });
   }
 
+  // Matriz de permissões por papel
+  // Estoque: acessa cadastros básicos, orçamentos (leitura), lista de compras e entradas (que ficam em Fornecedores)
+  const _paginasEstoque = ['dashboard', 'produtos', 'fornecedores', 'orcamentos', 'lista-compras', 'minha-conta'];
+  const _paginasAdminOnly = ['financeiro', 'contas-pagar', 'contas-receber', 'relatorios', 'usuarios', 'configuracoes', 'configuracoes-fiscais', 'catalogo', 'pedidos-online', 'caixa'];
+
+  function podeAcessarPagina(pg) {
+    const papel = window._papelAtual;
+    if (papel === 'admin') return true;
+    if (papel === 'estoque') {
+      return _paginasEstoque.includes(pg);
+    }
+    // Vendedor: bloqueia páginas admin
+    return !_paginasAdminOnly.includes(pg);
+  }
+
   function showPage(pg) {
-    // Bloqueia páginas de admin para vendedor
-    if(window._papelAtual !== 'admin' && ['financeiro','contas-pagar','contas-receber','relatorios','usuarios','configuracoes'].includes(pg)) {
-      alert('Acesso restrito a administradores.');
+    if (!podeAcessarPagina(pg)) {
+      alert('Você não tem permissão para acessar esta página.');
       return;
     }
     // Bloqueia Ambientes se empresa não tem recurso ativo
@@ -5496,12 +5559,18 @@ https://sistema.glinformatica.com.br
       papelAtual = usuario.papel || 'admin';
       const info = document.getElementById('info-usuario');
       if(info) {
-        const papelLabel = papelAtual === 'admin' ? 'Admin' : 'Vendedor';
-        info.innerHTML = `<strong style="color:var(--azul)">${empresa.nome || ''}</strong><br>${usuario.nome || ''} <span style="color:#aab;">·</span> <span style="color:${papelAtual==='admin'?'var(--verde)':'#889'};font-weight:700">${papelLabel}</span>`;
+        const papelLabels = { admin: '👑 Admin', vendedor: '🛒 Vendedor', estoque: '📦 Estoque' };
+        const papelLabel = papelLabels[papelAtual] || 'Vendedor';
+        const papelCor = papelAtual === 'admin' ? 'var(--verde)' : (papelAtual === 'estoque' ? '#f59e0b' : '#889');
+        info.innerHTML = `<strong style="color:var(--azul)">${empresa.nome || ''}</strong><br>${usuario.nome || ''} <span style="color:#aab;">·</span> <span style="color:${papelCor};font-weight:700">${papelLabel}</span>`;
       }
       // Esconde itens do menu para vendedor
       if(papelAtual !== 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+      }
+      // Esconde itens específicos pro papel ESTOQUE
+      if(papelAtual === 'estoque') {
+        document.querySelectorAll('.estoque-hide').forEach(el => el.style.display = 'none');
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
@@ -10370,9 +10439,12 @@ ${conteudo}
     const usuarioLogado = JSON.parse(localStorage.getItem('usuario') || '{}');
     tbody.innerHTML = _usuariosCache.map(u => {
       const ehVoce = u.id === usuarioLogado.id;
-      const papelLabel = u.papel === 'admin'
-        ? '<span style="color:var(--verde);font-weight:700">Admin</span>'
-        : '<span style="color:#668;font-weight:700">Vendedor</span>';
+      const papelLabels = {
+        admin: '<span style="color:var(--verde);font-weight:700">👑 Admin</span>',
+        estoque: '<span style="color:#f59e0b;font-weight:700">📦 Estoque</span>',
+        vendedor: '<span style="color:#668;font-weight:700">🛒 Vendedor</span>'
+      };
+      const papelLabel = papelLabels[u.papel] || papelLabels.vendedor;
       return `
         <tr>
           <td>${u.nome}${ehVoce ? ' <span style="color:var(--azul);font-size:11px;font-weight:700">(você)</span>' : ''}</td>
@@ -10972,6 +11044,16 @@ ${conteudo}
       document.getElementById('lc-cnt-pendente').textContent = r.pendente || 0;
       document.getElementById('lc-cnt-pedido').textContent = r.pedido || 0;
       document.getElementById('lc-cnt-recebido').textContent = r.recebidoUltimos7d || 0;
+      // Cards do Dashboard
+      const cardPend = document.getElementById('card-lc-pendente');
+      const cardPed = document.getElementById('card-lc-pedido');
+      const cardFooter = document.getElementById('card-lc-footer');
+      if (cardPend) cardPend.textContent = r.pendente || 0;
+      if (cardPed) cardPed.textContent = r.pedido || 0;
+      if (cardFooter) {
+        const p = r.pendente || 0;
+        cardFooter.textContent = p === 0 ? 'nenhum item pendente' : (p === 1 ? 'item pendente de compra' : 'itens pendentes de compra');
+      }
       // Badge no menu
       const badge = document.getElementById('badge-lista-compras');
       if (badge) {
@@ -11145,6 +11227,90 @@ ${conteudo}
   function verListaCompras() {
     fecharAlertaLcCriados();
     showPage('lista-compras');
+  }
+
+  function verListaComprasComplete() {
+    fecharComprasOrc();
+    showPage('lista-compras');
+  }
+
+  // ===== Status de Compras por Orçamento =====
+  async function verComprasOrcamento(orcamentoId, numero) {
+    try {
+      document.getElementById('mco-orc-info').textContent = `Orçamento #${numero}`;
+      document.getElementById('modal-compras-orc').style.display = 'flex';
+      document.getElementById('mco-resumo').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">Carregando...</div>';
+      document.getElementById('mco-lista').innerHTML = '';
+      document.getElementById('mco-vazio').style.display = 'none';
+
+      const itens = await api('GET', `/api/lista-compras/por-orcamento/${orcamentoId}`);
+
+      if (!itens || itens.length === 0) {
+        document.getElementById('mco-resumo').innerHTML = '';
+        document.getElementById('mco-vazio').style.display = 'block';
+        return;
+      }
+
+      // Resumo
+      const cnt = { pendente: 0, pedido: 0, recebido: 0 };
+      itens.forEach(x => cnt[x.status] = (cnt[x.status] || 0) + 1);
+      document.getElementById('mco-resumo').innerHTML = `
+        <div style="background:#fef3c7;border-radius:8px;padding:10px 12px;border:1px solid #fbbf24;">
+          <div style="font-size:11px;color:#92400e;font-weight:700;">🕐 PENDENTE</div>
+          <div style="font-size:22px;font-weight:800;color:#92400e;">${cnt.pendente}</div>
+        </div>
+        <div style="background:#dbeafe;border-radius:8px;padding:10px 12px;border:1px solid #93c5fd;">
+          <div style="font-size:11px;color:#1e40af;font-weight:700;">📦 PEDIDO</div>
+          <div style="font-size:22px;font-weight:800;color:#1e40af;">${cnt.pedido}</div>
+        </div>
+        <div style="background:#dcfce7;border-radius:8px;padding:10px 12px;border:1px solid #86efac;">
+          <div style="font-size:11px;color:#166534;font-weight:700;">✅ RECEBIDO</div>
+          <div style="font-size:22px;font-weight:800;color:#166534;">${cnt.recebido}</div>
+        </div>
+      `;
+
+      // Lista
+      const statusBadge = {
+        pendente: '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">🕐 Pendente</span>',
+        pedido:   '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📦 Pedido</span>',
+        recebido: '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✅ Recebido</span>'
+      };
+
+      document.getElementById('mco-lista').innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:center;width:70px;">Qtd</th>
+              <th style="padding:10px;text-align:center;width:120px;">Status</th>
+              <th style="padding:10px;text-align:left;width:180px;">Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itens.map(it => `
+              <tr style="border-top:1px solid #f1f5f9;">
+                <td style="padding:10px;">
+                  <div style="font-weight:600;">${escapeHtml(it.produtoNome)}</div>
+                  ${it.referencia ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;">Ref: ${escapeHtml(it.referencia)}</div>` : ''}
+                </td>
+                <td style="padding:10px;text-align:center;font-weight:700;">${it.quantidade}</td>
+                <td style="padding:10px;text-align:center;">${statusBadge[it.status] || it.status}</td>
+                <td style="padding:10px;font-size:12px;color:#64748b;">
+                  ${it.observacao ? escapeHtml(it.observacao) : '<span style="color:#cbd5e1;">—</span>'}
+                  ${it.atualizadoPorNome ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Por: ${escapeHtml(it.atualizadoPorNome)}</div>` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      document.getElementById('mco-resumo').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function fecharComprasOrc() {
+    document.getElementById('modal-compras-orc').style.display = 'none';
   }
 
   // ====== IMPRESSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS ======
@@ -11930,9 +12096,9 @@ ${conteudo}
         'aberto': '📝 Aberto', 'aprovado': '✅ Aprovado', 'convertido': '🛒 Convertido',
         'cancelado': '❌ Cancelado', 'expirado': '⏰ Expirado'
       };
-      const podeEditar = o.status !== 'convertido';
-      const podeAprovar = o.status === 'aberto';
-      const podeConverter = o.status === 'aberto' || o.status === 'aprovado';
+      const podeEditar = o.status !== 'convertido' && window._papelAtual !== 'estoque';
+      const podeAprovar = o.status === 'aberto' && window._papelAtual !== 'estoque';
+      const podeConverter = (o.status === 'aberto' || o.status === 'aprovado') && window._papelAtual !== 'estoque';
       // Info de rastreamento pra ADMIN
       const isAdmin = window._papelAtual === 'admin';
       const infoUsuarioIcone = isAdmin && o.vendedor_nome
@@ -11941,6 +12107,8 @@ ${conteudo}
       const linhaUsuarioCriou = isAdmin && o.vendedor_nome
         ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(o.vendedor_nome)}</div>`
         : '';
+      const empresaAmb = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const mostrarStatusCompras = !!empresaAmb.usaAmbientes && (o.status === 'aprovado' || o.status === 'convertido');
       return `
         <tr>
           <td><strong>#${o.numero}</strong>${infoUsuarioIcone}</td>
@@ -11951,9 +12119,10 @@ ${conteudo}
           <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">${statusLabels[o.status] || o.status}</span></td>
           <td class="acoes">
             <button onclick="visualizarOrc(${o.id})" title="Visualizar/Imprimir">👁️</button>
+            ${mostrarStatusCompras ? `<button onclick="verComprasOrcamento(${o.id}, ${o.numero})" title="Ver status de compras" style="color:#f59e0b;">🛒</button>` : ''}
             ${podeEditar ? `<button onclick="editarOrc(${o.id})" title="Editar">✏️</button>` : ''}
             ${podeAprovar ? `<button onclick="aprovarOrc(${o.id})" title="Aprovar" style="color:#16a34a;">✓</button>` : ''}
-            ${podeConverter ? `<button onclick="converterOrc(${o.id})" title="Converter em venda" style="color:#7c3aed;">🛒</button>` : ''}
+            ${podeConverter ? `<button onclick="converterOrc(${o.id})" title="Converter em venda" style="color:#7c3aed;">💰</button>` : ''}
             ${podeEditar ? `<button onclick="cancelarOrc(${o.id})" title="Cancelar">❌</button>` : ''}
             ${podeEditar ? `<button onclick="excluirOrc(${o.id})" title="Excluir">🗑️</button>` : ''}
           </td>
