@@ -1438,6 +1438,125 @@
       </div>
     </div>
 
+    <!-- Modal Histórico de Fechamentos de Caixa -->
+    <div id="modal-historico-caixa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;padding:24px;border-radius:14px;max-width:1000px;width:100%;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <h2 style="color:var(--azul);margin:0;">📋 Histórico de Fechamentos de Caixa</h2>
+          <button onclick="fecharHistoricoCaixa()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+        </div>
+
+        <!-- Filtros -->
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f1f5f9;border-radius:8px;">
+          <label style="font-weight:600;color:#334155;font-size:13px;">Mês:</label>
+          <select id="hist-mes" onchange="carregarHistoricoCaixa()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+            <option value="3">Março</option><option value="4">Abril</option>
+            <option value="5">Maio</option><option value="6">Junho</option>
+            <option value="7">Julho</option><option value="8">Agosto</option>
+            <option value="9">Setembro</option><option value="10">Outubro</option>
+            <option value="11">Novembro</option><option value="12">Dezembro</option>
+          </select>
+          <label style="font-weight:600;color:#334155;font-size:13px;">Ano:</label>
+          <select id="hist-ano" onchange="carregarHistoricoCaixa()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;"></select>
+          <div style="margin-left:auto;font-size:13px;color:#64748b;">
+            <span id="hist-total-dias" style="font-weight:600;">—</span> dias no período
+          </div>
+        </div>
+
+        <!-- Cards resumo do mês -->
+        <div id="hist-resumo-mes" style="display:none;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
+          <div style="background:#dbeafe;border-radius:8px;padding:12px;">
+            <div style="font-size:11px;color:#1e40af;font-weight:700;">TOTAL VENDAS</div>
+            <div id="hist-total-vendas" style="font-size:20px;font-weight:800;color:#1e40af;margin-top:2px;">R$ 0,00</div>
+          </div>
+          <div style="background:#dcfce7;border-radius:8px;padding:12px;">
+            <div style="font-size:11px;color:#166534;font-weight:700;">TOTAL REFORÇOS</div>
+            <div id="hist-total-reforcos" style="font-size:20px;font-weight:800;color:#166534;margin-top:2px;">R$ 0,00</div>
+          </div>
+          <div style="background:#fef3c7;border-radius:8px;padding:12px;">
+            <div style="font-size:11px;color:#92400e;font-weight:700;">TOTAL SANGRIAS</div>
+            <div id="hist-total-sangrias" style="font-size:20px;font-weight:800;color:#92400e;margin-top:2px;">R$ 0,00</div>
+          </div>
+          <div style="background:#fee2e2;border-radius:8px;padding:12px;">
+            <div style="font-size:11px;color:#991b1b;font-weight:700;">TOTAL DESPESAS</div>
+            <div id="hist-total-despesas" style="font-size:20px;font-weight:800;color:#991b1b;margin-top:2px;">R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- Tabela -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead style="background:#f1f5f9;">
+              <tr>
+                <th style="padding:10px;text-align:left;">Data</th>
+                <th style="padding:10px;text-align:right;">Saldo Inicial</th>
+                <th style="padding:10px;text-align:right;">Vendas</th>
+                <th style="padding:10px;text-align:center;">Qtd</th>
+                <th style="padding:10px;text-align:right;">Reforços</th>
+                <th style="padding:10px;text-align:right;">Sangrias</th>
+                <th style="padding:10px;text-align:right;">Despesas</th>
+                <th style="padding:10px;text-align:right;">Saldo Final</th>
+                <th style="padding:10px;text-align:right;">Diferença</th>
+                <th style="padding:10px;text-align:center;">Status</th>
+                <th style="padding:10px;text-align:center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-historico-caixa">
+              <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:30px;">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detalhes de um Caixa Fechado -->
+    <div id="modal-detalhe-caixa" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;padding:24px;border-radius:14px;max-width:800px;width:100%;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <div>
+            <h2 style="color:var(--azul);margin:0;font-size:20px;">📊 Detalhes do Fechamento</h2>
+            <div id="dc-data" style="font-size:14px;color:#64748b;margin-top:4px;">—</div>
+          </div>
+          <button onclick="fecharDetalheCaixa()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+        </div>
+
+        <!-- Resumo financeiro -->
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:14px;">
+            <div>Saldo inicial: <b id="dc-saldo-inicial">R$ 0,00</b></div>
+            <div>Vendas à vista: <b id="dc-vendas" style="color:#16a34a;">R$ 0,00</b></div>
+            <div>Reforços: <b id="dc-reforcos" style="color:#16a34a;">R$ 0,00</b></div>
+            <div>Sangrias: <b id="dc-sangrias" style="color:#dc2626;">R$ 0,00</b></div>
+            <div>Despesas: <b id="dc-despesas" style="color:#dc2626;">R$ 0,00</b></div>
+            <div>Saldo esperado: <b id="dc-esperado">R$ 0,00</b></div>
+            <div>Saldo informado: <b id="dc-informado">R$ 0,00</b></div>
+            <div>Diferença: <b id="dc-diferenca">R$ 0,00</b></div>
+          </div>
+          <div id="dc-obs-box" style="display:none;margin-top:10px;padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:12px;">
+            <b>Observação:</b> <span id="dc-obs">—</span>
+          </div>
+        </div>
+
+        <!-- Vendas do dia -->
+        <div style="margin-bottom:14px;">
+          <h3 style="color:#1e3a8a;font-size:15px;margin:0 0 8px 0;">🛒 Vendas do Dia</h3>
+          <div id="dc-vendas-lista" style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;"></div>
+        </div>
+
+        <!-- Movimentos -->
+        <div style="margin-bottom:14px;">
+          <h3 style="color:#1e3a8a;font-size:15px;margin:0 0 8px 0;">💰 Movimentos</h3>
+          <div id="dc-mov-lista" style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button class="btn" onclick="imprimirDetalheCaixa()" style="flex:1;background:#16a34a;">🖨️ Imprimir</button>
+          <button class="btn" onclick="fecharDetalheCaixa()" style="flex:1;background:#eceef2;color:var(--azul);">Fechar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Usuários -->
     <div id="page-usuarios" style="display:none;">
       <div class="page-title">Usuários</div>
@@ -10277,8 +10396,274 @@ ${conteudo}
     setTimeout(() => w.print(), 250);
   }
 
+  // ====== HISTÓRICO DE CAIXA (fechamentos) ======
+  let _historicoCaixaCache = [];
+  let _detalheCaixaAtual = null;
+
   function abrirHistoricoCaixa() {
-    alert('Histórico de fechamentos pode ser visto em Relatórios → (em breve).\n\nPor enquanto, você pode acompanhar pelo backend.');
+    // Preenche selects
+    const hoje = new Date();
+    document.getElementById('hist-mes').value = hoje.getMonth() + 1;
+    const anoAtual = hoje.getFullYear();
+    const selAno = document.getElementById('hist-ano');
+    selAno.innerHTML = '';
+    for (let a = anoAtual + 1; a >= anoAtual - 3; a--) {
+      const opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = a;
+      if (a === anoAtual) opt.selected = true;
+      selAno.appendChild(opt);
+    }
+    document.getElementById('modal-historico-caixa').style.display = 'flex';
+    carregarHistoricoCaixa();
+  }
+
+  function fecharHistoricoCaixa() {
+    document.getElementById('modal-historico-caixa').style.display = 'none';
+  }
+
+  async function carregarHistoricoCaixa() {
+    const tbody = document.getElementById('tbody-historico-caixa');
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:30px;">Carregando...</td></tr>';
+    const ano = document.getElementById('hist-ano').value;
+    const mes = document.getElementById('hist-mes').value;
+    try {
+      _historicoCaixaCache = await api('GET', `/api/caixa/historico?ano=${ano}&mes=${mes}`);
+      renderHistoricoCaixa();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#dc2626;padding:30px;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function renderHistoricoCaixa() {
+    const tbody = document.getElementById('tbody-historico-caixa');
+    const lista = _historicoCaixaCache || [];
+    document.getElementById('hist-total-dias').textContent = lista.length;
+
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:30px;">Nenhum caixa encontrado neste período.</td></tr>';
+      document.getElementById('hist-resumo-mes').style.display = 'none';
+      return;
+    }
+
+    // Totais do mês
+    const totVendas = lista.reduce((s, c) => s + (c.totalVendasVista || 0), 0);
+    const totRef = lista.reduce((s, c) => s + (c.totalReforcos || 0), 0);
+    const totSan = lista.reduce((s, c) => s + (c.totalSangrias || 0), 0);
+    const totDesp = lista.reduce((s, c) => s + (c.totalDespesas || 0), 0);
+
+    document.getElementById('hist-total-vendas').textContent = formatarBRL(totVendas);
+    document.getElementById('hist-total-reforcos').textContent = formatarBRL(totRef);
+    document.getElementById('hist-total-sangrias').textContent = formatarBRL(totSan);
+    document.getElementById('hist-total-despesas').textContent = formatarBRL(totDesp);
+    document.getElementById('hist-resumo-mes').style.display = 'grid';
+
+    tbody.innerHTML = lista.map(c => {
+      const dataFmt = formatarDataBR(c.data);
+      const statusHtml = c.status === 'fechado'
+        ? '<span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534;">Fechado</span>'
+        : '<span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e;">Aberto</span>';
+      const difClass = c.diferenca === null ? '' : c.diferenca === 0 ? 'color:#166534;' : c.diferenca > 0 ? 'color:#0891b2;' : 'color:#dc2626;';
+      const difTxt = c.diferenca === null ? '—' : (c.diferenca > 0 ? '+' : '') + formatarBRL(c.diferenca);
+      return `
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:10px;font-weight:600;">${dataFmt}</td>
+          <td style="padding:10px;text-align:right;">${formatarBRL(c.saldoInicial)}</td>
+          <td style="padding:10px;text-align:right;color:#16a34a;font-weight:600;">${formatarBRL(c.totalVendasVista)}</td>
+          <td style="padding:10px;text-align:center;">${c.qtdVendas || 0}</td>
+          <td style="padding:10px;text-align:right;color:#16a34a;">${c.totalReforcos > 0 ? formatarBRL(c.totalReforcos) : '—'}</td>
+          <td style="padding:10px;text-align:right;color:#dc2626;">${c.totalSangrias > 0 ? formatarBRL(c.totalSangrias) : '—'}</td>
+          <td style="padding:10px;text-align:right;color:#dc2626;">${c.totalDespesas > 0 ? formatarBRL(c.totalDespesas) : '—'}</td>
+          <td style="padding:10px;text-align:right;font-weight:700;">${c.saldoFinalInformado != null ? formatarBRL(c.saldoFinalInformado) : '—'}</td>
+          <td style="padding:10px;text-align:right;font-weight:700;${difClass}">${difTxt}</td>
+          <td style="padding:10px;text-align:center;">${statusHtml}</td>
+          <td style="padding:10px;text-align:center;">
+            <button onclick="verDetalheCaixa(${c.id})" style="background:#dbeafe;color:#1e40af;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">Ver</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function verDetalheCaixa(id) {
+    try {
+      const d = await api('GET', `/api/caixa/${id}`);
+      _detalheCaixaAtual = d;
+      const c = d.caixa;
+      document.getElementById('dc-data').textContent = `Data: ${formatarDataBR(c.data)}${c.fechadoEm ? ' · Fechado em ' + new Date(c.fechadoEm).toLocaleString('pt-BR') : ''}`;
+      document.getElementById('dc-saldo-inicial').textContent = formatarBRL(c.saldoInicial);
+      document.getElementById('dc-vendas').textContent = formatarBRL(d.totais.totalVendasVista);
+      document.getElementById('dc-reforcos').textContent = formatarBRL(d.totais.totalReforcos);
+      document.getElementById('dc-sangrias').textContent = formatarBRL(d.totais.totalSangrias);
+      document.getElementById('dc-despesas').textContent = formatarBRL(d.totais.totalDespesas);
+      document.getElementById('dc-esperado').textContent = formatarBRL(d.saldoEsperado);
+      document.getElementById('dc-informado').textContent = c.saldoFinalInformado != null ? formatarBRL(c.saldoFinalInformado) : '—';
+      const difEl = document.getElementById('dc-diferenca');
+      if (d.diferenca === null) {
+        difEl.textContent = '—';
+        difEl.style.color = '';
+      } else {
+        difEl.textContent = (d.diferenca > 0 ? '+' : '') + formatarBRL(d.diferenca);
+        difEl.style.color = d.diferenca === 0 ? '#166534' : d.diferenca > 0 ? '#0891b2' : '#dc2626';
+      }
+      if (c.obs) {
+        document.getElementById('dc-obs').textContent = c.obs;
+        document.getElementById('dc-obs-box').style.display = '';
+      } else {
+        document.getElementById('dc-obs-box').style.display = 'none';
+      }
+
+      // Vendas
+      const vendasBox = document.getElementById('dc-vendas-lista');
+      if (!d.vendas || d.vendas.length === 0) {
+        vendasBox.innerHTML = '<div style="padding:12px;text-align:center;color:#94a3b8;font-size:13px;">Nenhuma venda registrada.</div>';
+      } else {
+        vendasBox.innerHTML = `
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead style="background:#f1f5f9;">
+              <tr>
+                <th style="padding:6px;text-align:left;">#</th>
+                <th style="padding:6px;text-align:left;">Cliente</th>
+                <th style="padding:6px;text-align:left;">Pagamento</th>
+                <th style="padding:6px;text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.vendas.map(v => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:6px;">${v.id}</td>
+                  <td style="padding:6px;">${escapeHtml(v.cliente || '—')}</td>
+                  <td style="padding:6px;">${escapeHtml(v.pagamento || '—')}</td>
+                  <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(v.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      // Movimentos
+      const movBox = document.getElementById('dc-mov-lista');
+      if (!d.movimentos || d.movimentos.length === 0) {
+        movBox.innerHTML = '<div style="padding:12px;text-align:center;color:#94a3b8;font-size:13px;">Nenhum movimento registrado.</div>';
+      } else {
+        movBox.innerHTML = `
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead style="background:#f1f5f9;">
+              <tr>
+                <th style="padding:6px;text-align:left;">Tipo</th>
+                <th style="padding:6px;text-align:left;">Descrição</th>
+                <th style="padding:6px;text-align:left;">Usuário</th>
+                <th style="padding:6px;text-align:right;">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.movimentos.map(m => {
+                const cor = m.tipo === 'reforco' ? '#16a34a' : '#dc2626';
+                const sinal = m.tipo === 'reforco' ? '+' : '-';
+                const tipoNome = { reforco: '💵 Reforço', sangria: '💸 Sangria', despesa: '🧾 Despesa' }[m.tipo] || m.tipo;
+                return `
+                  <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:6px;">${tipoNome}</td>
+                    <td style="padding:6px;">${escapeHtml(m.descricao || '')}</td>
+                    <td style="padding:6px;color:#64748b;">${escapeHtml(m.usuario || '—')}</td>
+                    <td style="padding:6px;text-align:right;font-weight:600;color:${cor};">${sinal}${formatarBRL(m.valor)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      document.getElementById('modal-detalhe-caixa').style.display = 'flex';
+    } catch (err) {
+      alert('Erro ao carregar detalhes: ' + err.message);
+    }
+  }
+
+  function fecharDetalheCaixa() {
+    document.getElementById('modal-detalhe-caixa').style.display = 'none';
+    _detalheCaixaAtual = null;
+  }
+
+  function imprimirDetalheCaixa() {
+    if (!_detalheCaixaAtual) return;
+    const d = _detalheCaixaAtual;
+    const c = d.caixa;
+    const dataFmt = formatarDataBR(c.data);
+
+    const vendasHtml = (d.vendas || []).map(v => `
+      <tr>
+        <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${v.id}</td>
+        <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(v.cliente || '—')}</td>
+        <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(v.pagamento || '—')}</td>
+        <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(v.total)}</td>
+      </tr>
+    `).join('');
+
+    const movHtml = (d.movimentos || []).map(m => {
+      const sinal = m.tipo === 'reforco' ? '+' : '-';
+      const tipoNome = { reforco: 'Reforço', sangria: 'Sangria', despesa: 'Despesa' }[m.tipo] || m.tipo;
+      return `
+        <tr>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${tipoNome}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(m.descricao || '')}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${sinal}${formatarBRL(m.valor)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const conteudo = `
+      ${cabecalhoEmpresaParaRecibo()}
+      <h2 style="color:#1e3a8a;text-align:center;margin:10px 0;">FECHAMENTO DE CAIXA</h2>
+      <div style="text-align:center;font-size:14px;color:#475569;margin-bottom:16px;">
+        <strong>Data:</strong> ${dataFmt}
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;">
+        <tr><td style="padding:6px;border-bottom:1px solid #e2e8f0;">Saldo inicial</td><td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(c.saldoInicial)}</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid #e2e8f0;">Vendas à vista</td><td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#16a34a;">${formatarBRL(d.totais.totalVendasVista)}</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid #e2e8f0;">Reforços</td><td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#16a34a;">${formatarBRL(d.totais.totalReforcos)}</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid #e2e8f0;">Sangrias</td><td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#dc2626;">${formatarBRL(d.totais.totalSangrias)}</td></tr>
+        <tr><td style="padding:6px;border-bottom:1px solid #e2e8f0;">Despesas</td><td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#dc2626;">${formatarBRL(d.totais.totalDespesas)}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px;font-weight:700;">Saldo esperado</td><td style="padding:8px;text-align:right;font-weight:700;">${formatarBRL(d.saldoEsperado)}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px;font-weight:700;">Saldo informado</td><td style="padding:8px;text-align:right;font-weight:700;">${c.saldoFinalInformado != null ? formatarBRL(c.saldoFinalInformado) : '—'}</td></tr>
+        ${d.diferenca !== null ? `<tr style="background:${d.diferenca === 0 ? '#dcfce7' : d.diferenca > 0 ? '#dbeafe' : '#fee2e2'};"><td style="padding:8px;font-weight:700;">Diferença</td><td style="padding:8px;text-align:right;font-weight:700;">${d.diferenca > 0 ? '+' : ''}${formatarBRL(d.diferenca)}</td></tr>` : ''}
+      </table>
+
+      ${vendasHtml ? `
+        <h3 style="color:#1e3a8a;margin:16px 0 8px;">Vendas do Dia</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="background:#f1f5f9;">
+            <tr><th style="padding:6px;text-align:left;">#</th><th style="padding:6px;text-align:left;">Cliente</th><th style="padding:6px;text-align:left;">Pagamento</th><th style="padding:6px;text-align:right;">Total</th></tr>
+          </thead>
+          <tbody>${vendasHtml}</tbody>
+        </table>
+      ` : ''}
+
+      ${movHtml ? `
+        <h3 style="color:#1e3a8a;margin:16px 0 8px;">Movimentos</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="background:#f1f5f9;">
+            <tr><th style="padding:6px;text-align:left;">Tipo</th><th style="padding:6px;text-align:left;">Descrição</th><th style="padding:6px;text-align:right;">Valor</th></tr>
+          </thead>
+          <tbody>${movHtml}</tbody>
+        </table>
+      ` : ''}
+
+      ${c.obs ? `<div style="margin-top:14px;padding:10px;background:#fef3c7;border-radius:6px;font-size:13px;"><strong>Observação:</strong> ${escapeHtml(c.obs)}</div>` : ''}
+
+      <div style="margin-top:20px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:12px;">
+        Gerado em ${new Date().toLocaleString('pt-BR')}
+      </div>
+    `;
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fechamento ${dataFmt}</title>
+      <style>body{font-family:Arial,sans-serif;padding:24px;color:#1e293b;max-width:800px;margin:0 auto;} @media print{body{padding:10px;}@page{margin:10mm;}}</style>
+      </head><body>${conteudo}</body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
   }
 
   // ====== AMBIENTES ======
