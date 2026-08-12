@@ -329,16 +329,44 @@
     #tabela-itens-venda input:focus { outline: 1.5px solid var(--azul); }
     #tabela-itens-venda input[type="number"] { text-align: right; }
     .quick-form {
-      background: #fff; padding: 26px 24px; border-radius: 14px;
-      width: 90%; max-width: 420px;
-      max-height: 90vh; overflow-y: auto;
-      box-shadow: 0 6px 36px #0005;
+      background: #fff; padding: 28px 32px; border-radius: 16px;
+      width: 92%; max-width: 640px;
+      max-height: 92vh; overflow-y: auto;
+      box-shadow: 0 10px 50px rgba(0,0,0,0.25);
     }
-    .quick-form h3 { color: var(--azul); margin: 0 0 14px 0; }
-    .quick-form .form-field { margin-bottom: 10px; }
-    .quick-form .form-actions { margin-top: 14px; }
+    .quick-form h3 {
+      color: var(--azul); margin: 0 0 20px 0; font-size: 22px; font-weight: 700;
+      padding-bottom: 12px; border-bottom: 2px solid #f1f5f9;
+    }
+    .quick-form .form-field { margin-bottom: 14px; }
+    .quick-form .form-field label {
+      font-weight: 600; font-size: 13px; color: #334155;
+      margin-bottom: 4px; display: block;
+    }
+    .quick-form .form-field input,
+    .quick-form .form-field select,
+    .quick-form .form-field textarea {
+      padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: 14px; transition: all 0.15s;
+    }
+    .quick-form .form-field input:focus,
+    .quick-form .form-field select:focus,
+    .quick-form .form-field textarea:focus {
+      outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(57,96,249,0.15);
+    }
+    .quick-form .form-row { gap: 12px; margin-bottom: 14px; }
+    .quick-form .form-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
     .quick-erro { color: var(--vermelho); font-size: 13px; display: none; font-weight: 600; margin-top: 6px; }
-    .quick-form.wide { max-width: 720px; }
+    .quick-form.wide { max-width: 780px; }
+    .quick-form-section {
+      background: #f8fafc; border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 14px; border: 1px solid #e2e8f0;
+    }
+    .quick-form-section-title {
+      font-size: 12px; font-weight: 700; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+    }
     .resumo-estoque {
       display: flex; gap: 12px; margin: 8px 0 4px 0; flex-wrap: wrap;
     }
@@ -3144,49 +3172,59 @@
 
   <!-- Modal de cadastro rápido de PRODUTO -->
   <div id="modal-novo-produto-rapido">
-    <form class="quick-form" id="form-novo-produto-rapido" autocomplete="off">
-      <h3>Cadastrar Produto</h3>
-      <div class="form-field">
-        <label>Nome do Produto*</label>
-        <input type="text" id="npr-nome" required>
-      </div>
-      <div class="form-row" style="margin-bottom:0;">
+    <form class="quick-form wide" id="form-novo-produto-rapido" autocomplete="off">
+      <h3>📦 Cadastrar Produto</h3>
+
+      <!-- SEÇÃO: Informações Básicas -->
+      <div class="quick-form-section">
+        <div class="quick-form-section-title">📋 Informações Básicas</div>
         <div class="form-field">
-          <label>Código</label>
-          <input type="text" id="npr-codigo" placeholder="Automático se vazio">
+          <label>Nome do Produto*</label>
+          <input type="text" id="npr-nome" required>
         </div>
-        <div class="form-field">
-          <label>Categoria</label>
-          <input type="text" id="npr-categoria" placeholder="Opcional">
+        <div class="form-row" style="margin-bottom:0;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Código</label>
+            <input type="text" id="npr-codigo" placeholder="Automático se vazio">
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Categoria</label>
+            <input type="text" id="npr-categoria" placeholder="Opcional">
+          </div>
         </div>
-      </div>
-      <div class="form-field">
-        <label>Fornecedor*</label>
-        <div class="field-com-botao">
-          <input type="text" id="npr-fornecedor" list="lista-fornecedores" required>
-          <button type="button" class="btn-mais" title="Cadastrar novo fornecedor" onclick="openNovoFornecedorRapido('produto')">+</button>
+        <div class="form-field" style="margin-top:14px;margin-bottom:0;">
+          <label>Fornecedor*</label>
+          <div class="field-com-botao">
+            <input type="text" id="npr-fornecedor" list="lista-fornecedores" required>
+            <button type="button" class="btn-mais" title="Cadastrar novo fornecedor" onclick="openNovoFornecedorRapido('produto')">+</button>
+          </div>
         </div>
-      </div>
-      <div class="form-row" style="margin-bottom:0;">
-        <div class="form-field">
-          <label>Preço de Custo (R$)*</label>
-          <input type="number" id="npr-preco-custo" min="0.01" step="0.01" placeholder="0,00" required>
-        </div>
-        <div class="form-field">
-          <label>Preço de Venda (R$)*</label>
-          <input type="number" id="npr-preco-venda" min="0.01" step="0.01" placeholder="0,00" required>
-        </div>
-      </div>
-      <div class="form-field" style="margin-bottom:0;">
-        <label>Estoque Inicial</label>
-        <input type="number" id="npr-estoque" min="0" step="1" value="0" style="max-width:150px;">
       </div>
 
-      <!-- Foto do Produto (Cloudinary) -->
-      <div class="form-field" style="margin-top:16px;">
-        <label>📷 Foto do Produto <span style="color:#778;font-weight:normal;font-size:11px;">(opcional, máx 2MB)</span></label>
+      <!-- SEÇÃO: Preços & Estoque -->
+      <div class="quick-form-section">
+        <div class="quick-form-section-title">💰 Preços & Estoque</div>
+        <div class="form-row" style="margin-bottom:14px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Preço de Custo (R$)*</label>
+            <input type="number" id="npr-preco-custo" min="0.01" step="0.01" placeholder="0,00" required>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Preço de Venda (R$)*</label>
+            <input type="number" id="npr-preco-venda" min="0.01" step="0.01" placeholder="0,00" required>
+          </div>
+        </div>
+        <div class="form-field" style="margin-bottom:0;">
+          <label>Estoque Inicial</label>
+          <input type="number" id="npr-estoque" min="0" step="1" value="0" style="max-width:150px;">
+        </div>
+      </div>
+
+      <!-- SEÇÃO: Foto -->
+      <div class="quick-form-section">
+        <div class="quick-form-section-title">📷 Foto do Produto <span style="text-transform:none;font-weight:normal;color:#94a3b8;font-size:10px;letter-spacing:normal;">(opcional, máx 2MB)</span></div>
         <div style="display:flex;gap:14px;align-items:flex-start;">
-          <div id="npr-foto-preview" style="width:100px;height:100px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f8fafc;flex-shrink:0;overflow:hidden;position:relative;">
+          <div id="npr-foto-preview" style="width:100px;height:100px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;flex-shrink:0;overflow:hidden;position:relative;">
             <span id="npr-foto-placeholder" style="color:#94a3b8;font-size:30px;">📷</span>
             <img id="npr-foto-img" style="display:none;width:100%;height:100%;object-fit:contain;" alt="">
           </div>
@@ -3199,29 +3237,29 @@
         </div>
       </div>
 
-      <!-- Descrição Impressão + Observação Interna (só empresas com ambientes ativos) -->
-      <div class="feature-ambientes" style="display:none;margin-top:16px;border:1px solid #fbbf24;border-radius:8px;background:#fffbeb;padding:14px;">
-        <div style="font-weight:700;color:#92400e;font-size:13px;margin-bottom:10px;">📝 Descrições avançadas (só empresas com ambientes)</div>
+      <!-- SEÇÃO: Recursos avançados (só empresas com Módulo Iluminação) -->
+      <div class="quick-form-section feature-ambientes" style="display:none;background:#fffbeb;border-color:#fbbf24;">
+        <div class="quick-form-section-title" style="color:#92400e;">💡 Módulo Iluminação</div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-row" style="margin-bottom:14px;">
           <div class="form-field" style="margin-bottom:0;">
-            <label style="color:#7c3aed;">🏷️ Referência <span style="color:#778;font-weight:normal;font-size:11px;">(do fabricante)</span></label>
-            <input type="text" id="npr-referencia" placeholder="Ex: LUS-A123-XYZ" maxlength="100" style="width:100%;padding:8px 10px;border:1px solid #c4b5fd;border-radius:6px;font-size:13px;text-transform:uppercase;background:#faf5ff;">
+            <label style="color:#7c3aed;">🏷️ Referência <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(fabricante)</span></label>
+            <input type="text" id="npr-referencia" placeholder="Ex: LUS-A123-XYZ" maxlength="100" style="text-transform:uppercase;background:#faf5ff;border-color:#c4b5fd;">
           </div>
           <div class="form-field" style="margin-bottom:0;">
-            <label style="color:#0891b2;">📊 Código de Barras <span style="color:#778;font-weight:normal;font-size:11px;">(auto-gerado)</span></label>
-            <input type="text" id="npr-codigo-barras" readonly placeholder="Auto ao salvar" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#f1f5f9;color:#64748b;font-family:monospace;">
+            <label style="color:#0891b2;">📊 Código de Barras <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(auto)</span></label>
+            <input type="text" id="npr-codigo-barras" readonly placeholder="Auto ao salvar" style="background:#f1f5f9;color:#64748b;font-family:monospace;">
           </div>
         </div>
 
-        <div class="form-field" style="margin-bottom:12px;">
-          <label style="color:#0891b2;">📄 Descrição pra Impressão <span style="color:#778;font-weight:normal;font-size:11px;">(aparece no orçamento pro cliente)</span></label>
-          <textarea id="npr-descricao-impressao" rows="3" placeholder="Ex: Lustre em cristal K9 legítimo, com 4 lâmpadas E14, dimmerizável. Base em metal cromado, altura ajustável." style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+        <div class="form-field" style="margin-bottom:14px;">
+          <label style="color:#0891b2;">📄 Descrição pra Impressão <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(aparece pro cliente)</span></label>
+          <textarea id="npr-descricao-impressao" rows="3" placeholder="Ex: Lustre em cristal K9 legítimo, com 4 lâmpadas E14, dimmerizável. Base em metal cromado, altura ajustável." style="resize:vertical;"></textarea>
         </div>
 
         <div class="form-field" style="margin-bottom:0;">
-          <label style="color:#dc2626;">🔒 Observação Interna <span style="color:#778;font-weight:normal;font-size:11px;">(NUNCA sai na impressão - só uso interno)</span></label>
-          <textarea id="npr-observacao-interna" rows="3" placeholder="Ex: Fornecedor: Iluminação SP. Prazo: 15 dias. Margem mínima: 40%. Substituto: Modelo ZY-123." style="width:100%;padding:8px 10px;border:1px solid #fca5a5;border-radius:6px;font-size:13px;background:#fef2f2;resize:vertical;"></textarea>
+          <label style="color:#dc2626;">🔒 Observação Interna <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(NUNCA sai na impressão)</span></label>
+          <textarea id="npr-observacao-interna" rows="3" placeholder="Ex: Fornecedor: Iluminação SP. Prazo: 15 dias. Margem mínima: 40%." style="background:#fef2f2;border-color:#fca5a5;resize:vertical;"></textarea>
         </div>
       </div>
 
