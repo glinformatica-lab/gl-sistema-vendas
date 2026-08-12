@@ -628,6 +628,321 @@ router.post('/:id/rejeitar-financeiro', async (req, res) => {
   }
 });
 
+// ==============================================
+// FLUXO DE SEPARAÇÃO PELO ESTOQUE
+// ==============================================
+
+// GET /:id/separacao — Retorna itens do orçamento com status de separação
+// Estoque usa isso pra saber o que separar
+router.get('/:id/separacao', async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!['admin', 'estoque'].includes(req.user.papel)) {
+    return res.status(403).json({ error: 'Apenas admin ou estoque pode ver separação.' });
+  }
+  try {
+    const rOrc = await db.query(
+      `SELECT o.*, c.nome AS cliente_nome_real, c.telefone AS cliente_telefone,
+              c.endereco AS cliente_endereco, c.cidade AS cliente_cidade, c.uf AS cliente_uf
+       FROM orcamentos o
+       LEFT JOIN clientes c ON c.id = o.cliente_id
+       WHERE o.id=$1 AND o.empresa_id=$2`,
+      [id, req.user.empresaId]
+    );
+    if (rOrc.rows.length === 0) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const orc = rOrc.rows[0];
+
+    // Só permite ver se está aprovado_financeiro, em_separacao ou separado
+    if (!['aprovado_financeiro', 'em_separacao', 'separado'].includes(orc.status)) {
+      return res.status(400).json({ error: `Pedido em status "${orc.status}" não está pronto pra separação.` });
+    }
+
+    // Itens do orçamento com status separação + dados atualizados de estoque
+    const rItens = await db.query(
+      `SELECT oi.*,
+              p.estoque AS estoque_atual, p.nome AS produto_nome_atual,
+              us.nome AS separado_por_nome_atual
+       FROM orcamento_itens oi
+       LEFT JOIN produtos p ON p.id = oi.produto_id
+       LEFT JOIN usuarios us ON us.id = oi.separado_por
+       WHERE oi.orcamento_id=$1
+       ORDER BY oi.ordem, oi.id`,
+      [id]
+    );
+
+    // Enriquece itens: mostra o que está aguardando compra e status compras
+    const rCompras = await db.query(
+      `SELECT produto_id, status FROM lista_compras WHERE orcamento_id=$1 AND empresa_id=$2`,
+      [id, req.user.empresaId]
+    );
+    const comprasByProd = {};
+    rCompras.rows.forEach(c => {
+      comprasByProd[c.produto_id] = c.status;
+    });
+
+    const itens = rItens.rows.map(it => ({
+      ...it,
+      status_compra: it.produto_id ? (comprasByProd[it.produto_id] || null) : null
+    }));
+
+    res.json({ orcamento: orc, itens });
+  } catch (err) {
+    console.error('[orcamentos] separacao GET', err);
+    res.status(500).json({ error: 'Erro ao buscar separação.' });
+  }
+});
+
+// POST /:id/separar-item — Marca um item como separado
+// Baixa estoque + cria movimentação
+// Se todos itens ficarem separados, marca pedido como 'separado' + venda como 'ativa'
+router.post('/:id/separar-item', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { itemId } = req.body || {};
+  if (!itemId) return res.status(400).json({ error: 'itemId obrigatório.' });
+  if (!['admin', 'estoque'].includes(req.user.papel)) {
+    return res.status(403).json({ error: 'Apenas admin ou estoque pode separar.' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verifica orçamento + trava
+    const rOrc = await client.query(
+      'SELECT * FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [id, req.user.empresaId]
+    );
+    if (rOrc.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+    const orc = rOrc.rows[0];
+    if (!['aprovado_financeiro', 'em_separacao'].includes(orc.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Pedido em "${orc.status}" não permite separação.` });
+    }
+
+    // 2. Busca item
+    const rItem = await client.query(
+      'SELECT * FROM orcamento_itens WHERE id=$1 AND orcamento_id=$2 FOR UPDATE',
+      [itemId, id]
+    );
+    if (rItem.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item não encontrado.' });
+    }
+    const item = rItem.rows[0];
+    if (item.status_separacao === 'separado') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Item já está separado.' });
+    }
+
+    // 3. Se item está aguardando compra, verifica se já chegou (produto tem estoque agora)
+    if (item.status_separacao === 'aguardando_compra' && item.produto_id) {
+      const rProd = await client.query(
+        'SELECT estoque FROM produtos WHERE id=$1 AND empresa_id=$2',
+        [item.produto_id, req.user.empresaId]
+      );
+      const est = Number(rProd.rows[0]?.estoque) || 0;
+      const qtd = Number(item.quantidade) || 0;
+      if (est < qtd) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Este item aguarda compra: estoque atual ${est}, precisa ${qtd}. Marque como recebido na Lista de Compras primeiro.`
+        });
+      }
+    }
+
+    // 4. Se é produto cadastrado: baixa estoque + cria movimentação (agora sim!)
+    if (item.tipo === 'produto' && item.produto_id) {
+      const rProd = await client.query(
+        'SELECT id, nome, codigo, estoque FROM produtos WHERE id=$1 AND empresa_id=$2',
+        [item.produto_id, req.user.empresaId]
+      );
+      if (rProd.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Produto não encontrado no cadastro.' });
+      }
+      const p = rProd.rows[0];
+      const estAtual = Number(p.estoque) || 0;
+      const qtdReq = Number(item.quantidade) || 0;
+      if (estAtual < qtdReq) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Estoque insuficiente: ${estAtual} disponível, ${qtdReq} necessário.`
+        });
+      }
+
+      // Baixa estoque
+      await client.query(
+        'UPDATE produtos SET estoque = estoque - $1 WHERE id=$2 AND empresa_id=$3',
+        [qtdReq, item.produto_id, req.user.empresaId]
+      );
+
+      // Cria movimentação (vinculada à venda gerada pelo financeiro)
+      const dataHoje = new Date().toISOString().slice(0, 10);
+      await client.query(
+        `INSERT INTO movimentacoes (empresa_id, produto_codigo, produto_nome, data, tipo, qtd, origem, observacao, venda_id)
+         VALUES ($1,$2,$3,$4,'saida',$5,$6,$7,$8)`,
+        [req.user.empresaId, p.codigo, p.nome, dataHoje, qtdReq,
+         `Separação Pedido #${orc.numero}`,
+         `Separado por: ${req.user.userId} · Cliente: ${orc.cliente_nome}`,
+         orc.venda_id]
+      );
+    }
+
+    // 5. Pega nome do separador
+    const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
+    const nomeSep = rUser.rows[0]?.nome || null;
+
+    // 6. Marca item como separado
+    await client.query(
+      `UPDATE orcamento_itens
+       SET status_separacao='separado',
+           separado_por=$1, separado_por_nome=$2, separado_em=NOW()
+       WHERE id=$3`,
+      [req.user.userId, nomeSep, itemId]
+    );
+
+    // 7. Se pedido ainda está aprovado_financeiro, transiciona pra em_separacao
+    if (orc.status === 'aprovado_financeiro') {
+      await client.query(
+        `UPDATE orcamentos SET status='em_separacao', separacao_iniciada_em=NOW(), atualizado_em=NOW()
+         WHERE id=$1`,
+        [id]
+      );
+    }
+
+    // 8. Verifica se TODOS os itens estão separados
+    const rContagem = await client.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status_separacao != 'separado')::int AS falta_separar,
+         COUNT(*)::int AS total
+       FROM orcamento_itens WHERE orcamento_id=$1`,
+      [id]
+    );
+    const faltaSeparar = rContagem.rows[0].falta_separar;
+    let pedidoCompleto = false;
+    if (faltaSeparar === 0) {
+      // Todos separados! Marca pedido como separado
+      await client.query(
+        `UPDATE orcamentos SET status='separado', separado_em=NOW(), atualizado_em=NOW()
+         WHERE id=$1`,
+        [id]
+      );
+      // Atualiza status da VENDA vinculada de 'em_separacao' pra NULL (venda ativa normal)
+      if (orc.venda_id) {
+        await client.query(
+          `UPDATE vendas SET status=NULL WHERE id=$1 AND empresa_id=$2 AND status='em_separacao'`,
+          [orc.venda_id, req.user.empresaId]
+        );
+      }
+      pedidoCompleto = true;
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      separadoPor: nomeSep,
+      itensFaltando: faltaSeparar,
+      pedidoCompleto,
+      vendaLiberada: pedidoCompleto ? orc.venda_id : null
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[orcamentos] separar-item', err);
+    res.status(500).json({ error: 'Erro ao separar: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /:id/desfazer-separacao-item — Desmarca item separado (só admin)
+// Devolve estoque, remove movimentação
+router.post('/:id/desfazer-separacao-item', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { itemId } = req.body || {};
+  if (req.user.papel !== 'admin') {
+    return res.status(403).json({ error: 'Apenas admin pode desfazer separação.' });
+  }
+  if (!itemId) return res.status(400).json({ error: 'itemId obrigatório.' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const rItem = await client.query(
+      `SELECT oi.*, o.venda_id, o.numero AS orc_numero
+       FROM orcamento_itens oi
+       JOIN orcamentos o ON o.id = oi.orcamento_id
+       WHERE oi.id=$1 AND o.empresa_id=$2 FOR UPDATE`,
+      [itemId, req.user.empresaId]
+    );
+    if (rItem.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item não encontrado.' });
+    }
+    const item = rItem.rows[0];
+    if (item.status_separacao !== 'separado') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Item não está marcado como separado.' });
+    }
+
+    // Devolve estoque + remove movimentação
+    if (item.tipo === 'produto' && item.produto_id) {
+      await client.query(
+        'UPDATE produtos SET estoque = estoque + $1 WHERE id=$2 AND empresa_id=$3',
+        [Number(item.quantidade), item.produto_id, req.user.empresaId]
+      );
+      // Remove última movimentação de saída dessa venda pra esse produto
+      const rProd = await client.query('SELECT codigo FROM produtos WHERE id=$1', [item.produto_id]);
+      if (rProd.rows.length > 0 && item.venda_id) {
+        await client.query(
+          `DELETE FROM movimentacoes
+           WHERE id = (
+             SELECT id FROM movimentacoes
+             WHERE empresa_id=$1 AND venda_id=$2 AND produto_codigo=$3 AND tipo='saida'
+             ORDER BY id DESC LIMIT 1
+           )`,
+          [req.user.empresaId, item.venda_id, rProd.rows[0].codigo]
+        );
+      }
+    }
+
+    // Marca item como pendente novamente
+    const novoStatus = (item.status_separacao === 'aguardando_compra' || item.status_compra) ? 'aguardando_compra' : 'pendente';
+    await client.query(
+      `UPDATE orcamento_itens
+       SET status_separacao='pendente', separado_por=NULL, separado_por_nome=NULL, separado_em=NULL
+       WHERE id=$1`,
+      [itemId]
+    );
+
+    // Se pedido estava separado, volta pra em_separacao
+    await client.query(
+      `UPDATE orcamentos SET status='em_separacao', separado_em=NULL, atualizado_em=NOW()
+       WHERE id=$1 AND status='separado'`,
+      [id]
+    );
+
+    // Se venda estava ativa, volta pra em_separacao
+    if (item.venda_id) {
+      await client.query(
+        `UPDATE vendas SET status='em_separacao' WHERE id=$1 AND empresa_id=$2 AND (status IS NULL OR status='')`,
+        [item.venda_id, req.user.empresaId]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[orcamentos] desfazer-separacao', err);
+    res.status(500).json({ error: 'Erro ao desfazer.' });
+  } finally {
+    client.release();
+  }
+});
+
 // Marcar orçamento como convertido (quando a venda já foi criada via fluxo do modal)
 // POST /:id/cancelar — Cancela orçamento com auditoria completa
 // Regras:
