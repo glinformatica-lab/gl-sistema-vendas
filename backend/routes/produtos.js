@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
   const {
     codigo, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
     ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
-    fotoUrl, descricaoImpressao, observacaoInterna
+    fotoUrl, descricaoImpressao, observacaoInterna, referencia
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -70,8 +70,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO produtos (
          empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda,
          ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url,
-         descricao_impressao, observacao_interna
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+         descricao_impressao, observacao_interna, referencia
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, fornecedor.trim(),
        Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
@@ -83,9 +83,23 @@ router.post('/', async (req, res) => {
        unidadeTributavel || null,
        fotoUrl || null,
        descricaoImpressao ? String(descricaoImpressao).trim() : null,
-       observacaoInterna ? String(observacaoInterna).trim() : null]
+       observacaoInterna ? String(observacaoInterna).trim() : null,
+       referencia ? String(referencia).trim().toUpperCase() : null]
     );
     const p = ins.rows[0];
+
+    // Auto-gera código de barras baseado no ID (só empresas com módulo iluminação)
+    const empChk = await db.query('SELECT usa_ambientes FROM empresas WHERE id=$1', [req.user.empresaId]);
+    const usaAmbientes = empChk.rows[0]?.usa_ambientes;
+    if (usaAmbientes && !p.codigo_barras) {
+      const codigoBarras = 'PRD-' + String(p.id).padStart(6, '0');
+      const upd = await db.query(
+        'UPDATE produtos SET codigo_barras=$1 WHERE id=$2 RETURNING *',
+        [codigoBarras, p.id]
+      );
+      Object.assign(p, upd.rows[0]);
+    }
+
     if (Number(estoque) > 0) {
       await db.query(
         `INSERT INTO movimentacoes (empresa_id, produto_codigo, produto_nome, data, tipo, qtd, origem)
@@ -100,7 +114,12 @@ router.post('/', async (req, res) => {
       precoVenda: toNum(p.preco_venda)
     });
   } catch (err) {
-    if (err.code === '23505') return res.status(400).json({ error: 'Já existe um produto com esse nome.' });
+    if (err.code === '23505') {
+      if (err.constraint && err.constraint.includes('referencia')) {
+        return res.status(400).json({ error: 'Já existe um produto com essa referência.' });
+      }
+      return res.status(400).json({ error: 'Já existe um produto com esse nome.' });
+    }
     console.error('[produtos/create]', err);
     res.status(500).json({ error: 'Erro ao cadastrar produto.' });
   }
@@ -111,7 +130,7 @@ router.put('/:id', async (req, res) => {
   const {
     nome, categoria, fornecedor, precoCusto, precoVenda,
     ncm, cest, cfopPadrao, origemMercadoria, csosn, cst, unidadeTributavel,
-    fotoUrl, descricaoImpressao, observacaoInterna
+    fotoUrl, descricaoImpressao, observacaoInterna, referencia
   } = req.body || {};
   if (!nome || !fornecedor) return res.status(400).json({ error: 'Nome e fornecedor são obrigatórios.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -129,8 +148,8 @@ router.put('/:id', async (req, res) => {
          nome=$1, categoria=$2, fornecedor=$3, preco_custo=$4, preco_venda=$5,
          ncm=$6, cest=$7, cfop_padrao=$8, origem_mercadoria=$9,
          csosn=$10, cst=$11, unidade_tributavel=$12, foto_url=$13,
-         descricao_impressao=$14, observacao_interna=$15
-       WHERE id=$16 AND empresa_id=$17 RETURNING *`,
+         descricao_impressao=$14, observacao_interna=$15, referencia=$16
+       WHERE id=$17 AND empresa_id=$18 RETURNING *`,
       [nome.trim(), categoria || null, fornecedor.trim(), Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
        cest ? String(cest).replace(/\D/g, '') : null,
@@ -142,6 +161,7 @@ router.put('/:id', async (req, res) => {
        fotoUrl || null,
        descricaoImpressao ? String(descricaoImpressao).trim() : null,
        observacaoInterna ? String(observacaoInterna).trim() : null,
+       referencia ? String(referencia).trim().toUpperCase() : null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
@@ -153,7 +173,12 @@ router.put('/:id', async (req, res) => {
       precoVenda: toNum(p.preco_venda)
     });
   } catch (err) {
-    if (err.code === '23505') return res.status(400).json({ error: 'Já existe outro produto com esse nome.' });
+    if (err.code === '23505') {
+      if (err.constraint && err.constraint.includes('referencia')) {
+        return res.status(400).json({ error: 'Já existe outro produto com essa referência.' });
+      }
+      return res.status(400).json({ error: 'Já existe outro produto com esse nome.' });
+    }
     console.error('[produtos/update]', err);
     res.status(500).json({ error: 'Erro ao atualizar produto.' });
   }
