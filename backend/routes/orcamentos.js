@@ -278,9 +278,10 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/status', async (req, res) => {
   const id = parseInt(req.params.id);
   const { status } = req.body || {};
-  const validos = ['aberto', 'aprovado', 'cancelado'];
+  // 'cancelado' agora tem rota própria com validação de senha admin
+  const validos = ['aberto', 'aprovado'];
   if (!validos.includes(status)) {
-    return res.status(400).json({ error: 'Status inválido.' });
+    return res.status(400).json({ error: 'Status inválido. Para cancelar, use a rota /cancelar.' });
   }
   // Verifica se o vendedor é dono do orçamento
   const verif = await verificarDonoOrcamento(req, id);
@@ -365,6 +366,147 @@ router.post('/:id/status', async (req, res) => {
 });
 
 // Marcar orçamento como convertido (quando a venda já foi criada via fluxo do modal)
+// POST /:id/cancelar — Cancela orçamento com auditoria completa
+// Regras:
+//   - Se orçamento tem itens em lista_compras com status 'pedido' ou 'recebido': BLOQUEIA
+//   - Se quem clica é vendedor: exige senha de um admin
+//   - Se quem clica é admin: exige a própria senha
+//   - Remove itens 'pendente' da lista_compras
+//   - Grava: cancelado_por, autorizado_por, motivo, timestamp
+router.post('/:id/cancelar', async (req, res) => {
+  const bcrypt = require('bcryptjs');
+  const id = parseInt(req.params.id);
+  const { motivo, senha } = req.body || {};
+
+  if (!motivo || motivo.trim().length < 5) {
+    return res.status(400).json({ error: 'Motivo obrigatório (mínimo 5 caracteres).' });
+  }
+  if (!senha) {
+    return res.status(400).json({ error: 'Senha do admin obrigatória.' });
+  }
+
+  // Vendedor só cancela seus próprios
+  const verif = await verificarDonoOrcamento(req, id);
+  if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Valida orçamento
+    const rOrc = await client.query(
+      'SELECT id, status FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [id, req.user.empresaId]
+    );
+    if (rOrc.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orçamento não encontrado.' });
+    }
+    const orc = rOrc.rows[0];
+    if (orc.status === 'cancelado') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Orçamento já está cancelado.' });
+    }
+    if (orc.status === 'convertido') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Orçamento já foi convertido em venda e não pode ser cancelado.' });
+    }
+
+    // 2. Verifica compras: se tem 'pedido' ou 'recebido', bloqueia
+    const rCompras = await client.query(
+      `SELECT status, produto_nome
+       FROM lista_compras
+       WHERE orcamento_id=$1 AND empresa_id=$2 AND status IN ('pedido', 'recebido')`,
+      [id, req.user.empresaId]
+    );
+    if (rCompras.rows.length > 0) {
+      await client.query('ROLLBACK');
+      const detalhes = rCompras.rows.map(x => `${x.produto_nome} (${x.status})`).join(', ');
+      return res.status(400).json({
+        error: `Não é possível cancelar: existem itens já pedidos ou recebidos na Lista de Compras. Itens: ${detalhes}`
+      });
+    }
+
+    // 3. Valida senha do admin
+    // Vendedor: procura admin cuja senha bate. Admin: usa a própria senha.
+    let adminAutorizador = null;
+    if (req.user.papel === 'admin') {
+      const rMe = await client.query(
+        'SELECT id, nome, senha_hash FROM usuarios WHERE id=$1 LIMIT 1',
+        [req.user.userId]
+      );
+      if (rMe.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({ error: 'Usuário não encontrado.' });
+      }
+      const okSenha = await bcrypt.compare(senha, rMe.rows[0].senha_hash);
+      if (!okSenha) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({ error: 'Senha incorreta.' });
+      }
+      adminAutorizador = { id: rMe.rows[0].id, nome: rMe.rows[0].nome };
+    } else {
+      // Vendedor: verifica se a senha bate com algum admin da empresa
+      const rAdmins = await client.query(
+        `SELECT id, nome, senha_hash FROM usuarios
+         WHERE empresa_id=$1 AND papel='admin'`,
+        [req.user.empresaId]
+      );
+      for (const adm of rAdmins.rows) {
+        const ok = await bcrypt.compare(senha, adm.senha_hash);
+        if (ok) {
+          adminAutorizador = { id: adm.id, nome: adm.nome };
+          break;
+        }
+      }
+      if (!adminAutorizador) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({ error: 'Senha de admin incorreta. Peça a autorização a um administrador.' });
+      }
+    }
+
+    // 4. Pega nome do usuário que está cancelando
+    const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
+    const canceladoPorNome = rUser.rows[0]?.nome || null;
+
+    // 5. Remove itens PENDENTES da lista_compras (limpeza)
+    const rRemovidos = await client.query(
+      `DELETE FROM lista_compras
+       WHERE orcamento_id=$1 AND empresa_id=$2 AND status='pendente'
+       RETURNING produto_nome`,
+      [id, req.user.empresaId]
+    );
+
+    // 6. Atualiza orçamento
+    await client.query(
+      `UPDATE orcamentos
+       SET status='cancelado',
+           cancelado_por=$1, cancelado_por_nome=$2,
+           autorizado_por=$3, autorizado_por_nome=$4,
+           cancelado_em=NOW(), motivo_cancelamento=$5,
+           atualizado_em=NOW()
+       WHERE id=$6`,
+      [req.user.userId, canceladoPorNome,
+       adminAutorizador.id, adminAutorizador.nome,
+       motivo.trim(), id]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      canceladoPor: canceladoPorNome,
+      autorizadoPor: adminAutorizador.nome,
+      itensRemovidosDaListaCompras: rRemovidos.rows.length
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[orcamentos] cancelar', err);
+    res.status(500).json({ error: 'Erro ao cancelar orçamento.' });
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/:id/marcar-convertido', async (req, res) => {
   const id = parseInt(req.params.id);
   const { venda_id } = req.body || {};
@@ -495,6 +637,27 @@ router.delete('/:id', async (req, res) => {
     // Verifica se o vendedor é dono do orçamento
     const verif = await verificarDonoOrcamento(req, id);
     if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
+
+    // Bloqueia exclusão se há itens na lista_compras com status 'pedido' ou 'recebido'
+    const rCompras = await db.query(
+      `SELECT status, produto_nome FROM lista_compras
+       WHERE orcamento_id=$1 AND empresa_id=$2 AND status IN ('pedido','recebido')`,
+      [id, req.user.empresaId]
+    );
+    if (rCompras.rows.length > 0) {
+      const detalhes = rCompras.rows.map(x => `${x.produto_nome} (${x.status})`).join(', ');
+      return res.status(400).json({
+        error: `Não é possível excluir: existem itens já pedidos ou recebidos na Lista de Compras. Itens: ${detalhes}. Cancele o orçamento em vez de excluir.`
+      });
+    }
+
+    // Remove itens pendentes da lista_compras
+    await db.query(
+      `DELETE FROM lista_compras
+       WHERE orcamento_id=$1 AND empresa_id=$2 AND status='pendente'`,
+      [id, req.user.empresaId]
+    );
+
     const r = await db.query(
       `DELETE FROM orcamentos WHERE id=$1 AND empresa_id=$2 AND status != 'convertido' RETURNING id`,
       [id, req.user.empresaId]

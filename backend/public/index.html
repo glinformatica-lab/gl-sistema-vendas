@@ -2115,6 +2115,41 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Cancelar Orçamento (com senha admin) -->
+  <div id="modal-cancelar-orc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:500px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:#dc2626;margin:0;font-size:20px;">❌ Cancelar Orçamento</h2>
+          <div id="canc-orc-info" style="font-size:13px;color:#64748b;margin-top:4px;"></div>
+        </div>
+        <button onclick="fecharCancelarOrc()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#991b1b;">
+        <strong>⚠️ Atenção:</strong> Esta ação é permanente e ficará registrada quem cancelou e qual admin autorizou.
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">Motivo do cancelamento* <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(mínimo 5 caracteres)</span></label>
+        <textarea id="canc-orc-motivo" rows="3" placeholder="Ex: Cliente desistiu, valor acima do orçamento, produto indisponível..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">🔒 Senha de um administrador*</label>
+        <input type="password" id="canc-orc-senha" placeholder="Digite a senha de um admin" autocomplete="new-password" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <div id="canc-orc-dica" style="font-size:11px;color:#64748b;margin-top:4px;"></div>
+      </div>
+
+      <div id="canc-orc-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharCancelarOrc()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Voltar</button>
+        <button type="button" onclick="confirmarCancelarOrc()" style="flex:2;padding:12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">❌ Cancelar Orçamento</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Cadastrar/Editar Transportadora -->
   <div id="modal-transportadora" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px 32px;border-radius:16px;max-width:640px;width:100%;">
@@ -12398,6 +12433,7 @@ ${conteudo}
       const status = document.getElementById('filtro-status-orc')?.value || '';
       const url = '/api/orcamentos' + (status ? '?status=' + status : '');
       _orcamentosCache = await api('GET', url);
+      window._orcamentosCache = _orcamentosCache;
       renderOrcamentos();
     } catch (err) { alert(err.message); }
   }
@@ -12477,7 +12513,7 @@ ${conteudo}
           <td>${formatarDataBR(o.data_orcamento)}</td>
           <td>${validadeTxt}</td>
           <td><strong>${formatarBRL(o.total)}</strong></td>
-          <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">${statusLabels[o.status] || o.status}</span>${indicadorCompras}</td>
+          <td><span style="background:${statusCores[o.status] || '#666'};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;" ${o.status === 'cancelado' && o.cancelado_por_nome ? `title="Cancelado por ${escapeHtml(o.cancelado_por_nome)}${o.autorizado_por_nome ? ' · Autorizado por ' + escapeHtml(o.autorizado_por_nome) : ''}${o.motivo_cancelamento ? ' · Motivo: ' + escapeHtml(o.motivo_cancelamento) : ''}"` : ''}>${statusLabels[o.status] || o.status}</span>${indicadorCompras}</td>
           <td class="acoes">
             <button onclick="visualizarOrc(${o.id})" title="Visualizar/Imprimir">👁️</button>
             ${btnStatusCompras}
@@ -13254,15 +13290,81 @@ ${conteudo}
       }
     } catch (err) { alert(err.message); }
   }
-  async function cancelarOrc(id) {
-    if (!confirm('Cancelar este orçamento?')) return;
-    try { await api('POST', '/api/orcamentos/' + id + '/status', { status: 'cancelado' }); carregarOrcamentos(); }
-    catch (err) { alert(err.message); }
+  // ID do orçamento sendo cancelado (usado pelo modal)
+  let _orcCancelandoId = null;
+  let _orcCancelandoNumero = null;
+
+  function cancelarOrc(id) {
+    // Busca dados do orçamento pra mostrar no modal
+    _orcCancelandoId = id;
+    const orc = (window._orcamentosCache || []).find(o => o.id === id);
+    _orcCancelandoNumero = orc?.numero || id;
+    const info = document.getElementById('canc-orc-info');
+    if (info) {
+      info.textContent = `Orçamento #${_orcCancelandoNumero}` + (orc?.cliente_nome ? ' — ' + orc.cliente_nome : '');
+    }
+    // Dica sobre senha conforme papel
+    const dica = document.getElementById('canc-orc-dica');
+    if (dica) {
+      if (window._papelAtual === 'admin') {
+        dica.textContent = 'Digite sua própria senha para autorizar.';
+      } else {
+        dica.textContent = 'Vendedor: peça a um administrador que digite a senha dele aqui.';
+      }
+    }
+    document.getElementById('canc-orc-motivo').value = '';
+    document.getElementById('canc-orc-senha').value = '';
+    document.getElementById('canc-orc-erro').style.display = 'none';
+    document.getElementById('modal-cancelar-orc').style.display = 'flex';
+    setTimeout(() => document.getElementById('canc-orc-motivo').focus(), 100);
+  }
+
+  function fecharCancelarOrc() {
+    document.getElementById('modal-cancelar-orc').style.display = 'none';
+    _orcCancelandoId = null;
+    _orcCancelandoNumero = null;
+  }
+
+  async function confirmarCancelarOrc() {
+    const motivo = document.getElementById('canc-orc-motivo').value.trim();
+    const senha = document.getElementById('canc-orc-senha').value;
+    const erro = document.getElementById('canc-orc-erro');
+    erro.style.display = 'none';
+    if (motivo.length < 5) {
+      erro.textContent = 'Motivo deve ter pelo menos 5 caracteres.';
+      erro.style.display = 'block';
+      return;
+    }
+    if (!senha) {
+      erro.textContent = 'Senha do admin é obrigatória.';
+      erro.style.display = 'block';
+      return;
+    }
+    try {
+      const r = await api('POST', `/api/orcamentos/${_orcCancelandoId}/cancelar`, { motivo, senha });
+      fecharCancelarOrc();
+      let msg = `✅ Orçamento #${_orcCancelandoNumero} cancelado com sucesso!\n\n`;
+      msg += `Cancelado por: ${r.canceladoPor || '—'}\n`;
+      msg += `Autorizado por: ${r.autorizadoPor || '—'}`;
+      if (r.itensRemovidosDaListaCompras > 0) {
+        msg += `\n\n🛒 ${r.itensRemovidosDaListaCompras} item(ns) pendente(s) removido(s) da Lista de Compras.`;
+      }
+      alert(msg);
+      carregarOrcamentos();
+      // Atualiza resumo lista compras (caso mudou)
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (err) {
+      erro.textContent = err.message || 'Erro ao cancelar.';
+      erro.style.display = 'block';
+    }
   }
   async function excluirOrc(id) {
-    if (!confirm('Excluir este orçamento? Esta ação não pode ser desfeita.')) return;
-    try { await api('DELETE', '/api/orcamentos/' + id); carregarOrcamentos(); }
-    catch (err) { alert(err.message); }
+    if (!confirm('Excluir este orçamento? Esta ação não pode ser desfeita.\n\n⚠️ Se houver itens já pedidos/recebidos na Lista de Compras, a exclusão será bloqueada.')) return;
+    try {
+      await api('DELETE', '/api/orcamentos/' + id);
+      carregarOrcamentos();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (err) { alert(err.message); }
   }
   async function converterOrc(id) {
     try {
@@ -13442,6 +13544,17 @@ ${conteudo}
         ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
         ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
         ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
+        ${orc.status === 'cancelado' && orc.cancelado_por_nome ? `
+          <div style="background:#fef2f2;border:1px solid #fca5a5;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
+            <strong>❌ ORÇAMENTO CANCELADO</strong><br>
+            ${orc.motivo_cancelamento ? `<div style="margin-top:4px;"><strong>Motivo:</strong> ${escapeHtml(orc.motivo_cancelamento)}</div>` : ''}
+            <div style="margin-top:6px;font-size:11px;color:#7c2d12;">
+              Cancelado por: <strong>${escapeHtml(orc.cancelado_por_nome)}</strong>
+              ${orc.autorizado_por_nome ? ` · Autorizado por: <strong>${escapeHtml(orc.autorizado_por_nome)}</strong>` : ''}
+              ${orc.cancelado_em ? ` · Em ${new Date(orc.cancelado_em).toLocaleString('pt-BR')}` : ''}
+            </div>
+          </div>
+        ` : ''}
         <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
           Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
         </div>
@@ -13709,6 +13822,17 @@ ${conteudo}
       ${orc.observacoes ? `<div style="background:#f6f8fc;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Observações:</strong><br>${escapeHtml(orc.observacoes).replace(/\n/g,'<br>')}</div>` : ''}
       ${orc.condicoes_pagamento ? `<div style="background:#fef3c7;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>Condições de pagamento:</strong> ${escapeHtml(orc.condicoes_pagamento)}</div>` : ''}
       ${orc.transportadora_nome ? `<div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;"><strong>🚚 Transportadora:</strong> ${escapeHtml(orc.transportadora_nome)}${orc.transportadora_telefone ? ' — Tel: ' + escapeHtml(orc.transportadora_telefone) : ''}</div>` : ''}
+      ${orc.status === 'cancelado' && orc.cancelado_por_nome ? `
+        <div style="background:#fef2f2;border:1px solid #fca5a5;padding:12px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#991b1b;">
+          <strong>❌ ORÇAMENTO CANCELADO</strong><br>
+          ${orc.motivo_cancelamento ? `<div style="margin-top:4px;"><strong>Motivo:</strong> ${escapeHtml(orc.motivo_cancelamento)}</div>` : ''}
+          <div style="margin-top:6px;font-size:11px;color:#7c2d12;">
+            Cancelado por: <strong>${escapeHtml(orc.cancelado_por_nome)}</strong>
+            ${orc.autorizado_por_nome ? ` · Autorizado por: <strong>${escapeHtml(orc.autorizado_por_nome)}</strong>` : ''}
+            ${orc.cancelado_em ? ` · Em ${new Date(orc.cancelado_em).toLocaleString('pt-BR')}` : ''}
+          </div>
+        </div>
+      ` : ''}
       <div style="margin-top:24px;text-align:center;font-size:11px;color:#888;border-top:1px solid #e2e8f0;padding-top:14px;">
         Orçamento válido até ${formatarDataBR(orc.data_validade)} · Status: ${orc.status.toUpperCase()}
       </div>
