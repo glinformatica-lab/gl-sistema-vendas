@@ -36,7 +36,7 @@ router.post('/', exigirAdmin, async (req, res) => {
   const { nome, email, senha, papel } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ error: 'Preencha nome, email e senha.' });
   if (senha.length < 6) return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
-  const papelFinal = (papel === 'admin' || papel === 'vendedor') ? papel : 'vendedor';
+  const papelFinal = ['admin', 'vendedor', 'estoque', 'financeiro'].includes(papel) ? papel : 'vendedor';
   try {
     const senhaHash = await bcrypt.hash(senha, 10);
     const r = await db.query(
@@ -56,7 +56,7 @@ router.post('/', exigirAdmin, async (req, res) => {
 router.put('/:id', exigirAdmin, async (req, res) => {
   const { nome, papel, senha } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
-  const papelFinal = (papel === 'admin' || papel === 'vendedor') ? papel : 'vendedor';
+  const papelFinal = ['admin', 'vendedor', 'estoque', 'financeiro'].includes(papel) ? papel : 'vendedor';
   // Não permite que o usuário rebaixe a si mesmo de admin para vendedor (evita ficar sem admin)
   if (Number(req.params.id) === req.user.userId && papelFinal !== 'admin') {
     return res.status(400).json({ error: 'Você não pode rebaixar seu próprio papel de admin.' });

@@ -979,10 +979,15 @@
         <button class="btn estoque-hide" onclick="openNovoOrcamento()">+ Novo Orçamento</button>
         <select id="filtro-status-orc" onchange="carregarOrcamentos()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
           <option value="">Todos status</option>
-          <option value="aberto">Aberto</option>
-          <option value="aprovado">Aprovado</option>
-          <option value="convertido">Convertido</option>
-          <option value="cancelado">Cancelado</option>
+          <option value="aberto">📝 Aberto</option>
+          <option value="aprovado">✅ Aprovado (vendedor)</option>
+          <option value="aguardando_financeiro">💰 Aguardando financeiro</option>
+          <option value="aprovado_financeiro">💚 Financeiro OK</option>
+          <option value="rejeitado_financeiro">⚠️ Rejeitado (Financeiro)</option>
+          <option value="em_separacao">📦 Em separação</option>
+          <option value="separado">✔️ Separado</option>
+          <option value="convertido">🛒 Convertido</option>
+          <option value="cancelado">❌ Cancelado</option>
         </select>
         <input id="filtro-orc" type="text" placeholder="Buscar cliente ou número..." oninput="renderOrcamentos()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
       </div>
@@ -3062,7 +3067,8 @@
         <label>Papel*
           <select id="usu-papel" style="width:100%;padding:10px;border:1px solid var(--cinza-borda);border-radius:8px;">
             <option value="vendedor">🛒 Vendedor (vendas + orçamentos)</option>
-            <option value="estoque" class="feature-ambientes" style="display:none;">📦 Estoque (compras + entradas)</option>
+            <option value="estoque" class="feature-ambientes" style="display:none;">📦 Estoque (compras + entradas + separação)</option>
+            <option value="financeiro" class="feature-ambientes" style="display:none;">💰 Financeiro (aprovação de pagamentos)</option>
             <option value="admin">👑 Admin (acesso total)</option>
           </select>
         </label>
@@ -5735,9 +5741,10 @@ https://sistema.glinformatica.com.br
       papelAtual = usuario.papel || 'admin';
       const info = document.getElementById('info-usuario');
       if(info) {
-        const papelLabels = { admin: '👑 Admin', vendedor: '🛒 Vendedor', estoque: '📦 Estoque' };
+        const papelLabels = { admin: '👑 Admin', vendedor: '🛒 Vendedor', estoque: '📦 Estoque', financeiro: '💰 Financeiro' };
         const papelLabel = papelLabels[papelAtual] || 'Vendedor';
-        const papelCor = papelAtual === 'admin' ? 'var(--verde)' : (papelAtual === 'estoque' ? '#f59e0b' : '#889');
+        const papelCoresMap = { admin: 'var(--verde)', estoque: '#f59e0b', financeiro: '#0891b2', vendedor: '#889' };
+        const papelCor = papelCoresMap[papelAtual] || '#889';
         info.innerHTML = `<strong style="color:var(--azul)">${empresa.nome || ''}</strong><br>${usuario.nome || ''} <span style="color:#aab;">·</span> <span style="color:${papelCor};font-weight:700">${papelLabel}</span>`;
       }
       // Esconde itens do menu para vendedor
@@ -10630,6 +10637,7 @@ ${conteudo}
       const papelLabels = {
         admin: '<span style="color:var(--verde);font-weight:700">👑 Admin</span>',
         estoque: '<span style="color:#f59e0b;font-weight:700">📦 Estoque</span>',
+        financeiro: '<span style="color:#0891b2;font-weight:700">💰 Financeiro</span>',
         vendedor: '<span style="color:#668;font-weight:700">🛒 Vendedor</span>'
       };
       const papelLabel = papelLabels[u.papel] || papelLabels.vendedor;
@@ -12467,11 +12475,18 @@ ${conteudo}
       }
       const statusCores = {
         'aberto': '#3960f9', 'aprovado': '#16a34a', 'convertido': '#7c3aed',
-        'cancelado': '#94a3b8', 'expirado': '#dc2626'
+        'cancelado': '#94a3b8', 'expirado': '#dc2626',
+        'aguardando_financeiro': '#f59e0b', 'aprovado_financeiro': '#0891b2',
+        'rejeitado_financeiro': '#dc2626', 'em_separacao': '#8b5cf6', 'separado': '#059669'
       };
       const statusLabels = {
         'aberto': '📝 Aberto', 'aprovado': '✅ Aprovado', 'convertido': '🛒 Convertido',
-        'cancelado': '❌ Cancelado', 'expirado': '⏰ Expirado'
+        'cancelado': '❌ Cancelado', 'expirado': '⏰ Expirado',
+        'aguardando_financeiro': '💰 Aguard. Financeiro',
+        'aprovado_financeiro': '💚 Financeiro OK',
+        'rejeitado_financeiro': '⚠️ Rejeitado (Fin.)',
+        'em_separacao': '📦 Em Separação',
+        'separado': '✔️ Separado'
       };
       const podeEditar = o.status !== 'convertido' && window._papelAtual !== 'estoque';
       const podeAprovar = o.status === 'aberto' && window._papelAtual !== 'estoque';
@@ -13280,13 +13295,18 @@ ${conteudo}
     }
   }
   async function aprovarOrc(id) {
-    if (!confirm('Marcar orçamento como APROVADO?')) return;
+    const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const usaFluxo = !!_emp.usaAmbientes;
+    const msg = usaFluxo
+      ? 'Confirmar aprovação do orçamento?\n\n✅ Isso indica que o cliente aceitou.\n💰 O pedido será enviado para o Financeiro aprovar o pagamento.'
+      : 'Marcar orçamento como APROVADO?';
+    if (!confirm(msg)) return;
     try {
       const resp = await api('POST', '/api/orcamentos/' + id + '/status', { status: 'aprovado' });
       carregarOrcamentos();
-      // Se veio lista de itens criados pra compras, mostra alerta
-      if (resp && resp._listaComprasCriados && resp._listaComprasCriados.length > 0) {
-        mostrarAlertaLcCriados(resp._listaComprasCriados);
+      // Mostra confirmação se foi pro financeiro
+      if (resp && resp._iraParaFinanceiro) {
+        alert('✅ Orçamento enviado ao Financeiro!\n\nAguardando aprovação de pagamento.');
       }
     } catch (err) { alert(err.message); }
   }

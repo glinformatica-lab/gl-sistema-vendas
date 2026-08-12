@@ -28,7 +28,13 @@ router.get('/', async (req, res) => {
               (SELECT COUNT(*) FROM lista_compras lc
                WHERE lc.orcamento_id = o.id AND lc.status IN ('pendente','pedido'))::int AS compras_abertas,
               (SELECT COUNT(*) FROM lista_compras lc
-               WHERE lc.orcamento_id = o.id AND lc.status = 'pendente')::int AS compras_pendentes
+               WHERE lc.orcamento_id = o.id AND lc.status = 'pendente')::int AS compras_pendentes,
+              (SELECT COUNT(*) FROM orcamento_itens oi
+               WHERE oi.orcamento_id = o.id AND oi.tipo='produto')::int AS itens_total,
+              (SELECT COUNT(*) FROM orcamento_itens oi
+               WHERE oi.orcamento_id = o.id AND oi.tipo='produto' AND oi.status_separacao='separado')::int AS itens_separados,
+              (SELECT COUNT(*) FROM orcamento_itens oi
+               WHERE oi.orcamento_id = o.id AND oi.tipo='produto' AND oi.status_separacao='aguardando_compra')::int AS itens_aguardando_compra
        FROM orcamentos o
        LEFT JOIN clientes c ON c.id = o.cliente_id
        LEFT JOIN transportadoras t ON t.id = o.transportadora_id
@@ -278,88 +284,229 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/status', async (req, res) => {
   const id = parseInt(req.params.id);
   const { status } = req.body || {};
-  // 'cancelado' agora tem rota própria com validação de senha admin
+
+  // Status permitidos por papel:
+  // - vendedor/admin: 'aberto' (voltar rascunho) e 'aprovado' (vendedor confirma que cliente aceitou)
+  //   → APROVAR agora dispara pro FINANCEIRO (não gera lista de compras ainda)
+  // - Para outras transições, usar rotas específicas: /aprovar-financeiro, /rejeitar-financeiro, /iniciar-separacao, /cancelar
   const validos = ['aberto', 'aprovado'];
   if (!validos.includes(status)) {
-    return res.status(400).json({ error: 'Status inválido. Para cancelar, use a rota /cancelar.' });
+    return res.status(400).json({ error: 'Status inválido. Use as rotas específicas: /aprovar-financeiro, /rejeitar-financeiro, /cancelar.' });
   }
-  // Verifica se o vendedor é dono do orçamento
+
+  // Vendedor só mexe nos próprios (admin/estoque/financeiro passam)
   const verif = await verificarDonoOrcamento(req, id);
   if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const r = await client.query(
-      `UPDATE orcamentos SET status=$1, atualizado_em=NOW()
-       WHERE id=$2 AND empresa_id=$3 AND status NOT IN ('convertido')
-       RETURNING *`,
-      [status, id, req.user.empresaId]
-    );
-    if (r.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Orçamento não encontrado ou já convertido.' });
-    }
-    const orcamento = r.rows[0];
 
-    // Ao APROVAR: verifica se empresa usa iluminação e gera itens de compra pra produtos sem estoque
-    let itensCriados = [];
+    // Busca status atual pra validar transições
+    const rAtual = await client.query(
+      'SELECT status FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [id, req.user.empresaId]
+    );
+    if (rAtual.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orçamento não encontrado.' });
+    }
+    const statusAtual = rAtual.rows[0].status;
+
+    // Não permite voltar de estados avançados via /status
+    const estadosBloqueados = ['aguardando_financeiro', 'aprovado_financeiro', 'em_separacao', 'separado', 'convertido', 'cancelado'];
+    if (estadosBloqueados.includes(statusAtual) && status !== statusAtual) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Orçamento está em "${statusAtual}" e não pode voltar pra "${status}" por esta rota.` });
+    }
+
+    // Se APROVAR: verifica se empresa usa iluminação → vai pro financeiro
+    // Se não usa: aprovação direta (fluxo antigo mantido pra compatibilidade)
+    let statusFinal = status;
+    let iraParaFinanceiro = false;
     if (status === 'aprovado') {
       const empChk = await client.query('SELECT usa_ambientes FROM empresas WHERE id = $1', [req.user.empresaId]);
       const usaAmbientes = empChk.rows[0]?.usa_ambientes;
-
       if (usaAmbientes) {
-        // Busca itens do orçamento com produto vinculado
-        const rItens = await client.query(
-          `SELECT oi.produto_id, oi.quantidade,
-                  p.nome, p.codigo, p.referencia, p.estoque
-           FROM orcamento_itens oi
-           JOIN produtos p ON p.id = oi.produto_id
-           WHERE oi.orcamento_id = $1 AND oi.tipo = 'produto' AND oi.produto_id IS NOT NULL`,
-          [id]
-        );
-
-        for (const item of rItens.rows) {
-          const estoque = Number(item.estoque) || 0;
-          const qtdOrc = Number(item.quantidade) || 0;
-          const faltando = qtdOrc - estoque;
-
-          if (faltando > 0) {
-            // Verifica se já existe item na lista pra esse orçamento+produto (evita duplicata)
-            const jaExiste = await client.query(
-              `SELECT id FROM lista_compras
-               WHERE empresa_id = $1 AND orcamento_id = $2 AND produto_id = $3`,
-              [req.user.empresaId, id, item.produto_id]
-            );
-            if (jaExiste.rows.length === 0) {
-              const ins = await client.query(
-                `INSERT INTO lista_compras (empresa_id, orcamento_id, produto_id, produto_nome,
-                                            produto_codigo, referencia, quantidade, status, criado_por)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendente', $8)
-                 RETURNING id, produto_nome, quantidade`,
-                [req.user.empresaId, id, item.produto_id, item.nome,
-                 item.codigo, item.referencia, faltando, req.user.userId]
-              );
-              itensCriados.push({
-                produto: ins.rows[0].produto_nome,
-                quantidade: Number(ins.rows[0].quantidade)
-              });
-            }
-          }
-        }
+        statusFinal = 'aguardando_financeiro';
+        iraParaFinanceiro = true;
       }
     }
 
+    const r = await client.query(
+      `UPDATE orcamentos SET status=$1, atualizado_em=NOW()
+       WHERE id=$2 AND empresa_id=$3
+       RETURNING *`,
+      [statusFinal, id, req.user.empresaId]
+    );
+    const orcamento = r.rows[0];
+
     await client.query('COMMIT');
-    // Retorna orçamento + info dos itens criados (pra frontend mostrar alerta)
     res.json({
       ...orcamento,
-      _listaComprasCriados: itensCriados
+      _iraParaFinanceiro: iraParaFinanceiro,
+      _listaComprasCriados: [] // Não gera mais aqui - só quando financeiro aprovar
     });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[orcamentos] status', err);
     res.status(500).json({ error: 'Erro ao alterar status.' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /:id/aprovar-financeiro — Financeiro aprova pagamento
+// Só admin ou financeiro. Gera lista_compras aqui!
+router.post('/:id/aprovar-financeiro', async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (!['admin', 'financeiro'].includes(req.user.papel)) {
+    return res.status(403).json({ error: 'Apenas admin ou financeiro pode aprovar.' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verifica orçamento
+    const rOrc = await client.query(
+      'SELECT * FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [id, req.user.empresaId]
+    );
+    if (rOrc.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orçamento não encontrado.' });
+    }
+    if (rOrc.rows[0].status !== 'aguardando_financeiro') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Orçamento não está aguardando financeiro (está em "${rOrc.rows[0].status}").` });
+    }
+
+    // Pega nome do usuário
+    const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
+    const nomeUsuario = rUser.rows[0]?.nome || null;
+
+    // Atualiza orçamento → aprovado_financeiro
+    await client.query(
+      `UPDATE orcamentos
+       SET status='aprovado_financeiro',
+           financeiro_aprovado_por=$1, financeiro_aprovado_por_nome=$2,
+           financeiro_aprovado_em=NOW(), atualizado_em=NOW()
+       WHERE id=$3`,
+      [req.user.userId, nomeUsuario, id]
+    );
+
+    // AGORA gera lista_compras pra itens sem estoque suficiente
+    // E marca itens com status_separacao adequado
+    let itensCriados = [];
+    const rItens = await client.query(
+      `SELECT oi.id AS item_id, oi.produto_id, oi.quantidade,
+              p.nome, p.codigo, p.referencia, p.estoque
+       FROM orcamento_itens oi
+       LEFT JOIN produtos p ON p.id = oi.produto_id
+       WHERE oi.orcamento_id = $1 AND oi.tipo = 'produto' AND oi.produto_id IS NOT NULL`,
+      [id]
+    );
+
+    for (const item of rItens.rows) {
+      const estoque = Number(item.estoque) || 0;
+      const qtdOrc = Number(item.quantidade) || 0;
+      const faltando = qtdOrc - estoque;
+
+      if (faltando > 0) {
+        // Marca item como aguardando compra
+        await client.query(
+          `UPDATE orcamento_itens SET status_separacao='aguardando_compra' WHERE id=$1`,
+          [item.item_id]
+        );
+        // Cria item na lista_compras (evita duplicata)
+        const jaExiste = await client.query(
+          `SELECT id FROM lista_compras
+           WHERE empresa_id=$1 AND orcamento_id=$2 AND produto_id=$3`,
+          [req.user.empresaId, id, item.produto_id]
+        );
+        if (jaExiste.rows.length === 0) {
+          const ins = await client.query(
+            `INSERT INTO lista_compras (empresa_id, orcamento_id, produto_id, produto_nome,
+                                        produto_codigo, referencia, quantidade, status, criado_por)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'pendente',$8)
+             RETURNING produto_nome, quantidade`,
+            [req.user.empresaId, id, item.produto_id, item.nome,
+             item.codigo, item.referencia, faltando, req.user.userId]
+          );
+          itensCriados.push({
+            produto: ins.rows[0].produto_nome,
+            quantidade: Number(ins.rows[0].quantidade)
+          });
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      aprovadoPor: nomeUsuario,
+      itensAguardandoCompra: itensCriados
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[orcamentos] aprovar-financeiro', err);
+    res.status(500).json({ error: 'Erro ao aprovar financeiramente.' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /:id/rejeitar-financeiro — Financeiro rejeita com motivo
+// Volta pro vendedor editar (status: rejeitado_financeiro)
+router.post('/:id/rejeitar-financeiro', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { motivo } = req.body || {};
+
+  if (!['admin', 'financeiro'].includes(req.user.papel)) {
+    return res.status(403).json({ error: 'Apenas admin ou financeiro pode rejeitar.' });
+  }
+  if (!motivo || motivo.trim().length < 5) {
+    return res.status(400).json({ error: 'Motivo obrigatório (mínimo 5 caracteres).' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const rOrc = await client.query(
+      'SELECT status FROM orcamentos WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      [id, req.user.empresaId]
+    );
+    if (rOrc.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orçamento não encontrado.' });
+    }
+    if (rOrc.rows[0].status !== 'aguardando_financeiro') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Só pode rejeitar orçamento em "aguardando_financeiro" (está em "${rOrc.rows[0].status}").` });
+    }
+
+    const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
+    const nomeUsuario = rUser.rows[0]?.nome || null;
+
+    await client.query(
+      `UPDATE orcamentos
+       SET status='rejeitado_financeiro',
+           financeiro_rejeitado_por=$1, financeiro_rejeitado_por_nome=$2,
+           financeiro_rejeitado_em=NOW(), motivo_rejeicao_financeira=$3,
+           atualizado_em=NOW()
+       WHERE id=$4`,
+      [req.user.userId, nomeUsuario, motivo.trim(), id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ ok: true, rejeitadoPor: nomeUsuario });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[orcamentos] rejeitar-financeiro', err);
+    res.status(500).json({ error: 'Erro ao rejeitar.' });
   } finally {
     client.release();
   }
