@@ -2107,6 +2107,45 @@
     </div>
   </div>
 
+  <!-- Modal: Leitor de Código de Barras (Câmera) -->
+  <div id="modal-leitor-camera" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10002;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:20px;border-radius:14px;max-width:520px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="color:var(--azul);margin:0;font-size:20px;">📷 Ler Código de Barras</h2>
+        <button onclick="fecharLeitorCamera()" style="background:none;border:none;font-size:28px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Video da câmera -->
+      <div id="leitor-camera-container" style="position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;">
+        <div id="leitor-camera-reader" style="width:100%;height:100%;"></div>
+      </div>
+
+      <!-- Status -->
+      <div id="leitor-status" style="margin-top:12px;padding:10px;border-radius:8px;background:#f1f5f9;color:#64748b;font-size:13px;text-align:center;">
+        📷 Aponte a câmera pro código de barras...
+      </div>
+
+      <!-- Botão fechar -->
+      <div style="margin-top:14px;">
+        <button onclick="fecharLeitorCamera()" style="width:100%;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar próxima leitura -->
+  <div id="modal-continuar-leitura" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10003;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:24px;border-radius:14px;max-width:400px;width:100%;text-align:center;">
+      <div style="font-size:48px;margin-bottom:10px;">✅</div>
+      <h2 style="color:#16a34a;margin:0 0 8px 0;font-size:20px;">Produto adicionado!</h2>
+      <div id="continuar-produto-info" style="font-size:14px;color:#475569;margin-bottom:20px;padding:10px;background:#f0fdf4;border-radius:8px;"></div>
+      <div style="font-size:14px;color:#64748b;margin-bottom:16px;">Quer ler mais um código de barras?</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="continuarLeitura(false)" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Não, terminar</button>
+        <button onclick="continuarLeitura(true)" style="flex:1;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">📷 Sim, ler mais</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Impressão de Etiquetas de Código de Barras -->
   <div id="modal-etiquetas" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -2269,9 +2308,13 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
         <!-- Buscar produto -->
         <div style="position:relative;">
-          <input type="text" id="busca-produto" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar produto pelo nome..."
-                 oninput="filtrarProdutos(this.value)" onfocus="filtrarProdutos(this.value)"
-                 style="width:100%;padding:10px 12px;border:2px solid #3960f9;border-radius:6px;font-size:14px;background:#f0f4ff;">
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="busca-produto" autocomplete="new-password" data-form-type="other" placeholder="🔍 Buscar produto pelo nome, referência ou código..."
+                   oninput="filtrarProdutos(this.value)" onfocus="filtrarProdutos(this.value)"
+                   style="flex:1;padding:10px 12px;border:2px solid #3960f9;border-radius:6px;font-size:14px;background:#f0f4ff;">
+            <button type="button" class="feature-ambientes" onclick="abrirLeitorCamera()" title="Ler código de barras com a câmera"
+                    style="display:none;padding:10px 12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:18px;cursor:pointer;flex-shrink:0;font-weight:700;">📷</button>
+          </div>
           <div id="orc-lista-produtos" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #3960f9;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
         </div>
         <!-- Buscar serviço -->
@@ -10555,6 +10598,150 @@ ${conteudo}
   // ====== HISTÓRICO DE CAIXA (fechamentos) ======
   let _historicoCaixaCache = [];
   let _detalheCaixaAtual = null;
+
+  // ====== LEITOR DE CÓDIGO DE BARRAS (CÂMERA) ======
+  let _leitorInstance = null;
+  let _leitorAtivo = false;
+
+  function carregarLibLeitor() {
+    return new Promise((resolve, reject) => {
+      if (window.Html5Qrcode) return resolve();
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Falha ao carregar biblioteca do leitor.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function abrirLeitorCamera() {
+    const emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (!emp.usaAmbientes) {
+      alert('Este recurso está disponível apenas para empresas com o Módulo Iluminação ativo.');
+      return;
+    }
+    // Verifica suporte a câmera
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Seu navegador não suporta acesso à câmera. Tente pelo Chrome/Edge/Safari.');
+      return;
+    }
+    document.getElementById('modal-leitor-camera').style.display = 'flex';
+    document.getElementById('leitor-status').innerHTML = '⏳ Carregando câmera...';
+    document.getElementById('leitor-status').style.background = '#f1f5f9';
+    document.getElementById('leitor-status').style.color = '#64748b';
+
+    try {
+      await carregarLibLeitor();
+      await iniciarCamera();
+    } catch (e) {
+      console.error('Erro leitor:', e);
+      document.getElementById('leitor-status').innerHTML = '❌ ' + (e.message || 'Erro ao iniciar câmera. Verifique se autorizou o acesso.');
+      document.getElementById('leitor-status').style.background = '#fef2f2';
+      document.getElementById('leitor-status').style.color = '#991b1b';
+    }
+  }
+
+  async function iniciarCamera() {
+    if (_leitorAtivo) return;
+    try {
+      _leitorInstance = new Html5Qrcode('leitor-camera-reader');
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 100 },
+        aspectRatio: 4/3,
+        // Aceita CODE 128 (que geramos), EAN-13, EAN-8 etc
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      };
+      await _leitorInstance.start(
+        { facingMode: 'environment' }, // câmera traseira em celular
+        config,
+        onCodigoLido,
+        () => {} // callback erro por frame (silencioso)
+      );
+      _leitorAtivo = true;
+      document.getElementById('leitor-status').innerHTML = '📷 Aponte a câmera pro código de barras...';
+      document.getElementById('leitor-status').style.background = '#f1f5f9';
+      document.getElementById('leitor-status').style.color = '#64748b';
+    } catch (e) {
+      throw new Error('Não foi possível acessar a câmera. Autorize o acesso e tente de novo.');
+    }
+  }
+
+  async function pararCamera() {
+    if (_leitorInstance && _leitorAtivo) {
+      try {
+        await _leitorInstance.stop();
+        _leitorInstance.clear();
+      } catch(e) { /* ignora */ }
+      _leitorInstance = null;
+      _leitorAtivo = false;
+    }
+  }
+
+  async function onCodigoLido(codigo) {
+    if (!_leitorAtivo) return;
+    // Bloqueia leitura enquanto processa
+    _leitorAtivo = false;
+    document.getElementById('leitor-status').innerHTML = '🔍 Buscando produto: <strong>' + escapeHtml(codigo) + '</strong>...';
+
+    // Busca produto no cache local por codigoBarras OU referencia OU codigo
+    const codigoUpper = (codigo || '').toUpperCase().trim();
+    const produto = _produtosCacheLocal.find(p =>
+      (p.codigoBarras || '').toUpperCase() === codigoUpper ||
+      (p.referencia || '').toUpperCase() === codigoUpper ||
+      (p.codigo || '').toUpperCase() === codigoUpper
+    );
+
+    if (!produto) {
+      document.getElementById('leitor-status').innerHTML = '❌ Nenhum produto encontrado com o código: <strong>' + escapeHtml(codigo) + '</strong>';
+      document.getElementById('leitor-status').style.background = '#fef2f2';
+      document.getElementById('leitor-status').style.color = '#991b1b';
+      // Retorna a leitura após 2 segundos
+      setTimeout(() => {
+        _leitorAtivo = true;
+        document.getElementById('leitor-status').innerHTML = '📷 Aponte a câmera pro código de barras...';
+        document.getElementById('leitor-status').style.background = '#f1f5f9';
+        document.getElementById('leitor-status').style.color = '#64748b';
+      }, 2000);
+      return;
+    }
+
+    // Adiciona produto ao orçamento
+    selecionarProduto(produto.id);
+
+    // Para câmera
+    await pararCamera();
+
+    // Fecha modal câmera
+    document.getElementById('modal-leitor-camera').style.display = 'none';
+
+    // Mostra confirmação
+    document.getElementById('continuar-produto-info').innerHTML = `
+      <strong>${escapeHtml(produto.nome)}</strong><br>
+      <span style="color:#64748b;font-size:12px;">${produto.codigoBarras || produto.codigo}</span>
+    `;
+    document.getElementById('modal-continuar-leitura').style.display = 'flex';
+  }
+
+  async function continuarLeitura(sim) {
+    document.getElementById('modal-continuar-leitura').style.display = 'none';
+    if (sim) {
+      // Reabre câmera
+      await abrirLeitorCamera();
+    }
+    // Se não, já foi fechado
+  }
+
+  async function fecharLeitorCamera() {
+    await pararCamera();
+    document.getElementById('modal-leitor-camera').style.display = 'none';
+  }
 
   // ====== IMPRESSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS ======
   let _etiquetasTamanho = 'media';
