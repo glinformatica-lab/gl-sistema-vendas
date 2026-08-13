@@ -95,13 +95,19 @@ router.post('/', async (req, res) => {
     // Atualiza estoque, custo e venda + movimentações
     for (const it of e.itens) {
       const p = produtosByNome.get(it.produto);
+      // Atualiza fornecedor SÓ se estiver vazio (null ou string vazia)
       await client.query(
         `UPDATE produtos SET estoque = estoque + $1, preco_custo = $2,
-                preco_venda = COALESCE($3, preco_venda)
+                preco_venda = COALESCE($3, preco_venda),
+                fornecedor = CASE
+                  WHEN fornecedor IS NULL OR TRIM(fornecedor) = '' THEN $6
+                  ELSE fornecedor
+                END
          WHERE id=$4 AND empresa_id=$5`,
         [Number(it.qtd), Number(it.custo),
          (it.precoVenda != null && it.precoVenda > 0) ? Number(it.precoVenda) : null,
-         p.id, req.user.empresaId]
+         p.id, req.user.empresaId,
+         e.fornecedor]
       );
       await client.query(
         `INSERT INTO movimentacoes (empresa_id, produto_codigo, produto_nome, data, tipo, qtd, origem, observacao, entrada_id)

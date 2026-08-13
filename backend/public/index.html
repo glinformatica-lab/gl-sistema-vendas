@@ -615,6 +615,7 @@
       <button class="menu-btn submenu-item" onclick="showPage('configuracoes')">&#9881;&#65039; Geral</button>
       <button class="menu-btn submenu-item" onclick="showPage('usuarios')">&#128101; Usuários</button>
       <button class="menu-btn submenu-item fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
+      <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('migracao')" style="display:none;">&#128260; Migração de Sistema</button>
     </div>
 
     <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
@@ -2030,6 +2031,116 @@
           <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="carregarConfigEmpresa()">Descartar Alterações</button>
         </div>
       </form>
+    </div>
+
+    <!-- Migração de Sistema (Módulo Iluminação, só admin) -->
+    <div id="page-migracao" style="display:none;">
+      <div class="page-title">🔄 Migração de Sistema</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;max-width:800px;">
+        Importe seus produtos vindos de outro ERP/sistema. Suportamos planilhas Excel (.xlsx, .xls) e CSV.
+        Marcas serão criadas automaticamente. Fornecedor pode ficar em branco (será preenchido automaticamente nas entradas de mercadoria).
+      </div>
+
+      <!-- Stepper visual -->
+      <div style="display:flex;gap:0;margin-bottom:20px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div id="mg-step-1" style="flex:1;padding:14px;text-align:center;background:#0891b2;color:#fff;font-weight:700;font-size:13px;">1️⃣ Enviar Planilha</div>
+        <div id="mg-step-2" style="flex:1;padding:14px;text-align:center;background:#f1f5f9;color:#94a3b8;font-weight:700;font-size:13px;">2️⃣ Preview e Ajustes</div>
+        <div id="mg-step-3" style="flex:1;padding:14px;text-align:center;background:#f1f5f9;color:#94a3b8;font-weight:700;font-size:13px;">3️⃣ Confirmar Importação</div>
+      </div>
+
+      <!-- Passo 1: Upload -->
+      <div id="mg-panel-1" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;">
+        <h3 style="color:#0891b2;margin:0 0 14px;">📤 Passo 1: Enviar Planilha</h3>
+
+        <div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:16px;margin-bottom:16px;">
+          <strong style="color:#1e40af;">📋 Colunas aceitas (nomes flexíveis)</strong>
+          <div style="font-size:12px;color:#334155;margin-top:8px;line-height:1.7;">
+            • <strong>Nome</strong> (ou "Descrição", "Produto") — <strong>obrigatório</strong><br>
+            • <strong>Código</strong> (opcional, se vazio gera automático)<br>
+            • <strong>Referência / Grade / Ref</strong> (opcional)<br>
+            • <strong>Marca / Fabricante</strong> (opcional, cria marca se não existe)<br>
+            • <strong>Quantidade / Estoque / Qtd</strong> (opcional, padrão 0)<br>
+            • <strong>preco_custo / Custo</strong> (opcional, padrão 0)<br>
+            • <strong>preco_venda / Preço / Venda</strong> — <strong>obrigatório</strong><br>
+            • <strong>Categoria</strong> (opcional)<br>
+            <br>
+            <em style="color:#64748b;">Outras colunas serão ignoradas (ex: Unid., NCM, etc).</em>
+          </div>
+        </div>
+
+        <label style="display:block;font-weight:600;color:#334155;font-size:13px;margin-bottom:8px;">Selecione o arquivo:</label>
+        <input type="file" id="mg-arquivo" accept=".xlsx,.xls,.csv" onchange="mgProcessarArquivo(event)"
+               style="display:block;padding:20px;border:2px dashed #94a3b8;border-radius:8px;width:100%;background:#f8fafc;cursor:pointer;">
+
+        <div id="mg-erro-upload" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:12px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+      </div>
+
+      <!-- Passo 2: Preview -->
+      <div id="mg-panel-2" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;">
+        <h3 style="color:#0891b2;margin:0 0 14px;">🔍 Passo 2: Preview e Ajustes</h3>
+
+        <div id="mg-resumo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
+
+        <div style="margin-bottom:12px;font-size:13px;color:#334155;">
+          <strong>Mapeamento detectado:</strong> <span id="mg-mapeamento" style="color:#0891b2;"></span>
+        </div>
+
+        <div id="mg-avisos" style="display:none;background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:12px;border-radius:6px;font-size:13px;margin-bottom:12px;"></div>
+
+        <div style="max-height:360px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead style="background:#f8fafc;position:sticky;top:0;">
+              <tr>
+                <th style="padding:8px;text-align:left;">Linha</th>
+                <th style="padding:8px;text-align:left;">Código</th>
+                <th style="padding:8px;text-align:left;">Referência</th>
+                <th style="padding:8px;text-align:left;">Nome</th>
+                <th style="padding:8px;text-align:left;">Marca</th>
+                <th style="padding:8px;text-align:center;">Qtd</th>
+                <th style="padding:8px;text-align:right;">Custo</th>
+                <th style="padding:8px;text-align:right;">Venda</th>
+                <th style="padding:8px;text-align:center;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="mg-preview-body"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="button" onclick="mgVoltarPasso1()" style="padding:12px 20px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">← Escolher outro arquivo</button>
+          <button type="button" id="mg-btn-avancar" onclick="mgIrParaPasso3()" style="flex:1;padding:12px 20px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Avançar para confirmação →</button>
+        </div>
+      </div>
+
+      <!-- Passo 3: Confirmar -->
+      <div id="mg-panel-3" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;">
+        <h3 style="color:#0891b2;margin:0 0 14px;">✅ Passo 3: Confirmar Importação</h3>
+
+        <div style="background:#fef3c7;border:1px solid #fbbf24;padding:14px;border-radius:8px;margin-bottom:14px;">
+          <strong style="color:#92400e;">⚠️ Antes de confirmar, revise:</strong>
+          <ul style="margin:8px 0 0 20px;padding:0;color:#78350f;font-size:13px;line-height:1.7;">
+            <li>Faça um backup do sistema (recomendado)</li>
+            <li>Produtos com <strong>mesma referência</strong> ou <strong>mesmo nome</strong> serão ATUALIZADOS</li>
+            <li>Marcas que não existem serão <strong>criadas automaticamente</strong></li>
+            <li>Fornecedor ficará em branco e será preenchido nas entradas</li>
+            <li>Esta operação NÃO PODE SER DESFEITA (só editando ou excluindo depois)</li>
+          </ul>
+        </div>
+
+        <div id="mg-confirmar-resumo" style="background:#f0fdf4;border:1px solid #16a34a;padding:14px;border-radius:8px;margin-bottom:16px;"></div>
+
+        <div id="mg-progresso" style="display:none;background:#eff6ff;border:1px solid #3b82f6;padding:14px;border-radius:8px;margin-bottom:16px;">
+          <div style="font-weight:700;color:#1e40af;margin-bottom:8px;">⏳ Importando...</div>
+          <div style="font-size:12px;color:#3730a3;">Isso pode levar alguns minutos dependendo do tamanho da planilha.</div>
+        </div>
+
+        <div id="mg-resultado" style="display:none;padding:14px;border-radius:8px;margin-bottom:16px;"></div>
+
+        <div style="display:flex;gap:10px;">
+          <button type="button" id="mg-btn-voltar-preview" onclick="mgVoltarPasso2()" style="padding:12px 20px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">← Voltar</button>
+          <button type="button" id="mg-btn-confirmar" onclick="mgConfirmarImportacao()" style="flex:1;padding:14px 20px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">🚀 Confirmar Importação</button>
+        </div>
+      </div>
     </div>
 
     <!-- Configurações Fiscais (Plano Pro) -->
@@ -4218,9 +4329,9 @@
           </div>
         </div>
         <div class="form-field" style="margin-top:14px;margin-bottom:0;">
-          <label>Fornecedor*</label>
+          <label>Fornecedor <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(opcional · atualizado nas entradas)</span></label>
           <div class="field-com-botao">
-            <input type="text" id="npr-fornecedor" list="lista-fornecedores" required>
+            <input type="text" id="npr-fornecedor" list="lista-fornecedores">
             <button type="button" class="btn-mais" title="Cadastrar novo fornecedor" onclick="openNovoFornecedorRapido('produto')">+</button>
           </div>
         </div>
@@ -6500,7 +6611,8 @@ https://sistema.glinformatica.com.br
     'contas-receber': 'financeiro',
     'configuracoes': 'config',
     'usuarios': 'config',
-    'configuracoes-fiscais': 'config'
+    'configuracoes-fiscais': 'config',
+    'migracao': 'config'
   };
 
   // Abre/fecha um grupo de submenu manualmente
@@ -6785,6 +6897,25 @@ https://sistema.glinformatica.com.br
         return;
       }
       carregarMarcas();
+    }
+    if(pg === 'migracao') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      if (window._papelAtual !== 'admin') {
+        alert('Acesso restrito: apenas administradores.');
+        showPage('dashboard');
+        return;
+      }
+      // Carrega marcas cache se ainda não carregou (usado no resumo do preview)
+      if (!_marcasCache || _marcasCache.length === 0) {
+        api('GET', '/api/marcas').then(m => { _marcasCache = m || []; }).catch(() => {});
+      }
+      // Reseta pro passo 1 ao abrir
+      mgVoltarPasso1();
     }
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
@@ -12974,6 +13105,325 @@ ${conteudo}
         _transportadorasCache.map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
       sel.value = valorAtual;
     });
+  }
+
+  // ====== MIGRAÇÃO DE SISTEMA (Iluminação) ======
+  let _mgItensPreview = [];
+  let _mgMapeamentoDetectado = {};
+
+  function mgVoltarPasso1() {
+    document.getElementById('mg-panel-1').style.display = '';
+    document.getElementById('mg-panel-2').style.display = 'none';
+    document.getElementById('mg-panel-3').style.display = 'none';
+    document.getElementById('mg-step-1').style.background = '#0891b2';
+    document.getElementById('mg-step-1').style.color = '#fff';
+    document.getElementById('mg-step-2').style.background = '#f1f5f9';
+    document.getElementById('mg-step-2').style.color = '#94a3b8';
+    document.getElementById('mg-step-3').style.background = '#f1f5f9';
+    document.getElementById('mg-step-3').style.color = '#94a3b8';
+    _mgItensPreview = [];
+    document.getElementById('mg-arquivo').value = '';
+  }
+
+  function mgVoltarPasso2() {
+    document.getElementById('mg-panel-1').style.display = 'none';
+    document.getElementById('mg-panel-2').style.display = '';
+    document.getElementById('mg-panel-3').style.display = 'none';
+    document.getElementById('mg-step-2').style.background = '#0891b2';
+    document.getElementById('mg-step-2').style.color = '#fff';
+    document.getElementById('mg-step-3').style.background = '#f1f5f9';
+    document.getElementById('mg-step-3').style.color = '#94a3b8';
+    // Reset resultado
+    document.getElementById('mg-resultado').style.display = 'none';
+    document.getElementById('mg-progresso').style.display = 'none';
+    document.getElementById('mg-btn-confirmar').disabled = false;
+    document.getElementById('mg-btn-confirmar').style.opacity = '1';
+  }
+
+  function mgIrParaPasso3() {
+    if (_mgItensPreview.length === 0) {
+      alert('Nenhum produto válido pra importar.');
+      return;
+    }
+    document.getElementById('mg-panel-2').style.display = 'none';
+    document.getElementById('mg-panel-3').style.display = '';
+    document.getElementById('mg-step-2').style.background = '#16a34a';
+    document.getElementById('mg-step-2').style.color = '#fff';
+    document.getElementById('mg-step-3').style.background = '#0891b2';
+    document.getElementById('mg-step-3').style.color = '#fff';
+
+    // Resumo
+    const novos = _mgItensPreview.filter(i => i._status === 'novo').length;
+    const atualizar = _mgItensPreview.filter(i => i._status === 'atualizar').length;
+    const marcas = new Set(_mgItensPreview.map(i => i.marca).filter(Boolean));
+    const marcasExistentes = (_marcasCache || []).map(m => String(m.nome).toLowerCase());
+    const marcasNovas = [...marcas].filter(m => !marcasExistentes.includes(String(m).toLowerCase()));
+
+    document.getElementById('mg-confirmar-resumo').innerHTML = `
+      <strong style="color:#166534;font-size:14px;">📊 Resumo da Importação</strong>
+      <div style="margin-top:8px;font-size:13px;color:#065f46;line-height:1.8;">
+        • <strong>${novos}</strong> produto(s) novo(s) serão criados<br>
+        • <strong>${atualizar}</strong> produto(s) existente(s) serão atualizados<br>
+        • <strong>${marcasNovas.length}</strong> marca(s) nova(s) serão criadas automaticamente
+        ${marcasNovas.length > 0 && marcasNovas.length <= 10 ? `<div style="font-size:11px;color:#059669;margin-top:4px;">→ ${marcasNovas.slice(0, 10).map(m => `<code>${escapeHtml(m)}</code>`).join(', ')}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function mgProcessarArquivo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (typeof XLSX === 'undefined') {
+      document.getElementById('mg-erro-upload').textContent = 'Biblioteca XLSX não carregou. Recarregue a página.';
+      document.getElementById('mg-erro-upload').style.display = 'block';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+
+        if (linhas.length < 2) {
+          throw new Error('Planilha vazia. Verifique se há cabeçalho na linha 1 e dados a partir da linha 2.');
+        }
+
+        // Normaliza cabeçalho: minúsculo, sem acento, sem espaço extra
+        const normalizar = (s) => String(s || '').toLowerCase().trim()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+          .replace(/[\.\s\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+        const cab = linhas[0].map(normalizar);
+
+        // findCol: encontra pelo primeiro alias que bate
+        const findCol = (aliases) => {
+          for (const alias of aliases) {
+            const idx = cab.findIndex(h => h === alias || h.includes(alias));
+            if (idx >= 0) return idx;
+          }
+          return -1;
+        };
+
+        const idx = {
+          codigo:      findCol(['codigo', 'cod', 'sku']),
+          referencia:  findCol(['grade referencia', 'grade/referencia', 'referencia', 'ref', 'grade']),
+          nome:        findCol(['nome', 'descricao', 'produto', 'item']),
+          marca:       findCol(['marca', 'fabricante']),
+          estoque:     findCol(['quantidade', 'estoque', 'qtd', 'quant']),
+          precoCusto:  findCol(['preco custo', 'precocusto', 'custo', 'valor custo']),
+          precoVenda:  findCol(['preco venda', 'precovenda', 'preco', 'venda', 'valor venda']),
+          categoria:   findCol(['categoria', 'grupo', 'departamento']),
+        };
+
+        _mgMapeamentoDetectado = idx;
+
+        if (idx.nome < 0) {
+          throw new Error('Coluna NOME não encontrada. É obrigatória (aceita: nome, descricao, produto, item).');
+        }
+        if (idx.precoVenda < 0) {
+          throw new Error('Coluna PREÇO DE VENDA não encontrada. É obrigatória (aceita: preco_venda, preco, venda).');
+        }
+
+        // Parser BR/EN de números
+        const parseNumero = (v) => {
+          if (typeof v === 'number') return v;
+          let s = String(v || '').trim();
+          if (!s) return 0;
+          s = s.replace(/[R$\s]/g, '');
+          if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+          else if (s.includes(',')) s = s.replace(',', '.');
+          return Number(s) || 0;
+        };
+
+        // Cache dos produtos existentes (por referência e por nome)
+        const mapaPorRef = new Map();
+        const mapaPorNome = new Map();
+        for (const p of (dbProdutos || [])) {
+          if (p.referencia) mapaPorRef.set(String(p.referencia).toUpperCase(), p);
+          if (p.nome) mapaPorNome.set(String(p.nome).toLowerCase(), p);
+        }
+
+        const itens = [];
+        for (let i = 1; i < linhas.length; i++) {
+          const l = linhas[i];
+          if (!l || l.length === 0) continue;
+          const nome = String(l[idx.nome] || '').trim();
+          if (!nome) continue;
+
+          const referencia = idx.referencia >= 0 ? String(l[idx.referencia] || '').trim().toUpperCase() : '';
+          const codigo = idx.codigo >= 0 ? String(l[idx.codigo] || '').trim() : '';
+          const marca = idx.marca >= 0 ? String(l[idx.marca] || '').trim() : '';
+          const categoria = idx.categoria >= 0 ? String(l[idx.categoria] || '').trim() : '';
+          const estoque = idx.estoque >= 0 ? parseNumero(l[idx.estoque]) : 0;
+          const precoCusto = idx.precoCusto >= 0 ? parseNumero(l[idx.precoCusto]) : 0;
+          const precoVenda = idx.precoVenda >= 0 ? parseNumero(l[idx.precoVenda]) : 0;
+
+          // Detecta duplicata
+          let status = 'novo';
+          if (referencia && mapaPorRef.has(referencia)) status = 'atualizar';
+          else if (mapaPorNome.has(nome.toLowerCase())) status = 'atualizar';
+
+          itens.push({
+            linha: i + 1,
+            codigo, referencia, nome, marca, categoria,
+            estoque, precoCusto, precoVenda,
+            _status: status,
+            _valido: precoVenda > 0
+          });
+        }
+
+        _mgItensPreview = itens;
+        mgRenderPreview();
+
+      } catch (err) {
+        document.getElementById('mg-erro-upload').textContent = '❌ ' + err.message;
+        document.getElementById('mg-erro-upload').style.display = 'block';
+        console.error('[mg] processar', err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function mgRenderPreview() {
+    // Avança pro passo 2
+    document.getElementById('mg-panel-1').style.display = 'none';
+    document.getElementById('mg-panel-2').style.display = '';
+    document.getElementById('mg-step-1').style.background = '#16a34a';
+    document.getElementById('mg-step-1').style.color = '#fff';
+    document.getElementById('mg-step-2').style.background = '#0891b2';
+    document.getElementById('mg-step-2').style.color = '#fff';
+
+    // Resumo
+    const total = _mgItensPreview.length;
+    const novos = _mgItensPreview.filter(i => i._status === 'novo').length;
+    const atualizar = _mgItensPreview.filter(i => i._status === 'atualizar').length;
+    const invalidos = _mgItensPreview.filter(i => !i._valido).length;
+    const comMarca = _mgItensPreview.filter(i => i.marca).length;
+
+    document.getElementById('mg-resumo').innerHTML = `
+      <div style="background:#f0f9ff;border:1px solid #93c5fd;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#0891b2;">${total}</div>
+        <div style="font-size:11px;color:#334155;">Total lidos</div>
+      </div>
+      <div style="background:#dcfce7;border:1px solid #16a34a;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#166534;">${novos}</div>
+        <div style="font-size:11px;color:#166534;">Novos</div>
+      </div>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#92400e;">${atualizar}</div>
+        <div style="font-size:11px;color:#92400e;">Atualizar</div>
+      </div>
+      <div style="background:#eef2ff;border:1px solid #6366f1;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#4338ca;">${comMarca}</div>
+        <div style="font-size:11px;color:#4338ca;">Com marca</div>
+      </div>
+      ${invalidos > 0 ? `
+      <div style="background:#fef2f2;border:1px solid #dc2626;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#991b1b;">${invalidos}</div>
+        <div style="font-size:11px;color:#991b1b;">Serão ignorados</div>
+      </div>` : ''}
+    `;
+
+    // Mapeamento visual
+    const map = [];
+    if (_mgMapeamentoDetectado.codigo >= 0) map.push('Código');
+    if (_mgMapeamentoDetectado.referencia >= 0) map.push('Referência');
+    map.push('Nome');
+    if (_mgMapeamentoDetectado.marca >= 0) map.push('Marca');
+    if (_mgMapeamentoDetectado.estoque >= 0) map.push('Quantidade');
+    if (_mgMapeamentoDetectado.precoCusto >= 0) map.push('Custo');
+    map.push('Venda');
+    if (_mgMapeamentoDetectado.categoria >= 0) map.push('Categoria');
+    document.getElementById('mg-mapeamento').textContent = map.join(' · ');
+
+    // Avisos
+    const avisos = [];
+    if (_mgMapeamentoDetectado.precoCusto < 0) avisos.push('Coluna "custo" não encontrada — produtos serão criados sem preço de custo (0).');
+    if (invalidos > 0) avisos.push(`${invalidos} linha(s) sem preço de venda serão ignoradas.`);
+    if (avisos.length > 0) {
+      document.getElementById('mg-avisos').innerHTML = '⚠️ ' + avisos.join('<br>⚠️ ');
+      document.getElementById('mg-avisos').style.display = 'block';
+    } else {
+      document.getElementById('mg-avisos').style.display = 'none';
+    }
+
+    // Tabela preview (mostra até 100)
+    const preview = _mgItensPreview.slice(0, 100);
+    document.getElementById('mg-preview-body').innerHTML = preview.map(it => {
+      const badgeStatus = it._status === 'novo'
+        ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">NOVO</span>'
+        : '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">ATUALIZAR</span>';
+      const badgeInvalido = !it._valido
+        ? '<span style="background:#fef2f2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">SEM PREÇO</span>'
+        : '';
+      return `
+        <tr style="border-top:1px solid #f1f5f9;${!it._valido ? 'opacity:0.5;' : ''}">
+          <td style="padding:6px;color:#64748b;">${it.linha}</td>
+          <td style="padding:6px;">${escapeHtml(it.codigo || '—')}</td>
+          <td style="padding:6px;font-family:monospace;color:#7c3aed;">${escapeHtml(it.referencia || '—')}</td>
+          <td style="padding:6px;font-weight:600;">${escapeHtml(it.nome)}</td>
+          <td style="padding:6px;color:#4338ca;">${escapeHtml(it.marca || '—')}</td>
+          <td style="padding:6px;text-align:center;">${it.estoque}</td>
+          <td style="padding:6px;text-align:right;">${formatarBRL(it.precoCusto)}</td>
+          <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(it.precoVenda)}</td>
+          <td style="padding:6px;text-align:center;">${badgeInvalido || badgeStatus}</td>
+        </tr>
+      `;
+    }).join('');
+    if (_mgItensPreview.length > 100) {
+      document.getElementById('mg-preview-body').innerHTML += `
+        <tr><td colspan="9" style="text-align:center;padding:10px;color:#94a3b8;font-style:italic;">
+          + ${_mgItensPreview.length - 100} produto(s) não mostrado(s) no preview (serão importados normalmente)
+        </td></tr>`;
+    }
+  }
+
+  async function mgConfirmarImportacao() {
+    if (!confirm('⚠️ Confirmar importação de ' + _mgItensPreview.length + ' produtos?\n\nEsta ação não pode ser desfeita facilmente.')) return;
+
+    document.getElementById('mg-btn-confirmar').disabled = true;
+    document.getElementById('mg-btn-confirmar').style.opacity = '0.5';
+    document.getElementById('mg-btn-voltar-preview').disabled = true;
+    document.getElementById('mg-progresso').style.display = 'block';
+    document.getElementById('mg-resultado').style.display = 'none';
+
+    try {
+      // Envia só os válidos
+      const validos = _mgItensPreview.filter(i => i._valido);
+      const r = await api('POST', '/api/produtos/migracao', { itens: validos });
+
+      document.getElementById('mg-progresso').style.display = 'none';
+      const div = document.getElementById('mg-resultado');
+      div.style.background = '#dcfce7';
+      div.style.border = '1px solid #16a34a';
+      div.innerHTML = `
+        <strong style="color:#166534;font-size:15px;">✅ Importação concluída com sucesso!</strong>
+        <div style="margin-top:10px;font-size:13px;color:#065f46;line-height:1.8;">
+          • <strong>${r.criados}</strong> produto(s) criado(s)<br>
+          • <strong>${r.atualizados}</strong> produto(s) atualizado(s)<br>
+          • <strong>${r.marcasCriadas}</strong> marca(s) criada(s) automaticamente<br>
+          • <strong>${r.ignorados}</strong> ignorado(s)<br>
+          ${r.erros && r.erros.length > 0 ? `<div style="margin-top:8px;color:#991b1b;"><strong>Erros:</strong><br>${r.erros.slice(0, 5).map(e => `Linha ${e.linha}: ${escapeHtml(e.motivo)}`).join('<br>')}</div>` : ''}
+        </div>
+        <div style="margin-top:12px;">
+          <button type="button" onclick="location.reload()" style="padding:10px 16px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🔄 Recarregar Sistema</button>
+        </div>
+      `;
+      div.style.display = 'block';
+    } catch (err) {
+      document.getElementById('mg-progresso').style.display = 'none';
+      const div = document.getElementById('mg-resultado');
+      div.style.background = '#fef2f2';
+      div.style.border = '1px solid #dc2626';
+      div.innerHTML = `<strong style="color:#991b1b;">❌ Erro na importação</strong><div style="margin-top:6px;color:#991b1b;font-size:13px;">${escapeHtml(err.message)}</div>`;
+      div.style.display = 'block';
+      document.getElementById('mg-btn-confirmar').disabled = false;
+      document.getElementById('mg-btn-confirmar').style.opacity = '1';
+      document.getElementById('mg-btn-voltar-preview').disabled = false;
+    }
   }
 
   // ====== MARCAS ======
