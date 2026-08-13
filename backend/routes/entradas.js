@@ -164,6 +164,17 @@ router.post('/', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  // Só admin ou quem criou a entrada pode excluir
+  if (req.user.papel !== 'admin') {
+    const rDono = await db.query(
+      'SELECT criado_por FROM entradas WHERE id=$1 AND empresa_id=$2',
+      [req.params.id, req.user.empresaId]
+    );
+    if (rDono.rows.length === 0) return res.status(404).json({ error: 'Entrada não encontrada.' });
+    if (rDono.rows[0].criado_por && rDono.rows[0].criado_por !== req.user.userId) {
+      return res.status(403).json({ error: 'Apenas administradores podem excluir entradas de outros usuários.' });
+    }
+  }
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');

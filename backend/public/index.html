@@ -7655,7 +7655,8 @@ https://sistema.glinformatica.com.br
           <td><strong>${formatarBRL(total)}</strong></td>
           <td>${escapeHtml(pagamentoLabel)}</td>
           <td>
-            <button class="btn-link" onclick="visualizarEntrada(${e.id})">👁️ Ver</button>
+            <button class="btn-link" onclick="editarEntrada(${e.id})">✏️ Editar</button>
+            | <button class="btn-link" onclick="imprimirEntrada(${e.id})">🖨️ Imprimir</button>
             ${isAdmin ? ` | <button class="btn-link danger" onclick="excluirEntrada(${e.id})">🗑️ Excluir</button>` : ''}
           </td>
         </tr>
@@ -10196,6 +10197,39 @@ https://sistema.glinformatica.com.br
   document.getElementById('modal-conta-manual').addEventListener('click', function(e){
     if(e.target === this) closeContaManual();
   });
+
+  // ====== EXCLUIR ENTRADA ======
+  async function excluirEntrada(id) {
+    const e = dbEntradas.find(x => x.id === id);
+    if (!e) { alert('Entrada não encontrada.'); return; }
+
+    if (window._papelAtual !== 'admin') {
+      alert('Apenas administradores podem excluir entradas.');
+      return;
+    }
+
+    const totalEntrada = e.tipo === 'com-nf' ? e.totalNf : e.totalGeral;
+    let msg = `Excluir esta entrada?\n\n`;
+    msg += `Fornecedor: ${e.fornecedor}\n`;
+    msg += `Data: ${formatarDataBR(e.data)}\n`;
+    msg += `Valor: ${formatarBRL(totalEntrada)}\n`;
+    msg += `Itens: ${(e.itens || []).length}\n\n`;
+    msg += `⚠️ Isso vai:\n`;
+    msg += `• Estornar o estoque adicionado (${(e.itens || []).length} produto(s))\n`;
+    msg += `• Remover conta a pagar vinculada (se ainda pendente)\n`;
+    msg += `• Registrar auditoria da exclusão\n\n`;
+    msg += `Esta ação NÃO pode ser desfeita.`;
+
+    if (!confirm(msg)) return;
+
+    try {
+      await api('DELETE', `/api/entradas/${id}`);
+      alert('✅ Entrada excluída com sucesso!\n\nEstoque estornado e conta a pagar removida (se aplicável).');
+      await atualizarTela();
+    } catch (err) {
+      alert('❌ Erro ao excluir: ' + (err.message || 'Erro desconhecido'));
+    }
+  }
 
   // ====== EDITAR ENTRADA EXISTENTE ======
   function editarEntrada(id) {
