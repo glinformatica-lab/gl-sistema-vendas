@@ -578,6 +578,7 @@
       <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('entrada-mercadorias')">&#128229; Entrada de Mercadorias</button>
       <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('ordens-compra')">&#128203; Ordens de Compra <span id="badge-ordens-compra" style="display:none;background:#0891b2;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
     <!-- Vendas Online (admin-only) -->
@@ -883,6 +884,46 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
+    </div>
+
+    <!-- Ordens de Compra (Módulo Iluminação - grupo Estoque) -->
+    <div id="page-ordens-compra" style="display:none;">
+      <div class="page-title">📋 Ordens de Compra</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Agrupe itens da Lista de Compras em ordens por fornecedor. Envie a ordem em PDF e acompanhe até o recebimento.</div>
+
+      <!-- Botão + filtros -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" type="button" onclick="abrirNovaOrdemCompra()" style="background:#0891b2;color:#fff;font-weight:700;">
+          ➕ Nova Ordem de Compra
+        </button>
+        <input type="text" id="oc-busca" oninput="renderOrdensCompra()" placeholder="🔎 Buscar por nº ou fornecedor"
+               style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+        <button type="button" id="oc-filtro-rascunho" onclick="filtrarOrdensCompra('rascunho')" style="padding:8px 14px;border:2px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;">📝 Rascunhos</button>
+        <button type="button" id="oc-filtro-enviada" onclick="filtrarOrdensCompra('enviada')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">📤 Enviadas</button>
+        <button type="button" id="oc-filtro-concluida" onclick="filtrarOrdensCompra('concluida')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">✅ Concluídas</button>
+        <button type="button" id="oc-filtro-cancelada" onclick="filtrarOrdensCompra('cancelada')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">❌ Canceladas</button>
+      </div>
+
+      <!-- Tabela -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;width:80px;">Nº</th>
+              <th style="padding:10px;text-align:left;">Fornecedor</th>
+              <th style="padding:10px;text-align:center;width:80px;">Itens</th>
+              <th style="padding:10px;text-align:right;width:120px;">Estimado</th>
+              <th style="padding:10px;text-align:left;width:120px;">Criada em</th>
+              <th style="padding:10px;text-align:left;width:120px;">Criada por</th>
+              <th style="padding:10px;text-align:center;width:110px;">Status</th>
+              <th style="padding:10px;text-align:center;width:190px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ordens-compra">
+            <tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Entrada de Mercadorias (Módulo Iluminação - grupo Estoque) -->
@@ -2326,6 +2367,69 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Nova Ordem de Compra -->
+  <div id="modal-nova-oc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:#0891b2;margin:0;font-size:22px;">📋 Nova Ordem de Compra</h2>
+          <div style="font-size:13px;color:#64748b;margin-top:4px;">Selecione os itens pendentes que farão parte desta ordem.</div>
+        </div>
+        <button onclick="fecharNovaOc()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Fornecedor (sugerido) -->
+      <div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#1e40af;display:block;margin-bottom:6px;">🏢 Fornecedor (opcional)</label>
+        <select id="noc-fornecedor" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <option value="">— Sem fornecedor definido (definir depois) —</option>
+        </select>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;">💡 Selecionar o fornecedor ajuda a organizar, mas é opcional.</div>
+      </div>
+
+      <!-- Observações -->
+      <div style="margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">📝 Observações (opcional)</label>
+        <textarea id="noc-obs" rows="2" placeholder="Ex: entrega até dia 25, pedido prioritário..."
+                  style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+      </div>
+
+      <!-- Cabeçalho da lista -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="color:#334155;font-size:14px;">🛒 Itens pendentes na Lista de Compras</strong>
+        <span id="noc-selecionados" style="font-size:12px;color:#0891b2;font-weight:700;">0 selecionados</span>
+      </div>
+
+      <!-- Lista de itens pendentes -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;max-height:400px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;position:sticky;top:0;">
+            <tr>
+              <th style="padding:10px;text-align:center;width:40px;"><input type="checkbox" id="noc-check-todos" onclick="nocToggleTodos(this.checked)" style="cursor:pointer;transform:scale(1.2);"></th>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:center;width:70px;">Qtd</th>
+              <th style="padding:10px;text-align:left;width:150px;">Orçamento</th>
+              <th style="padding:10px;text-align:left;width:150px;">Cliente</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-noc-itens">
+            <tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Preview de agrupamento -->
+      <div id="noc-preview" style="display:none;margin-top:14px;background:#dcfce7;border:1px solid #16a34a;padding:12px;border-radius:8px;font-size:13px;color:#166534;"></div>
+
+      <div id="noc-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <button type="button" onclick="fecharNovaOc()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="confirmarNovaOc()" style="flex:2;padding:12px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">📋 Gerar Ordem de Compra</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Separação de Pedido (detalhe/checklist) -->
   <div id="modal-separacao-detalhe" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:820px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -5883,6 +5987,7 @@ https://sistema.glinformatica.com.br
     'lista-compras': 'estoque',
     'separacao': 'estoque',
     'entrada-mercadorias': 'estoque',
+    'ordens-compra': 'estoque',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -6015,7 +6120,8 @@ https://sistema.glinformatica.com.br
   // VENDEDOR: vende, orçamentos, clientes, ambientes
   const _paginasEstoque = [
     'dashboard', 'produtos', 'servicos', 'fornecedores', 'transportadoras',
-    'orcamentos', 'lista-compras', 'separacao', 'entrada-mercadorias', 'ambientes', 'minha-conta'
+    'orcamentos', 'lista-compras', 'separacao', 'entrada-mercadorias', 'ordens-compra',
+    'ambientes', 'minha-conta'
   ];
   const _paginasVendedor = [
     'dashboard', 'vendas', 'orcamentos', 'clientes', 'ambientes', 'minha-conta'
@@ -6125,6 +6231,20 @@ https://sistema.glinformatica.com.br
         return;
       }
       carregarEntradaMercadorias();
+    }
+    if(pg === 'ordens-compra') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      if (!['admin', 'estoque'].includes(window._papelAtual)) {
+        alert('Acesso restrito: apenas admin ou estoque pode acessar Ordens de Compra.');
+        showPage('dashboard');
+        return;
+      }
+      carregarOrdensCompra();
     }
     // Bloqueia páginas pra vendedor
     if (window._papelAtual === 'vendedor' && !podeAcessarPagina(pg)) {
@@ -12006,7 +12126,380 @@ ${conteudo}
     });
   }
 
-  // ====== SEPARAÇÃO DE PEDIDOS (Módulo Iluminação) ======
+  // ====== ORDENS DE COMPRA ======
+  let _ordensCompraCache = [];
+  let _ocFiltro = 'rascunho';
+  let _nocItensPendentes = [];
+
+  async function carregarOrdensCompra() {
+    try {
+      _ordensCompraCache = await api('GET', '/api/ordens-compra') || [];
+      atualizarBadgeOrdensCompra();
+      renderOrdensCompra();
+    } catch (e) {
+      console.error('[ordens-compra]', e);
+      const tbody = document.getElementById('tbody-ordens-compra');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function atualizarBadgeOrdensCompra() {
+    const badge = document.getElementById('badge-ordens-compra');
+    if (!badge) return;
+    const papel = window._papelAtual;
+    if (!['admin', 'estoque'].includes(papel)) {
+      badge.style.display = 'none';
+      return;
+    }
+    // Badge mostra rascunhos (que precisam ser enviados)
+    const rascunhos = _ordensCompraCache.filter(o => o.status === 'rascunho').length;
+    if (rascunhos > 0) {
+      badge.textContent = rascunhos;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+    // Também atualiza o grupo Estoque
+    if (typeof atualizarBadgeGrupoEstoque === 'function') atualizarBadgeGrupoEstoque();
+  }
+
+  function filtrarOrdensCompra(status) {
+    _ocFiltro = status;
+    const cores = {
+      'rascunho':  { br: '#fbbf24', bg: '#fef3c7', tx: '#92400e' },
+      'enviada':   { br: '#3b82f6', bg: '#dbeafe', tx: '#1e40af' },
+      'concluida': { br: '#16a34a', bg: '#dcfce7', tx: '#166534' },
+      'cancelada': { br: '#94a3b8', bg: '#f1f5f9', tx: '#475569' }
+    };
+    ['rascunho', 'enviada', 'concluida', 'cancelada'].forEach(s => {
+      const btn = document.getElementById('oc-filtro-' + s);
+      if (!btn) return;
+      if (s === status) {
+        const c = cores[s];
+        btn.style.cssText = `padding:8px 14px;border:2px solid ${c.br};background:${c.bg};color:${c.tx};border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;`;
+      } else {
+        btn.style.cssText = 'padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+      }
+    });
+    renderOrdensCompra();
+  }
+
+  function renderOrdensCompra() {
+    const tbody = document.getElementById('tbody-ordens-compra');
+    if (!tbody) return;
+    const termo = (document.getElementById('oc-busca')?.value || '').toLowerCase().trim();
+
+    let filtrados = _ordensCompraCache.filter(o => o.status === _ocFiltro);
+    if (termo) {
+      filtrados = filtrados.filter(o =>
+        String(o.numero).includes(termo) ||
+        (o.fornecedor_nome || o.fornecedor_nome_atual || '').toLowerCase().includes(termo)
+      );
+    }
+
+    if (filtrados.length === 0) {
+      const msg = _ocFiltro === 'rascunho'
+        ? '📭 Nenhum rascunho. Clique em "Nova Ordem de Compra" pra criar.'
+        : `Nenhuma ordem "${_ocFiltro}" encontrada.`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
+      return;
+    }
+
+    const statusBadges = {
+      rascunho:  '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📝 Rascunho</span>',
+      enviada:   '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📤 Enviada</span>',
+      concluida: '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✅ Concluída</span>',
+      cancelada: '<span style="background:#f1f5f9;color:#475569;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">❌ Cancelada</span>'
+    };
+
+    tbody.innerHTML = filtrados.map(o => {
+      const fornecedor = o.fornecedor_nome_atual || o.fornecedor_nome || '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
+      let acoes = `<button onclick="visualizarOrdemCompra(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes">👁️</button>`;
+
+      if (o.status === 'rascunho') {
+        acoes += `<button onclick="marcarOcEnviada(${o.id})" style="background:#16a34a;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Marcar como enviada">📤 Enviei</button>`;
+        acoes += `<button onclick="excluirOc(${o.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;" title="Excluir">🗑️</button>`;
+      } else if (o.status === 'enviada') {
+        acoes += `<button onclick="cancelarOc(${o.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;" title="Cancelar ordem">❌</button>`;
+      }
+
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px;"><strong>#${String(o.numero).padStart(3, '0')}</strong></td>
+          <td style="padding:10px;">${escapeHtml(fornecedor)}</td>
+          <td style="padding:10px;text-align:center;"><span style="background:#f3f4f6;color:#475569;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${o.total_itens || 0}</span></td>
+          <td style="padding:10px;text-align:right;font-weight:700;color:#0891b2;">${formatarBRL(o.valor_estimado)}</td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : '—'}</td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(o.criado_por_nome || '—')}</td>
+          <td style="padding:10px;text-align:center;">${statusBadges[o.status] || o.status}</td>
+          <td style="padding:10px;text-align:center;">${acoes}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ===== NOVA ORDEM =====
+  async function abrirNovaOrdemCompra() {
+    try {
+      // Carrega itens pendentes da lista_compras (sem ordem vinculada)
+      const todos = await api('GET', '/api/lista-compras');
+      _nocItensPendentes = (todos || []).filter(x => x.status === 'pendente' && !x.ordemCompraId);
+
+      if (_nocItensPendentes.length === 0) {
+        alert('📭 Nenhum item pendente na Lista de Compras.\n\nAdicione itens à Lista de Compras antes de gerar uma ordem.');
+        return;
+      }
+
+      // Popula select de fornecedores
+      const fornecedores = await api('GET', '/api/fornecedores');
+      const sel = document.getElementById('noc-fornecedor');
+      sel.innerHTML = '<option value="">— Sem fornecedor definido (definir depois) —</option>' +
+        (fornecedores || []).map(f => `<option value="${f.id}">${escapeHtml(f.nome)}</option>`).join('');
+
+      document.getElementById('noc-obs').value = '';
+      document.getElementById('noc-erro').style.display = 'none';
+      document.getElementById('noc-preview').style.display = 'none';
+      document.getElementById('noc-check-todos').checked = false;
+      renderNocItens();
+      document.getElementById('modal-nova-oc').style.display = 'flex';
+    } catch (e) {
+      alert('Erro ao abrir: ' + e.message);
+    }
+  }
+
+  function renderNocItens() {
+    const tbody = document.getElementById('tbody-noc-itens');
+    if (!tbody) return;
+    if (_nocItensPendentes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum item pendente.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = _nocItensPendentes.map(item => `
+      <tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:10px;text-align:center;"><input type="checkbox" class="noc-check-item" data-id="${item.id}" onclick="nocAtualizarSelecao()" style="cursor:pointer;transform:scale(1.2);"></td>
+        <td style="padding:10px;">
+          <div style="font-weight:600;">${escapeHtml(item.produtoNome)}</div>
+          ${item.referencia ? `<div style="font-size:11px;color:#7c3aed;">Ref: ${escapeHtml(item.referencia)}</div>` : ''}
+        </td>
+        <td style="padding:10px;text-align:center;font-weight:700;">${item.quantidade}</td>
+        <td style="padding:10px;font-size:12px;">${item.orcamentoNumero ? '#' + item.orcamentoNumero : '<em style="color:#94a3b8;">Avulso</em>'}</td>
+        <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(item.clienteNome || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function nocToggleTodos(marcar) {
+    document.querySelectorAll('.noc-check-item').forEach(chk => chk.checked = marcar);
+    nocAtualizarSelecao();
+  }
+
+  function nocAtualizarSelecao() {
+    const marcados = document.querySelectorAll('.noc-check-item:checked');
+    document.getElementById('noc-selecionados').textContent = `${marcados.length} ${marcados.length === 1 ? 'selecionado' : 'selecionados'}`;
+
+    // Atualiza check "todos"
+    const todos = document.querySelectorAll('.noc-check-item');
+    const chkTodos = document.getElementById('noc-check-todos');
+    if (chkTodos) chkTodos.checked = (marcados.length === todos.length && todos.length > 0);
+
+    // Preview de agrupamento
+    const preview = document.getElementById('noc-preview');
+    if (marcados.length === 0) {
+      preview.style.display = 'none';
+      return;
+    }
+    const ids = [...marcados].map(chk => parseInt(chk.dataset.id));
+    const selecionados = _nocItensPendentes.filter(x => ids.includes(x.id));
+    // Agrupa por produto
+    const grupos = new Map();
+    selecionados.forEach(it => {
+      const chave = it.produtoNome.toLowerCase();
+      if (!grupos.has(chave)) grupos.set(chave, { nome: it.produtoNome, qtd: 0, fontes: 0 });
+      const g = grupos.get(chave);
+      g.qtd += Number(it.quantidade);
+      g.fontes += 1;
+    });
+    let html = `<strong>📦 Preview da ordem:</strong> ${grupos.size} produto${grupos.size === 1 ? '' : 's'} agrupado${grupos.size === 1 ? '' : 's'} de ${selecionados.length} item${selecionados.length === 1 ? '' : 's'} da lista<br>`;
+    html += '<div style="margin-top:6px;font-size:12px;">';
+    [...grupos.values()].slice(0, 5).forEach(g => {
+      html += `• <strong>${escapeHtml(g.nome)}</strong>: ${g.qtd} un${g.fontes > 1 ? ` <em style="color:#0891b2;">(agrupado de ${g.fontes} pedidos)</em>` : ''}<br>`;
+    });
+    if (grupos.size > 5) html += `<em style="color:#64748b;">... e mais ${grupos.size - 5} produto(s)</em>`;
+    html += '</div>';
+    preview.innerHTML = html;
+    preview.style.display = 'block';
+  }
+
+  function fecharNovaOc() {
+    document.getElementById('modal-nova-oc').style.display = 'none';
+    _nocItensPendentes = [];
+  }
+
+  async function confirmarNovaOc() {
+    const marcados = [...document.querySelectorAll('.noc-check-item:checked')];
+    if (marcados.length === 0) {
+      const erro = document.getElementById('noc-erro');
+      erro.textContent = 'Selecione ao menos um item.';
+      erro.style.display = 'block';
+      return;
+    }
+    const ids = marcados.map(chk => parseInt(chk.dataset.id));
+    const fornecedorId = document.getElementById('noc-fornecedor').value || null;
+    const observacao = document.getElementById('noc-obs').value.trim() || null;
+
+    try {
+      const r = await api('POST', '/api/ordens-compra', {
+        listaComprasIds: ids,
+        fornecedorId: fornecedorId ? parseInt(fornecedorId) : null,
+        observacao
+      });
+      fecharNovaOc();
+      alert(`✅ Ordem de Compra #${String(r.ordem.numero).padStart(3, '0')} criada!\n\n` +
+            `📦 ${r.itensAgrupados} produto(s) agrupado(s) de ${r.itensOrigem} item(ns) da lista.\n\n` +
+            `📤 Marque como "Enviada" após enviar ao fornecedor.`);
+      await carregarOrdensCompra();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      const erro = document.getElementById('noc-erro');
+      erro.textContent = e.message || 'Erro ao criar ordem.';
+      erro.style.display = 'block';
+    }
+  }
+
+  // ===== AÇÕES DA ORDEM =====
+  async function marcarOcEnviada(id) {
+    if (!confirm('Marcar esta Ordem de Compra como ENVIADA?\n\n📤 Os itens vinculados na Lista de Compras vão automaticamente pra status "pedido".')) return;
+    try {
+      const r = await api('POST', `/api/ordens-compra/${id}/enviada`);
+      alert(`✅ Ordem enviada!\n\n${r.itensPedidos} item(ns) marcado(s) como "pedido" na Lista de Compras.`);
+      await carregarOrdensCompra();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function cancelarOc(id) {
+    if (!confirm('Cancelar esta Ordem de Compra?\n\n⚠️ Os itens voltarão pra "pendente" na Lista de Compras (exceto os já recebidos).')) return;
+    try {
+      await api('POST', `/api/ordens-compra/${id}/cancelar`);
+      alert('✅ Ordem cancelada. Itens voltaram pra pendente na Lista de Compras.');
+      await carregarOrdensCompra();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function excluirOc(id) {
+    if (!confirm('Excluir esta Ordem de Compra?\n\n⚠️ Só é possível excluir rascunhos. Os itens serão liberados na Lista de Compras.')) return;
+    try {
+      await api('DELETE', `/api/ordens-compra/${id}`);
+      alert('✅ Ordem excluída. Itens liberados na Lista de Compras.');
+      await carregarOrdensCompra();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function visualizarOrdemCompra(id) {
+    try {
+      const r = await api('GET', `/api/ordens-compra/${id}`);
+      // Abre janela de impressão simples
+      const w = window.open('', '_blank');
+      const o = r.ordem;
+      const itens = r.itens || [];
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+
+      const html = `
+        <!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>Ordem de Compra #${String(o.numero).padStart(3, '0')}</title>
+        <style>
+          body { font-family: sans-serif; padding: 30px; color: #333; max-width: 800px; margin: 0 auto; }
+          h1 { color: #0891b2; margin: 0 0 6px; }
+          .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0891b2; padding-bottom:16px; margin-bottom:20px; }
+          .header .empresa { text-align:right; font-size:12px; color:#666; }
+          .bloco { background:#f8fafc; padding:14px; border-radius:8px; margin-bottom:14px; font-size:13px; }
+          table { width:100%; border-collapse:collapse; margin-top:20px; }
+          th, td { border:1px solid #cbd5e1; padding:10px; text-align:left; font-size:13px; }
+          th { background:#e0f2fe; color:#0e7490; }
+          .total { background:#fef3c7; font-weight:700; }
+          .footer { margin-top:30px; padding-top:14px; border-top:1px solid #e2e8f0; font-size:11px; color:#666; text-align:center; }
+          @media print { .no-print { display:none; } }
+        </style>
+        </head><body>
+          <div class="header">
+            <div>
+              <h1>📋 ORDEM DE COMPRA</h1>
+              <div style="font-size:22px;color:#0891b2;font-weight:700;">Nº ${String(o.numero).padStart(3, '0')}</div>
+              <div style="font-size:12px;color:#666;margin-top:4px;">Data: ${new Date(o.data_criacao).toLocaleDateString('pt-BR')}</div>
+            </div>
+            <div class="empresa">
+              <strong>${escapeHtml(empresa.nome || '')}</strong><br>
+              ${empresa.cnpj || ''}<br>
+              ${empresa.endereco || ''}<br>
+              ${empresa.telefone || ''}
+            </div>
+          </div>
+
+          <div class="bloco">
+            <strong>🏢 Fornecedor:</strong> ${escapeHtml(o.fornecedor_nome_atual || o.fornecedor_nome || '— Não definido —')}
+            ${o.fornecedor_cnpj ? `<br><strong>CNPJ:</strong> ${escapeHtml(o.fornecedor_cnpj)}` : ''}
+            ${o.fornecedor_email ? `<br><strong>E-mail:</strong> ${escapeHtml(o.fornecedor_email)}` : ''}
+            ${o.fornecedor_telefone ? `<br><strong>Telefone:</strong> ${escapeHtml(o.fornecedor_telefone)}` : ''}
+            ${o.fornecedor_endereco ? `<br><strong>Endereço:</strong> ${escapeHtml(o.fornecedor_endereco)}${o.fornecedor_cidade ? ', ' + escapeHtml(o.fornecedor_cidade) : ''}${o.fornecedor_uf ? '/' + escapeHtml(o.fornecedor_uf) : ''}` : ''}
+          </div>
+
+          ${o.observacao ? `<div class="bloco"><strong>📝 Observações:</strong><br>${escapeHtml(o.observacao)}</div>` : ''}
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:60px;">Item</th>
+                <th>Produto</th>
+                <th style="width:100px;">Código/Ref</th>
+                <th style="width:80px;text-align:center;">Qtd</th>
+                <th style="width:110px;text-align:right;">Preço Unit.</th>
+                <th style="width:110px;text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itens.map((it, i) => {
+                const total = Number(it.quantidade) * Number(it.preco_unitario);
+                return `
+                  <tr>
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td><strong>${escapeHtml(it.produto_nome)}</strong></td>
+                    <td style="font-size:11px;color:#666;">${escapeHtml(it.produto_codigo || '—')}${it.referencia ? '<br>Ref: ' + escapeHtml(it.referencia) : ''}</td>
+                    <td style="text-align:center;font-weight:700;">${it.quantidade}</td>
+                    <td style="text-align:right;">${formatarBRL(it.preco_unitario)}</td>
+                    <td style="text-align:right;font-weight:700;">${formatarBRL(total)}</td>
+                  </tr>
+                `;
+              }).join('')}
+              <tr class="total">
+                <td colspan="5" style="text-align:right;">VALOR TOTAL ESTIMADO:</td>
+                <td style="text-align:right;">${formatarBRL(o.valor_estimado)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Ordem gerada em ${new Date(o.data_criacao).toLocaleString('pt-BR')} · por ${escapeHtml(o.criado_por_nome || '—')} · Status: ${o.status.toUpperCase()}
+          </div>
+
+          <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:12px 24px;background:#0891b2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px;">🖨️ Imprimir / Salvar PDF</button>
+        </body></html>
+      `;
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      alert('Erro ao visualizar: ' + e.message);
+    }
+  }
+
+
   let _separacaoCache = [];
   let _sepFiltro = 'aprovado_financeiro';
   let _sepDetalheOrc = null;
@@ -15578,6 +16071,10 @@ ${conteudo}
     // Atualiza badge de separação (só se admin ou estoque)
     if (ativo && ['admin', 'estoque'].includes(window._papelAtual) && typeof carregarResumoSeparacao === 'function') {
       carregarResumoSeparacao();
+    }
+    // Atualiza badge de ordens de compra (só admin/estoque)
+    if (ativo && ['admin', 'estoque'].includes(window._papelAtual) && typeof carregarOrdensCompra === 'function') {
+      carregarOrdensCompra();
     }
   }
 
