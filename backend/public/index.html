@@ -555,6 +555,7 @@
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('clientes')">&#128100; Clientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
+      <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('marcas')" style="display:none;">&#127991;&#65039; Marcas</button>
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('transportadoras')" style="display:none;">&#128666; Transportadoras</button>
     </div>
 
@@ -999,6 +1000,37 @@
           <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">Carregando...</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Marcas -->
+    <div id="page-marcas" style="display:none;">
+      <div class="page-title">🏷️ Marcas</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Cadastre marcas (fabricantes) para vincular aos seus produtos. Diferente de fornecedor: Marca é quem <strong>fabrica</strong> (Osram, Philips, Golden); Fornecedor é quem <strong>vende</strong> pra você.</div>
+
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn" type="button" onclick="abrirNovaMarca()" style="background:#4338ca;color:#fff;font-weight:700;">
+          ➕ Nova Marca
+        </button>
+        <input type="text" id="marca-busca" oninput="renderMarcas()" placeholder="🔎 Buscar marca..."
+               style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+        <span id="contador-marcas" style="color:#64748b;font-size:13px;"></span>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Marca</th>
+              <th style="padding:10px;text-align:center;width:110px;">Produtos</th>
+              <th style="padding:10px;text-align:left;">Observação</th>
+              <th style="padding:10px;text-align:center;width:160px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-marcas">
+            <tr><td colspan="4" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Transportadoras (Módulo Iluminação) -->
@@ -2367,6 +2399,37 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Nova/Editar Marca -->
+  <div id="modal-marca" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:480px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 id="titulo-modal-marca" style="color:#4338ca;margin:0;font-size:20px;">🏷️ Nova Marca</h2>
+        <button onclick="fecharModalMarca()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <input type="hidden" id="marca-id">
+
+      <div class="form-field" style="margin-bottom:14px;">
+        <label style="font-weight:600;color:#334155;font-size:13px;">Nome da Marca *</label>
+        <input type="text" id="marca-nome" placeholder="Ex: Osram, Philips, Golden Iluminação" required maxlength="120"
+               style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-top:4px;">
+      </div>
+
+      <div class="form-field" style="margin-bottom:14px;">
+        <label style="font-weight:600;color:#334155;font-size:13px;">Observação</label>
+        <textarea id="marca-observacao" rows="3" placeholder="Ex: representante oficial, contatos, informações extras..."
+                  style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;margin-top:4px;resize:vertical;"></textarea>
+      </div>
+
+      <div id="marca-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-bottom:10px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="fecharModalMarca()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="salvarMarca()" style="flex:2;padding:12px;background:#4338ca;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💾 Salvar Marca</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Recuperar Rascunho -->
   <div id="modal-recuperar-rascunho" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10015;justify-content:center;align-items:center;padding:20px;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:480px;width:100%;">
@@ -4160,6 +4223,16 @@
             <input type="text" id="npr-fornecedor" list="lista-fornecedores" required>
             <button type="button" class="btn-mais" title="Cadastrar novo fornecedor" onclick="openNovoFornecedorRapido('produto')">+</button>
           </div>
+        </div>
+        <div class="form-field feature-ambientes" style="margin-top:14px;margin-bottom:0;display:none;">
+          <label>Marca <span style="color:#94a3b8;font-weight:normal;font-size:11px;">(fabricante · opcional)</span></label>
+          <div class="field-com-botao">
+            <select id="npr-marca-id" onchange="onMarcaProdutoChange()" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+              <option value="">— Sem marca definida —</option>
+            </select>
+            <button type="button" class="btn-mais" title="Cadastrar nova marca" onclick="openNovaMarcaRapida()">+</button>
+          </div>
+          <input type="hidden" id="npr-marca">
         </div>
       </div>
 
@@ -6410,6 +6483,7 @@ https://sistema.glinformatica.com.br
     'ambientes': 'cadastros',
     'clientes': 'cadastros',
     'fornecedores': 'cadastros',
+    'marcas': 'cadastros',
     'transportadoras': 'cadastros',
     'vendas': 'vendas',
     'orcamentos': 'vendas',
@@ -6549,7 +6623,7 @@ https://sistema.glinformatica.com.br
   // ESTOQUE: cadastros + estoque + ver orçamentos (não vende, não vê financeiro)
   // VENDEDOR: vende, orçamentos, clientes, ambientes
   const _paginasEstoque = [
-    'dashboard', 'produtos', 'servicos', 'fornecedores', 'transportadoras',
+    'dashboard', 'produtos', 'servicos', 'fornecedores', 'marcas', 'transportadoras',
     'orcamentos', 'lista-compras', 'separacao', 'entrada-mercadorias', 'ordens-compra',
     'ambientes', 'minha-conta'
   ];
@@ -6703,6 +6777,15 @@ https://sistema.glinformatica.com.br
       }
       carregarTransportadoras();
     }
+    if(pg === 'marcas') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      carregarMarcas();
+    }
     if(pg === 'configuracoes') carregarConfigEmpresa();
     if(pg === 'configuracoes-fiscais') carregarConfigFiscais();
     if(pg === 'minha-conta') { carregarMinhaConta(); trocarAbaMc('geral'); }
@@ -6847,6 +6930,7 @@ https://sistema.glinformatica.com.br
     renderClientes();
     renderListaClientes();
     renderListaFornecedores();
+    renderListaMarcas();
     renderFornecedores();
     renderListaProdutos();
     renderVendas();
@@ -7351,6 +7435,40 @@ https://sistema.glinformatica.com.br
     const dl = document.getElementById('lista-fornecedores');
     dl.innerHTML = dbFornecedores.map(f => `<option value="${f.nome}">`).join('');
   }
+  function renderListaMarcas() {
+    const sel = document.getElementById('npr-marca-id');
+    if (!sel) return;
+    const valorAtual = sel.value;
+    sel.innerHTML = '<option value="">— Sem marca definida —</option>' +
+      (_marcasCache || []).map(m => `<option value="${m.id}">${escapeHtml(m.nome)}</option>`).join('');
+    if (valorAtual) sel.value = valorAtual;
+  }
+
+  function onMarcaProdutoChange() {
+    const sel = document.getElementById('npr-marca-id');
+    const hid = document.getElementById('npr-marca');
+    if (!sel || !hid) return;
+    if (!sel.value) {
+      hid.value = '';
+      return;
+    }
+    const m = _marcasCache.find(x => x.id === parseInt(sel.value));
+    hid.value = m ? m.nome : '';
+  }
+
+  // Cadastrar marca rápida direto do formulário de produto
+  async function openNovaMarcaRapida() {
+    // Guarda que veio de produto para reabrir depois
+    window._voltarProduto = true;
+    // Simula abrir do zero
+    document.getElementById('titulo-modal-marca').textContent = '🏷️ Nova Marca (rápido)';
+    document.getElementById('marca-id').value = '';
+    document.getElementById('marca-nome').value = '';
+    document.getElementById('marca-observacao').value = '';
+    document.getElementById('marca-erro').style.display = 'none';
+    document.getElementById('modal-marca').style.display = 'flex';
+    setTimeout(() => document.getElementById('marca-nome').focus(), 100);
+  }
   function renderListaProdutos() {
     const dl = document.getElementById('lista-produtos');
     // Inclui produtos cadastrados + serviços cadastrados (ambos podem ser vendidos)
@@ -7390,6 +7508,7 @@ https://sistema.glinformatica.com.br
         (p.nome && p.nome.toLowerCase().includes(termo)) ||
         (p.categoria && p.categoria.toLowerCase().includes(termo)) ||
         (p.fornecedor && p.fornecedor.toLowerCase().includes(termo)) ||
+        (p.marca && p.marca.toLowerCase().includes(termo)) ||
         (p.referencia && p.referencia.toLowerCase().includes(termo)) ||
         (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termo))
       ));
@@ -7414,10 +7533,13 @@ https://sistema.glinformatica.com.br
       const iconeFoto = p.fotoUrl
         ? `<span onclick="event.stopPropagation(); abrirFotoLightbox('${escapeAttr(p.fotoUrl)}', '${escapeAttr(p.nome)}')" style="cursor:pointer;margin-left:6px;color:#0891b2;" title="Ver foto">📷</span>`
         : '';
+      const badgeMarca = p.marca
+        ? `<span style="display:inline-block;margin-left:6px;background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;" title="Marca">${escapeHtml(p.marca)}</span>`
+        : '';
       return `
       <tr>
         <td>${p.codigo || '-'}</td>
-        <td>${escapeHtml(p.nome)}${iconeFoto}</td>
+        <td>${escapeHtml(p.nome)}${badgeMarca}${iconeFoto}</td>
         <td>${p.categoria || '-'}</td>
         <td>${p.fornecedor || '-'}</td>
         <td>${p.estoque || 0}</td>
@@ -7447,6 +7569,22 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-codigo').value     = p.codigo || '';
     document.getElementById('npr-categoria').value  = p.categoria || '';
     document.getElementById('npr-fornecedor').value = p.fornecedor || '';
+    // Marca: preenche o select pelo ID (se tiver) ou pelo nome (fallback)
+    renderListaMarcas(); // garante que options estão atualizados
+    const selMarca = document.getElementById('npr-marca-id');
+    const hidMarca = document.getElementById('npr-marca');
+    if (selMarca) {
+      if (p.marcaId) {
+        selMarca.value = p.marcaId;
+      } else if (p.marca) {
+        // Tenta achar pela nome (marca só como texto, sem ID)
+        const m = _marcasCache.find(x => x.nome === p.marca);
+        selMarca.value = m ? m.id : '';
+      } else {
+        selMarca.value = '';
+      }
+      if (hidMarca) hidMarca.value = p.marca || '';
+    }
     document.getElementById('npr-preco-custo').value = (p.precoCusto || 0).toFixed(2);
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
@@ -8472,6 +8610,18 @@ https://sistema.glinformatica.com.br
   function openNovoProdutoRapido(origem) {
     _origemNovoProduto = origem || 'snf';
     document.getElementById('modal-novo-produto-rapido').style.display = 'flex';
+    // Carrega marcas em background só se módulo iluminação ativo
+    const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_emp.usaAmbientes) {
+      if (!_marcasCache || _marcasCache.length === 0) {
+        api('GET', '/api/marcas').then(m => {
+          _marcasCache = m || [];
+          renderListaMarcas();
+        }).catch(() => {});
+      } else {
+        renderListaMarcas();
+      }
+    }
   }
   function closeNovoProdutoRapido() {
     document.getElementById('modal-novo-produto-rapido').style.display = 'none';
@@ -8491,10 +8641,13 @@ https://sistema.glinformatica.com.br
       if (el) el.value = '';
     });
     // Reset das descrições novas (recurso ambientes)
-    ['npr-descricao-impressao','npr-observacao-interna','npr-referencia','npr-codigo-barras'].forEach(id => {
+    ['npr-descricao-impressao','npr-observacao-interna','npr-referencia','npr-codigo-barras','npr-marca'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    // Reset select de marca
+    const selMarcaReset = document.getElementById('npr-marca-id');
+    if (selMarcaReset) selMarcaReset.value = '';
     // Colapsa a seção fiscal de volta
     const _sec = document.getElementById('npr-fiscal-content');
     const _arrow = document.getElementById('npr-fiscal-arrow');
@@ -8556,6 +8709,12 @@ https://sistema.glinformatica.com.br
       // Pega URL da foto (vazio se removeu ou não tem)
       const fotoUrl = document.getElementById('npr-foto-url')?.value.trim() || null;
 
+      // Marca (só empresas com Módulo Iluminação)
+      const camposMarca = empresa.usaAmbientes ? {
+        marca: document.getElementById('npr-marca')?.value.trim() || null,
+        marcaId: (document.getElementById('npr-marca-id')?.value ? parseInt(document.getElementById('npr-marca-id').value) : null)
+      } : {};
+
       // Descrições novas (só se recurso ambientes ativo)
       const camposAmbientes = empresa.usaAmbientes ? {
         descricaoImpressao: document.getElementById('npr-descricao-impressao')?.value.trim() || null,
@@ -8569,6 +8728,7 @@ https://sistema.glinformatica.com.br
         const atualizado = await api('PUT', `/api/produtos/${p.id}`, {
           nome, categoria, fornecedor, precoCusto, precoVenda,
           fotoUrl,
+          ...camposMarca,
           ...camposFiscais,
           ...camposAmbientes
         });
@@ -8583,6 +8743,7 @@ https://sistema.glinformatica.com.br
       const novo = await api('POST', '/api/produtos', {
         codigo: codigoInput, nome, categoria, fornecedor, estoque, precoCusto, precoVenda,
         fotoUrl,
+        ...camposMarca,
         ...camposFiscais,
         ...camposAmbientes
       });
@@ -9737,6 +9898,7 @@ https://sistema.glinformatica.com.br
         (p.nome || '').toLowerCase().includes(t) ||
         (p.codigo || '').toLowerCase().includes(t) ||
         (p.codigoBarras || '').toLowerCase().includes(t) ||
+        (p.marca || '').toLowerCase().includes(t) ||
         (p.referencia || '').toLowerCase().includes(t)
       ).slice(0, 15);
       if (resultados.length === 0) {
@@ -12814,6 +12976,148 @@ ${conteudo}
     });
   }
 
+  // ====== MARCAS ======
+  let _marcasCache = [];
+
+  async function carregarMarcas() {
+    try {
+      _marcasCache = await api('GET', '/api/marcas') || [];
+      renderMarcas();
+      // Atualiza também o datalist se aberto em algum lugar
+      renderListaMarcas();
+    } catch (e) {
+      const tbody = document.getElementById('tbody-marcas');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function renderMarcas() {
+    const tbody = document.getElementById('tbody-marcas');
+    if (!tbody) return;
+    const termo = (document.getElementById('marca-busca')?.value || '').toLowerCase().trim();
+    let lista = _marcasCache;
+    if (termo) {
+      lista = _marcasCache.filter(m =>
+        m.nome.toLowerCase().includes(termo) ||
+        (m.observacao || '').toLowerCase().includes(termo)
+      );
+    }
+    const contador = document.getElementById('contador-marcas');
+    if (contador) {
+      contador.textContent = termo
+        ? `${lista.length} de ${_marcasCache.length} marca(s)`
+        : `${_marcasCache.length} marca(s)`;
+    }
+    if (_marcasCache.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:#94a3b8;">Nenhuma marca cadastrada ainda. Clique em "➕ Nova Marca" pra criar.</td></tr>';
+      return;
+    }
+    if (lista.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:#94a3b8;">Nenhuma marca encontrada para "${escapeHtml(termo)}".</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = lista.map(m => `
+      <tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:10px;"><strong style="color:#4338ca;">${escapeHtml(m.nome)}</strong></td>
+        <td style="padding:10px;text-align:center;">
+          ${m.totalProdutos > 0
+            ? `<span style="background:#eef2ff;color:#4338ca;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">${m.totalProdutos}</span>`
+            : '<span style="color:#94a3b8;font-size:12px;">—</span>'}
+        </td>
+        <td style="padding:10px;color:#64748b;font-size:12px;">${escapeHtml(m.observacao || '—')}</td>
+        <td style="padding:10px;text-align:center;">
+          <button class="btn-link" onclick="editarMarca(${m.id})">✏️ Editar</button>
+          | <button class="btn-link danger" onclick="excluirMarca(${m.id})">🗑️ Excluir</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function abrirNovaMarca() {
+    document.getElementById('titulo-modal-marca').textContent = '🏷️ Nova Marca';
+    document.getElementById('marca-id').value = '';
+    document.getElementById('marca-nome').value = '';
+    document.getElementById('marca-observacao').value = '';
+    document.getElementById('marca-erro').style.display = 'none';
+    document.getElementById('modal-marca').style.display = 'flex';
+    setTimeout(() => document.getElementById('marca-nome').focus(), 100);
+  }
+
+  function editarMarca(id) {
+    const m = _marcasCache.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('titulo-modal-marca').textContent = '✏️ Editar Marca';
+    document.getElementById('marca-id').value = m.id;
+    document.getElementById('marca-nome').value = m.nome;
+    document.getElementById('marca-observacao').value = m.observacao || '';
+    document.getElementById('marca-erro').style.display = 'none';
+    document.getElementById('modal-marca').style.display = 'flex';
+    setTimeout(() => document.getElementById('marca-nome').focus(), 100);
+  }
+
+  function fecharModalMarca() {
+    document.getElementById('modal-marca').style.display = 'none';
+  }
+
+  async function salvarMarca() {
+    const id = document.getElementById('marca-id').value;
+    const nome = document.getElementById('marca-nome').value.trim();
+    const observacao = document.getElementById('marca-observacao').value.trim() || null;
+    const erro = document.getElementById('marca-erro');
+    erro.style.display = 'none';
+
+    if (!nome) {
+      erro.textContent = 'Nome da marca é obrigatório.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    try {
+      let novaOuAtualizada;
+      if (id) {
+        novaOuAtualizada = await api('PUT', `/api/marcas/${id}`, { nome, observacao });
+      } else {
+        novaOuAtualizada = await api('POST', '/api/marcas', { nome, observacao });
+      }
+      fecharModalMarca();
+      await carregarMarcas();
+      // Recarrega produtos (o cache do nome pode ter mudado)
+      if (id) {
+        try { dbProdutos = await api('GET', '/api/produtos'); renderProdutos(); } catch(e) {}
+      }
+      // Se veio do formulário de produto, seleciona a nova marca automaticamente
+      if (window._voltarProduto && novaOuAtualizada && novaOuAtualizada.id) {
+        window._voltarProduto = false;
+        const sel = document.getElementById('npr-marca-id');
+        if (sel) {
+          sel.value = novaOuAtualizada.id;
+          onMarcaProdutoChange();
+        }
+      }
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao salvar marca.';
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirMarca(id) {
+    const m = _marcasCache.find(x => x.id === id);
+    if (!m) return;
+    let msg = `Excluir a marca "${m.nome}"?\n\n`;
+    if (m.totalProdutos > 0) {
+      msg += `⚠️ Esta marca está vinculada a ${m.totalProdutos} produto(s).\n`;
+      msg += `Os produtos MANTERÃO o nome da marca cadastrado (${m.nome}), mas ficarão sem vínculo.\n\n`;
+    }
+    msg += 'Esta ação não pode ser desfeita.';
+    if (!confirm(msg)) return;
+    try {
+      await api('DELETE', `/api/marcas/${id}`);
+      await carregarMarcas();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
   // ====== ORDENS DE COMPRA ======
   let _ordensCompraCache = [];
   let _ocFiltro = 'rascunho';
@@ -14304,6 +14608,7 @@ ${conteudo}
           (p.nome || '').toLowerCase().includes(termo) ||
           (p.codigo || '').toLowerCase().includes(termo) ||
           (p.codigoBarras || '').toLowerCase().includes(termo) ||
+          (p.marca || '').toLowerCase().includes(termo) ||
           (p.referencia || '').toLowerCase().includes(termo)
         )
       : _etiquetasProdutos;
@@ -14342,6 +14647,7 @@ ${conteudo}
           (p.nome || '').toLowerCase().includes(termo) ||
           (p.codigo || '').toLowerCase().includes(termo) ||
           (p.codigoBarras || '').toLowerCase().includes(termo) ||
+          (p.marca || '').toLowerCase().includes(termo) ||
           (p.referencia || '').toLowerCase().includes(termo)) {
         p.qtd = qtd;
       }

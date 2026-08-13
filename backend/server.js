@@ -25,6 +25,7 @@ app.use('/api/rascunhos',       autenticar, verificarAcesso, require('./routes/r
 app.use('/api/transportadoras', autenticar, verificarAcesso, require('./routes/transportadoras'));
 app.use('/api/clientes',        autenticar, verificarAcesso, require('./routes/clientes'));
 app.use('/api/fornecedores',    autenticar, verificarAcesso, require('./routes/fornecedores'));
+app.use('/api/marcas',          autenticar, verificarAcesso, require('./routes/marcas'));
 app.use('/api/vendas',          autenticar, verificarAcesso, require('./routes/vendas'));
 app.use('/api/entradas',        autenticar, verificarAcesso, require('./routes/entradas'));
 app.use('/api/contas-pagar',    autenticar, verificarAcesso, require('./routes/contas-pagar'));
