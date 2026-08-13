@@ -2468,6 +2468,10 @@
 
       <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#991b1b;">
         <strong>⚠️ Atenção:</strong> Esta ação é permanente e ficará registrada quem cancelou e qual admin autorizou.
+        <div style="margin-top:6px;font-size:12px;color:#7c2d12;">
+          • Itens <strong>pendentes</strong> serão removidos da Lista de Compras.<br>
+          • Itens já <strong>pedidos/recebidos</strong> serão mantidos (o produto vai pro estoque geral).
+        </div>
       </div>
 
       <div style="margin-bottom:14px;">
@@ -14633,6 +14637,13 @@ ${conteudo}
       if (r.itensRemovidosDaListaCompras > 0) {
         msg += `\n\n🛒 ${r.itensRemovidosDaListaCompras} item(ns) pendente(s) removido(s) da Lista de Compras.`;
       }
+      if (r.itensDesvinculadosDaListaCompras > 0) {
+        msg += `\n\n📦 ${r.itensDesvinculadosDaListaCompras} item(ns) já pedido/recebido MANTIDO(S) na Lista de Compras`;
+        msg += `\n(o produto virá pro estoque geral):`;
+        (r.itensPedidoRecebido || []).forEach(nome => {
+          msg += `\n  • ${nome}`;
+        });
+      }
       alert(msg);
       carregarOrcamentos();
       // Atualiza resumo lista compras (caso mudou)
@@ -14643,7 +14654,7 @@ ${conteudo}
     }
   }
   async function excluirOrc(id) {
-    if (!confirm('Excluir este orçamento? Esta ação não pode ser desfeita.\n\n⚠️ Se houver itens já pedidos/recebidos na Lista de Compras, a exclusão será bloqueada.')) return;
+    if (!confirm('Excluir este orçamento? Esta ação não pode ser desfeita.\n\n• Itens pendentes na Lista de Compras serão REMOVIDOS.\n• Itens já pedidos/recebidos serão MANTIDOS (produto vai pro estoque geral).')) return;
     try {
       await api('DELETE', '/api/orcamentos/' + id);
       carregarOrcamentos();

@@ -991,19 +991,17 @@ router.post('/:id/cancelar', async (req, res) => {
     }
 
     // 2. Verifica compras: se tem 'pedido' ou 'recebido', bloqueia
+    // 2. Conta itens em lista_compras por status (não bloqueia mais)
+    //    - 'pendente' → serão removidos
+    //    - 'pedido'/'recebido' → mantidos (produto virá pro estoque geral), só desvinculam do orçamento
     const rCompras = await client.query(
       `SELECT status, produto_nome
        FROM lista_compras
-       WHERE orcamento_id=$1 AND empresa_id=$2 AND status IN ('pedido', 'recebido')`,
+       WHERE orcamento_id=$1 AND empresa_id=$2`,
       [id, req.user.empresaId]
     );
-    if (rCompras.rows.length > 0) {
-      await client.query('ROLLBACK');
-      const detalhes = rCompras.rows.map(x => `${x.produto_nome} (${x.status})`).join(', ');
-      return res.status(400).json({
-        error: `Não é possível cancelar: existem itens já pedidos ou recebidos na Lista de Compras. Itens: ${detalhes}`
-      });
-    }
+    const itensPedidoRecebido = rCompras.rows.filter(x => ['pedido', 'recebido'].includes(x.status));
+    const itensPendentes = rCompras.rows.filter(x => x.status === 'pendente');
 
     // 3. Valida senha do admin
     // Vendedor: procura admin cuja senha bate. Admin: usa a própria senha.
@@ -1047,12 +1045,25 @@ router.post('/:id/cancelar', async (req, res) => {
     const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
     const canceladoPorNome = rUser.rows[0]?.nome || null;
 
-    // 5. Remove itens PENDENTES da lista_compras (limpeza)
+    // 5a. Remove itens PENDENTES da lista_compras (limpeza)
     const rRemovidos = await client.query(
       `DELETE FROM lista_compras
        WHERE orcamento_id=$1 AND empresa_id=$2 AND status='pendente'
        RETURNING produto_nome`,
       [id, req.user.empresaId]
+    );
+
+    // 5b. Desvincula itens JÁ PEDIDOS/RECEBIDOS (mantém na lista, mas não amarrado ao orçamento)
+    //     → produto virá pro estoque geral quando chegar
+    const rDesvinculados = await client.query(
+      `UPDATE lista_compras
+       SET orcamento_id = NULL,
+           observacao = COALESCE(observacao, '') ||
+             CASE WHEN COALESCE(observacao, '') = '' THEN '' ELSE ' | ' END ||
+             '[Orçamento #' || $3::text || ' cancelado em ' || TO_CHAR(NOW(), 'DD/MM/YYYY') || ']'
+       WHERE orcamento_id=$1 AND empresa_id=$2 AND status IN ('pedido','recebido')
+       RETURNING produto_nome, status`,
+      [id, req.user.empresaId, id]
     );
 
     // 6. Atualiza orçamento
@@ -1074,7 +1085,9 @@ router.post('/:id/cancelar', async (req, res) => {
       ok: true,
       canceladoPor: canceladoPorNome,
       autorizadoPor: adminAutorizador.nome,
-      itensRemovidosDaListaCompras: rRemovidos.rows.length
+      itensRemovidosDaListaCompras: rRemovidos.rows.length,
+      itensDesvinculadosDaListaCompras: rDesvinculados.rows.length,
+      itensPedidoRecebido: rDesvinculados.rows.map(x => `${x.produto_nome} (${x.status})`)
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -1216,18 +1229,16 @@ router.delete('/:id', async (req, res) => {
     const verif = await verificarDonoOrcamento(req, id);
     if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
 
-    // Bloqueia exclusão se há itens na lista_compras com status 'pedido' ou 'recebido'
-    const rCompras = await db.query(
-      `SELECT status, produto_nome FROM lista_compras
+    // Desvincula itens já PEDIDOS/RECEBIDOS (mantém na lista - compra segue normal)
+    await db.query(
+      `UPDATE lista_compras
+       SET orcamento_id = NULL,
+           observacao = COALESCE(observacao, '') ||
+             CASE WHEN COALESCE(observacao, '') = '' THEN '' ELSE ' | ' END ||
+             '[Orçamento #' || $1::text || ' excluído em ' || TO_CHAR(NOW(), 'DD/MM/YYYY') || ']'
        WHERE orcamento_id=$1 AND empresa_id=$2 AND status IN ('pedido','recebido')`,
       [id, req.user.empresaId]
     );
-    if (rCompras.rows.length > 0) {
-      const detalhes = rCompras.rows.map(x => `${x.produto_nome} (${x.status})`).join(', ');
-      return res.status(400).json({
-        error: `Não é possível excluir: existem itens já pedidos ou recebidos na Lista de Compras. Itens: ${detalhes}. Cancele o orçamento em vez de excluir.`
-      });
-    }
 
     // Remove itens pendentes da lista_compras
     await db.query(
