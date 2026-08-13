@@ -576,6 +576,7 @@
     </button>
     <div class="submenu feature-ambientes" id="submenu-estoque" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('entrada-mercadorias')">&#128229; Entrada de Mercadorias</button>
       <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
@@ -880,6 +881,81 @@
         </thead>
         <tbody id="tbody-entradas-fornecedores">
           <!-- renderizado dinamicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Entrada de Mercadorias (Módulo Iluminação - grupo Estoque) -->
+    <div id="page-entrada-mercadorias" style="display:none;">
+      <div class="page-title">📥 Entrada de Mercadorias</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Registre entradas de produtos: NF-e importada, entrada manual ou compra sem NF.</div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn" type="button" onclick="openEntradaMercadoria()" style="background:var(--verde);color:#fff;font-weight:700;">
+          ➕ Nova Entrada
+        </button>
+        <button class="btn" type="button" onclick="showPage('fornecedores')" style="background:#eceef2;color:var(--azul);">
+          💼 Ver Fornecedores
+        </button>
+      </div>
+
+      <!-- Cards resumo -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+        <div style="background:#dcfce7;border-radius:10px;padding:14px;border:1px solid #16a34a;">
+          <div style="font-size:11px;color:#166534;font-weight:700;">📥 ENTRADAS MÊS</div>
+          <div id="em-cnt-mes" style="font-size:26px;font-weight:800;color:#166534;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#166534;">entradas registradas</div>
+        </div>
+        <div style="background:#dbeafe;border-radius:10px;padding:14px;border:1px solid #3b82f6;">
+          <div style="font-size:11px;color:#1e40af;font-weight:700;">💰 VALOR MÊS</div>
+          <div id="em-val-mes" style="font-size:22px;font-weight:800;color:#1e40af;margin-top:2px;">R$ 0,00</div>
+          <div style="font-size:10px;color:#1e40af;">total investido</div>
+        </div>
+        <div style="background:#f3e8ff;border-radius:10px;padding:14px;border:1px solid #8b5cf6;">
+          <div style="font-size:11px;color:#6b21a8;font-weight:700;">📦 PRODUTOS</div>
+          <div id="em-cnt-produtos" style="font-size:26px;font-weight:800;color:#6b21a8;margin-top:2px;">0</div>
+          <div style="font-size:10px;color:#6b21a8;">itens diferentes no mês</div>
+        </div>
+      </div>
+
+      <!-- Filtros (mesmos do fornecedores, IDs distintos pra não conflitar) -->
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;background:#f6f8fc;padding:12px 16px;border-radius:10px;">
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
+          Mês
+          <input type="month" id="em-filtro-mes" onchange="sincronizarFiltrosEntradas()"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
+          Fornecedor
+          <select id="em-filtro-fornecedor" onchange="sincronizarFiltrosEntradas()"
+                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;min-width:200px;">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
+          Buscar (produto, código, NF, documento)
+          <input type="text" id="em-filtro-busca" oninput="sincronizarFiltrosEntradas()" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
+                 style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
+        </label>
+        <button class="btn" type="button" onclick="limparFiltrosEntradasEstoque()"
+                style="background:#eceef2;color:var(--azul);font-size:13px;padding:8px 14px;align-self:flex-end;">Limpar</button>
+        <span id="em-contador" style="color:#668;font-size:13px;align-self:flex-end;margin-left:auto;"></span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Fornecedor</th>
+            <th>Tipo</th>
+            <th>Documento</th>
+            <th>Total</th>
+            <th>Pagamento</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-entradas-estoque">
+          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -5789,6 +5865,7 @@ https://sistema.glinformatica.com.br
     'aprovacoes-financeiras': 'vendas',
     'lista-compras': 'estoque',
     'separacao': 'estoque',
+    'entrada-mercadorias': 'estoque',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -5921,7 +5998,7 @@ https://sistema.glinformatica.com.br
   // VENDEDOR: vende, orçamentos, clientes, ambientes
   const _paginasEstoque = [
     'dashboard', 'produtos', 'servicos', 'fornecedores', 'transportadoras',
-    'orcamentos', 'lista-compras', 'separacao', 'ambientes', 'minha-conta'
+    'orcamentos', 'lista-compras', 'separacao', 'entrada-mercadorias', 'ambientes', 'minha-conta'
   ];
   const _paginasVendedor = [
     'dashboard', 'vendas', 'orcamentos', 'clientes', 'ambientes', 'minha-conta'
@@ -6017,6 +6094,20 @@ https://sistema.glinformatica.com.br
         return;
       }
       carregarSeparacao();
+    }
+    if(pg === 'entrada-mercadorias') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      if (!['admin', 'estoque'].includes(window._papelAtual)) {
+        alert('Acesso restrito: apenas admin ou estoque pode acessar Entrada de Mercadorias.');
+        showPage('dashboard');
+        return;
+      }
+      carregarEntradaMercadorias();
     }
     // Bloqueia páginas pra vendedor
     if (window._papelAtual === 'vendedor' && !podeAcessarPagina(pg)) {
@@ -7189,6 +7280,13 @@ https://sistema.glinformatica.com.br
   }
   // Render da tabela de Entradas Registradas (aba Fornecedores)
   function renderEntradasFornecedores() {
+    // Sempre atualiza também a página Estoque (se aberta ou não, é barato)
+    setTimeout(() => {
+      if (typeof renderEntradaMercadoriasEstoque === 'function') {
+        renderEntradaMercadoriasEstoque();
+        if (typeof atualizarResumoEntradasEstoque === 'function') atualizarResumoEntradasEstoque();
+      }
+    }, 0);
     const tbody = document.getElementById('tbody-entradas-fornecedores');
     if(!tbody) return;
     // Atualiza opções do select de fornecedor (mantém o valor atual)
@@ -7288,7 +7386,164 @@ https://sistema.glinformatica.com.br
     const f = document.getElementById('filtro-ent-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('filtro-ent-busca');   if(b) b.value = '';
     renderEntradasFornecedores();
+    // Se a página estoque estiver aberta, sincroniza
+    if (document.getElementById('page-entrada-mercadorias')?.style.display !== 'none') {
+      copiarFiltrosParaEstoque();
+      renderEntradaMercadoriasEstoque();
+    }
   }
+
+  // ===== ENTRADA DE MERCADORIAS (grupo Estoque) =====
+  // Reaproveita dbEntradas e renderEntradasFornecedores.
+  // Aqui só sincroniza filtros e reflete a mesma tabela.
+
+  function carregarEntradaMercadorias() {
+    // Popula select de fornecedores (mesma lista)
+    const sel = document.getElementById('em-filtro-fornecedor');
+    if (sel) {
+      const valorAtual = sel.value;
+      const fornecedoresUnicos = [...new Set(dbEntradas.map(e => e.fornecedor).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">Todos</option>' +
+        fornecedoresUnicos.map(f => `<option value="${f.replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${f}</option>`).join('');
+    }
+    // Copia filtros do outro contexto se ainda não estiverem definidos aqui
+    if (!document.getElementById('em-filtro-mes').value && document.getElementById('filtro-ent-mes')?.value) {
+      document.getElementById('em-filtro-mes').value = document.getElementById('filtro-ent-mes').value;
+    }
+    atualizarResumoEntradasEstoque();
+    renderEntradaMercadoriasEstoque();
+  }
+
+  function sincronizarFiltrosEntradas() {
+    // Copia dos IDs "em-*" pros IDs "filtro-ent-*" (fornecedores usa esses)
+    const m = document.getElementById('em-filtro-mes');
+    const f = document.getElementById('em-filtro-fornecedor');
+    const b = document.getElementById('em-filtro-busca');
+    const mF = document.getElementById('filtro-ent-mes');
+    const fF = document.getElementById('filtro-ent-fornecedor');
+    const bF = document.getElementById('filtro-ent-busca');
+    if (mF) mF.value = m?.value || '';
+    if (fF) fF.value = f?.value || '';
+    if (bF) bF.value = b?.value || '';
+    atualizarResumoEntradasEstoque();
+    renderEntradaMercadoriasEstoque();
+  }
+
+  function copiarFiltrosParaEstoque() {
+    const m = document.getElementById('em-filtro-mes');
+    const f = document.getElementById('em-filtro-fornecedor');
+    const b = document.getElementById('em-filtro-busca');
+    if (m) m.value = document.getElementById('filtro-ent-mes')?.value || '';
+    if (f) f.value = document.getElementById('filtro-ent-fornecedor')?.value || '';
+    if (b) b.value = document.getElementById('filtro-ent-busca')?.value || '';
+  }
+
+  function limparFiltrosEntradasEstoque() {
+    const m = document.getElementById('em-filtro-mes');     if(m) m.value = '';
+    const f = document.getElementById('em-filtro-fornecedor'); if(f) f.value = '';
+    const b = document.getElementById('em-filtro-busca');   if(b) b.value = '';
+    sincronizarFiltrosEntradas();
+  }
+
+  function renderEntradaMercadoriasEstoque() {
+    const tbody = document.getElementById('tbody-entradas-estoque');
+    if (!tbody) return;
+
+    if (!dbEntradas || dbEntradas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">📭 Nenhuma entrada registrada. Clique em "Nova Entrada" pra começar.</td></tr>';
+      const c = document.getElementById('em-contador');
+      if (c) c.textContent = '';
+      return;
+    }
+
+    // Aplica os mesmos filtros
+    const filtroMes = document.getElementById('em-filtro-mes')?.value || '';
+    const filtroFornecedor = document.getElementById('em-filtro-fornecedor')?.value || '';
+    const filtroBusca = (document.getElementById('em-filtro-busca')?.value || '').trim().toLowerCase();
+
+    let lista = [...dbEntradas];
+    if (filtroMes) lista = lista.filter(e => (e.data || '').slice(0, 7) === filtroMes);
+    if (filtroFornecedor) lista = lista.filter(e => e.fornecedor === filtroFornecedor);
+    if (filtroBusca) {
+      const nomeParaCodigo = new Map();
+      (dbProdutos || []).forEach(p => {
+        if (p.nome) nomeParaCodigo.set(p.nome, String(p.codigo || ''));
+      });
+      lista = lista.filter(e => {
+        const docNum = `${e.numero || ''}${e.serie ? '/' + e.serie : ''} ${e.doc || ''}`.toLowerCase();
+        const itensTxt = (e.itens || []).map(i => {
+          const nomeProduto = i.produto || i.nome || '';
+          const codigoProduto = nomeParaCodigo.get(nomeProduto) || i.codigo || '';
+          return `${nomeProduto} ${codigoProduto}`;
+        }).join(' ').toLowerCase();
+        return docNum.includes(filtroBusca) ||
+               itensTxt.includes(filtroBusca) ||
+               (e.fornecedor && e.fornecedor.toLowerCase().includes(filtroBusca));
+      });
+    }
+    lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+    // Contador
+    const totalFiltrado = lista.reduce((s, e) => s + (Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0), 0);
+    const c = document.getElementById('em-contador');
+    if (c) {
+      c.textContent = (filtroMes || filtroFornecedor || filtroBusca)
+        ? `${lista.length} de ${dbEntradas.length} · Total: ${formatarBRL(totalFiltrado)}`
+        : `${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
+    }
+
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">Nenhuma entrada encontrada com esses filtros.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = lista.map(e => {
+      const isNf = e.tipo === 'com-nf';
+      const total = isNf ? e.totalNf : e.totalGeral;
+      const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
+      const badge = isNf
+        ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
+        : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
+      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
+      const isAdmin = window._papelAtual === 'admin';
+      const linhaUsuarioCriou = isAdmin && e.criadoPorNome
+        ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
+        : '';
+      return `
+        <tr>
+          <td>${formatarDataBR(e.data)}</td>
+          <td>${escapeHtml(e.fornecedor || '—')}${linhaUsuarioCriou}</td>
+          <td>${badge}</td>
+          <td>${escapeHtml(documento)}</td>
+          <td><strong>${formatarBRL(total)}</strong></td>
+          <td>${escapeHtml(pagamentoLabel)}</td>
+          <td>
+            <button class="btn-link" onclick="visualizarEntrada(${e.id})">👁️ Ver</button>
+            ${isAdmin ? ` | <button class="btn-link danger" onclick="excluirEntrada(${e.id})">🗑️ Excluir</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function atualizarResumoEntradasEstoque() {
+    if (!dbEntradas) return;
+    const mesAtual = new Date().toISOString().slice(0, 7);
+    const doMes = dbEntradas.filter(e => (e.data || '').slice(0, 7) === mesAtual);
+    const cntMes = doMes.length;
+    const valMes = doMes.reduce((s, e) => s + (Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0), 0);
+    // Produtos distintos no mês
+    const produtosSet = new Set();
+    doMes.forEach(e => (e.itens || []).forEach(i => produtosSet.add(i.produto || i.nome || '')));
+
+    const el1 = document.getElementById('em-cnt-mes');
+    const el2 = document.getElementById('em-val-mes');
+    const el3 = document.getElementById('em-cnt-produtos');
+    if (el1) el1.textContent = cntMes;
+    if (el2) el2.textContent = formatarBRL(valMes);
+    if (el3) el3.textContent = produtosSet.size;
+  }
+
   // Mostra/esconde o campo de data prevista conforme a forma de pagamento
   function toggleDataVencimento() {
     const pag = document.getElementById('snf-pagamento').value;
