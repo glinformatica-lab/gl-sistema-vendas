@@ -2912,20 +2912,48 @@
 
   <!-- Modal: Leitor de Código de Barras (Câmera) -->
   <div id="modal-leitor-camera" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10002;justify-content:center;align-items:center;padding:20px;">
-    <div style="background:#fff;padding:20px;border-radius:14px;max-width:520px;width:100%;">
+    <div style="background:#fff;padding:20px;border-radius:14px;max-width:560px;width:100%;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <h2 style="color:var(--azul);margin:0;font-size:20px;">📷 Ler Código de Barras</h2>
         <button onclick="fecharLeitorCamera()" style="background:none;border:none;font-size:28px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
       </div>
 
-      <!-- Video da câmera -->
-      <div id="leitor-camera-container" style="position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;">
+      <!-- Video da câmera - proporção 16:9 (melhor pra código de barras) -->
+      <div id="leitor-camera-container" style="position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/10;">
         <div id="leitor-camera-reader" style="width:100%;height:100%;"></div>
+        <!-- Overlay com "linha de mira" horizontal (só decorativo) -->
+        <div style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,0.6);pointer-events:none;opacity:0.6;"></div>
+      </div>
+
+      <!-- Controles rápidos -->
+      <div id="leitor-controles" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button type="button" id="btn-lanterna" onclick="toggleLanternaLeitor()" style="flex:1;padding:10px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">🔦 Ligar Lanterna</button>
+        <button type="button" id="btn-trocar-cam" onclick="trocarCameraLeitor()" style="flex:1;padding:10px;background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">🔄 Trocar Câmera</button>
       </div>
 
       <!-- Status -->
       <div id="leitor-status" style="margin-top:12px;padding:10px;border-radius:8px;background:#f1f5f9;color:#64748b;font-size:13px;text-align:center;">
         📷 Aponte a câmera pro código de barras...
+      </div>
+
+      <!-- Dicas pra iPhone/celular -->
+      <div style="margin-top:10px;padding:10px;background:#f0f9ff;border:1px solid #93c5fd;border-radius:8px;font-size:12px;color:#1e40af;">
+        <strong>💡 Dicas:</strong>
+        <ul style="margin:4px 0 0 20px;padding:0;line-height:1.5;">
+          <li>Segure o celular a <strong>10-20 cm</strong> do código</li>
+          <li>Mantenha o código <strong>horizontal</strong> na linha vermelha</li>
+          <li>Boa iluminação ajuda (use a 🔦 lanterna se preciso)</li>
+          <li>iPhone: use <strong>Safari</strong> (Chrome iOS não acessa câmera)</li>
+        </ul>
+      </div>
+
+      <!-- Entrada manual como fallback -->
+      <div style="margin-top:10px;padding:10px;background:#fefce8;border:1px solid #eab308;border-radius:8px;">
+        <div style="font-size:12px;color:#854d0e;margin-bottom:6px;"><strong>⌨️ Não consegue escanear?</strong> Digite o código:</div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="input-codigo-manual" placeholder="Cole ou digite o código" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" onkeypress="if(event.key==='Enter') buscarCodigoManual()">
+          <button type="button" onclick="buscarCodigoManual()" style="padding:8px 14px;background:#eab308;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">🔎 Buscar</button>
+        </div>
       </div>
 
       <!-- Botão fechar -->
@@ -12342,9 +12370,14 @@ ${conteudo}
       alert('Este recurso está disponível apenas para empresas com o Módulo Iluminação ativo.');
       return;
     }
+    // Verifica HTTPS (obrigatório pra câmera em iPhone/Android)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      alert('⚠️ Câmera requer HTTPS.\n\nAcesse pelo domínio oficial: https://sistema.glinformatica.com.br');
+      return;
+    }
     // Verifica suporte a câmera
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert('Seu navegador não suporta acesso à câmera. Tente pelo Chrome/Edge/Safari.');
+      alert('Seu navegador não suporta acesso à câmera.\n\n📱 iPhone: use SAFARI (Chrome iOS não funciona)\n💻 PC: use Chrome, Edge ou Firefox');
       return;
     }
     document.getElementById('modal-leitor-camera').style.display = 'flex';
@@ -12357,52 +12390,202 @@ ${conteudo}
       await iniciarCamera();
     } catch (e) {
       console.error('Erro leitor:', e);
-      document.getElementById('leitor-status').innerHTML = '❌ ' + (e.message || 'Erro ao iniciar câmera. Verifique se autorizou o acesso.');
+      let msg = e.message || 'Erro ao iniciar câmera.';
+      // Mensagens específicas amigáveis
+      if (/permission|denied|notallowed/i.test(msg)) {
+        msg = '🚫 Acesso à câmera negado.\n\niPhone Safari: Ajustes → Safari → Câmera → Permitir\niPhone: também precisa ir em Ajustes → Câmera → Safari';
+      } else if (/notfound|nodevice/i.test(msg)) {
+        msg = '📷 Nenhuma câmera encontrada no dispositivo.';
+      }
+      document.getElementById('leitor-status').innerHTML = '❌ ' + msg;
       document.getElementById('leitor-status').style.background = '#fef2f2';
       document.getElementById('leitor-status').style.color = '#991b1b';
     }
   }
 
+  let _leitorCameras = [];
+  let _leitorCameraAtualIdx = 0;
+  let _leitorTemLanterna = false;
+  let _leitorLanternaAcesa = false;
+
   async function iniciarCamera() {
     if (_leitorAtivo) return;
     try {
       _leitorInstance = new Html5Qrcode('leitor-camera-reader');
+
+      // Config otimizada pra iPhone/celular e código de barras 1D
+      // qrbox maior (75% da largura, 40% da altura) — muito mais fácil de mirar
       const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 100 },
-        aspectRatio: 4/3,
-        // Aceita CODE 128 (que geramos), EAN-13, EAN-8 etc
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ]
+        fps: 15, // mais alto que 10 = detecção mais rápida
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          // Faixa horizontal larga (código de barras é retangular)
+          const w = Math.floor(viewfinderWidth * 0.85);
+          const h = Math.floor(viewfinderHeight * 0.5);
+          return { width: w, height: h };
+        },
+        aspectRatio: 16/10,
+        // NÃO passa formatsToSupport → aceita TODOS os formatos
+        // (CODE_128, EAN_13, EAN_8, UPC_A, UPC_E, CODE_39, ITF, CODABAR, QR_CODE, DATA_MATRIX...)
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // navegadores modernos usam API nativa (muito mais rápida)
+        },
+        // Passa hints ZXing para preferir código de barras 1D (horizontal)
+        rememberLastUsedCamera: true,
+        // Ajusta constraints da câmera para melhor foco
+        videoConstraints: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: 'continuous'
+        }
       };
+
+      // Descobre câmeras disponíveis pra permitir troca
+      try {
+        _leitorCameras = await Html5Qrcode.getCameras();
+        // Se tem múltiplas câmeras, mostra botão de troca
+        const btnTroca = document.getElementById('btn-trocar-cam');
+        if (btnTroca) btnTroca.style.display = (_leitorCameras.length > 1) ? '' : 'none';
+      } catch(e) {
+        _leitorCameras = [];
+      }
+
+      // Preferência: câmera traseira (environment)
+      let cameraConfig;
+      if (_leitorCameras.length > 0) {
+        // Tenta achar câmera traseira pelo label
+        const traseira = _leitorCameras.find(c =>
+          /back|rear|traseir|environment/i.test(c.label || '')
+        );
+        _leitorCameraAtualIdx = traseira
+          ? _leitorCameras.indexOf(traseira)
+          : (_leitorCameras.length - 1); // última costuma ser a traseira
+        cameraConfig = _leitorCameras[_leitorCameraAtualIdx].id;
+      } else {
+        cameraConfig = { facingMode: 'environment' };
+      }
+
       await _leitorInstance.start(
-        { facingMode: 'environment' }, // câmera traseira em celular
+        cameraConfig,
         config,
         onCodigoLido,
         () => {} // callback erro por frame (silencioso)
       );
       _leitorAtivo = true;
-      document.getElementById('leitor-status').innerHTML = '📷 Aponte a câmera pro código de barras...';
+
+      // Mostra controles
+      document.getElementById('leitor-controles').style.display = 'flex';
+
+      // Verifica se câmera suporta lanterna (torch)
+      setTimeout(() => verificarLanterna(), 800);
+
+      document.getElementById('leitor-status').innerHTML = '📷 Aponte pro código (dentro da linha vermelha)...';
       document.getElementById('leitor-status').style.background = '#f1f5f9';
       document.getElementById('leitor-status').style.color = '#64748b';
     } catch (e) {
+      console.error('[leitor] iniciar', e);
       throw new Error('Não foi possível acessar a câmera. Autorize o acesso e tente de novo.');
     }
+  }
+
+  // Verifica se a câmera atual suporta lanterna
+  async function verificarLanterna() {
+    const btn = document.getElementById('btn-lanterna');
+    if (!btn) return;
+    try {
+      if (!_leitorInstance) return;
+      const track = _leitorInstance.getRunningTrackSettings ? _leitorInstance.getRunningTrackSettings() : null;
+      const caps = _leitorInstance.getRunningTrackCameraCapabilities ? _leitorInstance.getRunningTrackCameraCapabilities() : null;
+      _leitorTemLanterna = !!(caps && caps.torchFeature && caps.torchFeature().isSupported && caps.torchFeature().isSupported());
+      btn.style.display = _leitorTemLanterna ? '' : 'none';
+    } catch(e) {
+      // Fallback: mostra o botão de qualquer forma - se não funcionar, tudo bem
+      btn.style.display = '';
+    }
+  }
+
+  async function toggleLanternaLeitor() {
+    const btn = document.getElementById('btn-lanterna');
+    if (!btn || !_leitorInstance) return;
+    try {
+      _leitorLanternaAcesa = !_leitorLanternaAcesa;
+      // API nova (html5-qrcode 2.3.8+)
+      if (_leitorInstance.applyVideoConstraints) {
+        await _leitorInstance.applyVideoConstraints({
+          advanced: [{ torch: _leitorLanternaAcesa }]
+        });
+      }
+      btn.innerHTML = _leitorLanternaAcesa ? '🔦 Desligar Lanterna' : '🔦 Ligar Lanterna';
+      btn.style.background = _leitorLanternaAcesa ? '#fbbf24' : '#fef3c7';
+    } catch(e) {
+      console.warn('[leitor] lanterna', e);
+      alert('Sua câmera não suporta lanterna via web.');
+      _leitorLanternaAcesa = false;
+    }
+  }
+
+  async function trocarCameraLeitor() {
+    if (_leitorCameras.length < 2) return;
+    _leitorCameraAtualIdx = (_leitorCameraAtualIdx + 1) % _leitorCameras.length;
+    try {
+      await pararCamera();
+      _leitorInstance = new Html5Qrcode('leitor-camera-reader');
+      const config = {
+        fps: 15,
+        qrbox: (w, h) => ({ width: Math.floor(w*0.85), height: Math.floor(h*0.5) }),
+        aspectRatio: 16/10,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      };
+      await _leitorInstance.start(
+        _leitorCameras[_leitorCameraAtualIdx].id,
+        config,
+        onCodigoLido,
+        () => {}
+      );
+      _leitorAtivo = true;
+      _leitorLanternaAcesa = false;
+      document.getElementById('leitor-status').innerHTML = '📷 Câmera trocada. Aponte pro código...';
+    } catch(e) {
+      alert('Não foi possível trocar a câmera.');
+    }
+  }
+
+  // Entrada manual como fallback
+  async function buscarCodigoManual() {
+    const input = document.getElementById('input-codigo-manual');
+    const codigo = (input?.value || '').trim();
+    if (!codigo) {
+      alert('Digite um código.');
+      return;
+    }
+    input.value = '';
+    await onCodigoLido(codigo);
   }
 
   async function pararCamera() {
     if (_leitorInstance && _leitorAtivo) {
       try {
+        // Desliga lanterna antes de parar (importante no iPhone)
+        if (_leitorLanternaAcesa) {
+          try {
+            await _leitorInstance.applyVideoConstraints({ advanced: [{ torch: false }] });
+          } catch(e) {}
+        }
         await _leitorInstance.stop();
         _leitorInstance.clear();
       } catch(e) { /* ignora */ }
       _leitorInstance = null;
       _leitorAtivo = false;
+      _leitorLanternaAcesa = false;
+      // Reset botão lanterna
+      const btn = document.getElementById('btn-lanterna');
+      if (btn) {
+        btn.innerHTML = '🔦 Ligar Lanterna';
+        btn.style.background = '#fef3c7';
+      }
+      // Esconde controles
+      const ctrl = document.getElementById('leitor-controles');
+      if (ctrl) ctrl.style.display = 'none';
     }
   }
 
