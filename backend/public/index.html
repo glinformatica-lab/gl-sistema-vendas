@@ -5915,23 +5915,34 @@ https://sistema.glinformatica.com.br
   }
 
   // Matriz de permissões por papel
-  // Estoque: acessa cadastros básicos, orçamentos (leitura), lista de compras e entradas (que ficam em Fornecedores)
-  const _paginasEstoque = ['dashboard', 'produtos', 'fornecedores', 'orcamentos', 'lista-compras', 'separacao', 'minha-conta'];
-  // Financeiro: acessa dashboard, orçamentos (leitura pra ver o que vai aprovar) e aprovações
-  const _paginasFinanceiro = ['dashboard', 'orcamentos', 'aprovacoes-financeiras', 'minha-conta'];
-  const _paginasAdminOnly = ['financeiro', 'contas-pagar', 'contas-receber', 'relatorios', 'usuarios', 'configuracoes', 'configuracoes-fiscais', 'catalogo', 'pedidos-online', 'caixa'];
+  // ADMIN: acesso total
+  // FINANCEIRO: acesso quase total (só não cadastra usuários)
+  // ESTOQUE: cadastros + estoque + ver orçamentos (não vende, não vê financeiro)
+  // VENDEDOR: vende, orçamentos, clientes, ambientes
+  const _paginasEstoque = [
+    'dashboard', 'produtos', 'servicos', 'fornecedores', 'transportadoras',
+    'orcamentos', 'lista-compras', 'separacao', 'ambientes', 'minha-conta'
+  ];
+  const _paginasVendedor = [
+    'dashboard', 'vendas', 'orcamentos', 'clientes', 'ambientes', 'minha-conta'
+  ];
+  // Financeiro NÃO pode: cadastro de usuários
+  const _paginasBloqueadasFinanceiro = ['usuarios'];
 
   function podeAcessarPagina(pg) {
     const papel = window._papelAtual;
     if (papel === 'admin') return true;
+    if (papel === 'financeiro') {
+      return !_paginasBloqueadasFinanceiro.includes(pg);
+    }
     if (papel === 'estoque') {
       return _paginasEstoque.includes(pg);
     }
-    if (papel === 'financeiro') {
-      return _paginasFinanceiro.includes(pg);
+    // Vendedor
+    if (papel === 'vendedor') {
+      return _paginasVendedor.includes(pg);
     }
-    // Vendedor: bloqueia páginas admin
-    return !_paginasAdminOnly.includes(pg);
+    return false;
   }
 
   function showPage(pg) {
@@ -5987,7 +5998,7 @@ https://sistema.glinformatica.com.br
       }
       // Só admin ou financeiro
       if (!['admin', 'financeiro'].includes(window._papelAtual)) {
-        alert('Apenas admin ou financeiro pode acessar aprovações.');
+        alert('Acesso restrito: apenas admin ou financeiro pode acessar aprovações.');
         showPage('dashboard');
         return;
       }
@@ -6001,11 +6012,29 @@ https://sistema.glinformatica.com.br
         return;
       }
       if (!['admin', 'estoque'].includes(window._papelAtual)) {
-        alert('Apenas admin ou estoque pode acessar separação.');
+        alert('Acesso restrito: apenas admin ou estoque pode acessar separação.');
         showPage('dashboard');
         return;
       }
       carregarSeparacao();
+    }
+    // Bloqueia páginas pra vendedor
+    if (window._papelAtual === 'vendedor' && !podeAcessarPagina(pg)) {
+      alert('Acesso restrito ao seu perfil.');
+      showPage('dashboard');
+      return;
+    }
+    // Bloqueia páginas pra estoque
+    if (window._papelAtual === 'estoque' && !podeAcessarPagina(pg)) {
+      alert('Acesso restrito ao seu perfil.');
+      showPage('dashboard');
+      return;
+    }
+    // Bloqueia páginas pra financeiro
+    if (window._papelAtual === 'financeiro' && !podeAcessarPagina(pg)) {
+      alert('Acesso restrito: apenas administradores podem cadastrar usuários.');
+      showPage('dashboard');
+      return;
     }
     if(pg === 'transportadoras') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -6047,20 +6076,35 @@ https://sistema.glinformatica.com.br
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
       }
       // Esconde itens específicos pro papel ESTOQUE
+      // Estoque NÃO vê: vendas, clientes, catálogo, pedidos online, financeiro, relatórios, config
+      // Já usa classe .estoque-hide em vários pontos do HTML
       if(papelAtual === 'estoque') {
         document.querySelectorAll('.estoque-hide').forEach(el => el.style.display = 'none');
+        // Esconde também aprovações financeiras (só admin/financeiro)
+        document.querySelectorAll('[onclick*="aprovacoes-financeiras"]').forEach(el => el.style.display = 'none');
       }
       // Esconde itens específicos pro papel FINANCEIRO
+      // Financeiro tem acesso quase total, só NÃO cadastra usuários
       if(papelAtual === 'financeiro') {
-        // Financeiro só vê: Dashboard, Orçamentos, Aprovações Financeiras, Minha Conta
-        // Esconde: Cadastros, Vendas Online, Financeiro (grupo), Relatórios, Config
-        // Reaproveita .estoque-hide (mesma restrição) e esconde mais coisas
-        document.querySelectorAll('.estoque-hide').forEach(el => el.style.display = 'none');
-        // Esconde os itens que estoque vê mas financeiro não deve ver
+        document.querySelectorAll('[onclick*="showPage(\'usuarios\')"]').forEach(el => el.style.display = 'none');
+      }
+      // Esconde itens específicos pro papel VENDEDOR
+      // Vendedor só vê: dashboard, vendas, orçamentos, clientes, ambientes, minha conta
+      if(papelAtual === 'vendedor') {
+        // Bloqueia páginas admin (já existente)
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        // Esconde também: cadastros de produtos/serviços/fornecedores/transportadoras
         document.querySelectorAll('[onclick*="showPage(\'produtos\')"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('[onclick*="showPage(\'servicos\')"]').forEach(el => el.style.display = 'none');
         document.querySelectorAll('[onclick*="showPage(\'fornecedores\')"]').forEach(el => el.style.display = 'none');
         document.querySelectorAll('[onclick*="showPage(\'transportadoras\')"]').forEach(el => el.style.display = 'none');
+        // Esconde aprovações + estoque
+        document.querySelectorAll('[onclick*="aprovacoes-financeiras"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('[onclick*="showPage(\'separacao\')"]').forEach(el => el.style.display = 'none');
         document.querySelectorAll('[onclick*="showPage(\'lista-compras\')"]').forEach(el => el.style.display = 'none');
+        // Esconde grupo estoque
+        document.querySelectorAll('[data-grupo="estoque"]').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('#submenu-estoque').forEach(el => el.style.display = 'none');
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
