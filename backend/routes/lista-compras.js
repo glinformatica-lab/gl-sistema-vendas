@@ -31,10 +31,10 @@ async function requerAmbientes(req, res, next) {
 // Admin vê tudo. Vendedor vê só dos seus orçamentos.
 router.get('/', requerAmbientes, async (req, res) => {
   try {
-    const isAdmin = req.user.papel === 'admin';
+    const podeVerTudo = ['admin', 'estoque'].includes(req.user.papel);
     let query;
     let params;
-    if (isAdmin) {
+    if (podeVerTudo) {
       query = `
         SELECT lc.*,
                o.numero AS orcamento_numero,
@@ -85,10 +85,10 @@ router.get('/', requerAmbientes, async (req, res) => {
 // GET /api/lista-compras/resumo — Contadores por status
 router.get('/resumo', requerAmbientes, async (req, res) => {
   try {
-    const isAdmin = req.user.papel === 'admin';
+    const podeVerTudo = ['admin', 'estoque'].includes(req.user.papel);
     let query;
     let params;
-    if (isAdmin) {
+    if (podeVerTudo) {
       query = `
         SELECT lc.status,
                COUNT(*) AS qtd,
@@ -205,10 +205,10 @@ router.patch('/:id/observacao', requerAmbientes, async (req, res) => {
 // DELETE /api/lista-compras/:id — Remove item (só admin, ou o próprio vendedor que criou)
 router.delete('/:id', requerAmbientes, async (req, res) => {
   try {
-    const isAdmin = req.user.papel === 'admin';
+    const podeVerTudo = ['admin', 'estoque'].includes(req.user.papel);
     let query;
     let params;
-    if (isAdmin) {
+    if (podeVerTudo) {
       query = 'DELETE FROM lista_compras WHERE id = $1 AND empresa_id = $2 RETURNING id';
       params = [req.params.id, req.user.empresaId];
     } else {
@@ -242,6 +242,39 @@ router.get('/por-orcamento/:orcamentoId', requerAmbientes, async (req, res) => {
   } catch (err) {
     console.error('[lista-compras/por-orcamento]', err);
     res.status(500).json({ error: 'Erro ao carregar itens do orçamento.' });
+  }
+});
+
+// POST /api/lista-compras/excluir-lote — Exclui vários itens de uma vez (só admin)
+// Body: { ids: [1, 5, 7, ...] }
+router.post('/excluir-lote', requerAmbientes, async (req, res) => {
+  if (req.user.papel !== 'admin') {
+    return res.status(403).json({ error: 'Apenas admin pode excluir em lote.' });
+  }
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Informe ao menos um ID.' });
+  }
+  // Sanitiza: converte para inteiros e filtra inválidos
+  const idsInt = ids.map(x => parseInt(x)).filter(x => Number.isInteger(x) && x > 0);
+  if (idsInt.length === 0) {
+    return res.status(400).json({ error: 'IDs inválidos.' });
+  }
+  try {
+    const r = await db.query(
+      `DELETE FROM lista_compras
+       WHERE id = ANY($1::int[]) AND empresa_id = $2
+       RETURNING id, produto_nome, status`,
+      [idsInt, req.user.empresaId]
+    );
+    res.json({
+      ok: true,
+      excluidos: r.rows.length,
+      produtos: r.rows.map(x => x.produto_nome)
+    });
+  } catch (err) {
+    console.error('[lista-compras/excluir-lote]', err);
+    res.status(500).json({ error: 'Erro ao excluir em lote.' });
   }
 });
 

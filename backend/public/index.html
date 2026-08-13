@@ -1229,11 +1229,24 @@
         <button type="button" id="lc-filtro-recebido" onclick="filtrarListaCompras('recebido')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">✅ Recebidos</button>
       </div>
 
+      <!-- Barra flutuante de ações em lote (só admin, aparece quando algo está selecionado) -->
+      <div id="lc-barra-lote" style="display:none;position:sticky;top:10px;z-index:100;background:#7c3aed;color:#fff;padding:12px 18px;border-radius:10px;margin-bottom:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">☑️</span>
+          <strong id="lc-lote-contador">0 itens selecionados</strong>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="lcLimparSelecao()" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Cancelar</button>
+          <button type="button" onclick="lcExcluirSelecionados()" style="background:#fff;color:#7c3aed;border:none;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;">🗑️ Excluir selecionados</button>
+        </div>
+      </div>
+
       <!-- Tabela -->
       <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead style="background:#f8fafc;">
             <tr>
+              <th id="lc-col-check" style="padding:10px;text-align:center;width:40px;display:none;"><input type="checkbox" id="lc-check-todos" onclick="lcToggleTodos(this.checked)" style="cursor:pointer;transform:scale(1.2);"></th>
               <th style="padding:10px;text-align:left;">Produto</th>
               <th style="padding:10px;text-align:center;width:70px;">Qtd</th>
               <th style="padding:10px;text-align:left;width:170px;">Orçamento</th>
@@ -1243,7 +1256,7 @@
             </tr>
           </thead>
           <tbody id="tbody-lista-compras">
-            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+            <tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -12720,6 +12733,8 @@ ${conteudo}
   function renderListaCompras() {
     const tbody = document.getElementById('tbody-lista-compras');
     if (!tbody) return;
+    // Mostra/esconde coluna checkbox conforme papel
+    if (typeof lcMostrarColunaCheck === 'function') lcMostrarColunaCheck();
     const termo = (document.getElementById('lc-busca')?.value || '').toLowerCase().trim();
 
     let filtrados = _listaComprasCache;
@@ -12735,8 +12750,9 @@ ${conteudo}
       );
     }
 
+    const _lcCols = window._papelAtual === 'admin' ? 7 : 6;
     if (filtrados.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum item encontrado com esses filtros.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${_lcCols}" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum item encontrado com esses filtros.</td></tr>`;
       return;
     }
 
@@ -12754,8 +12770,13 @@ ${conteudo}
         ? `<div style="font-size:11px;color:#64748b;margin-top:4px;font-style:italic;">💬 ${escapeHtml(item.observacao)}</div>`
         : '';
       const usuario = item.atualizadoPorNome || item.criadoPorNome || '—';
+      const ehAdmin = window._papelAtual === 'admin';
+      const chkCell = ehAdmin
+        ? `<td style="padding:10px;text-align:center;"><input type="checkbox" class="lc-check-item" data-id="${item.id}" onclick="lcAtualizarSelecao()" style="cursor:pointer;transform:scale(1.2);"></td>`
+        : '';
       return `
-        <tr style="border-top:1px solid #f1f5f9;">
+        <tr style="border-top:1px solid #f1f5f9;" data-lc-id="${item.id}">
+          ${chkCell}
           <td style="padding:10px;">
             <div style="font-weight:600;">${escapeHtml(item.produtoNome)}</div>
             <div style="font-size:11px;color:#64748b;">
@@ -12770,10 +12791,103 @@ ${conteudo}
           <td style="padding:10px;text-align:center;">${statusBadge[item.status] || item.status}</td>
           <td style="padding:10px;text-align:center;">
             <button onclick="abrirModalLcStatus(${item.id})" style="background:#7c3aed;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">Atualizar</button>
+            ${['admin', 'estoque'].includes(window._papelAtual) ? `<button onclick="excluirItemLc(${item.id}, '${escapeAttr(item.produtoNome)}')" title="Excluir item da lista" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-left:4px;">🗑️</button>` : ''}
           </td>
         </tr>
       `;
     }).join('');
+    // Reseta seleção após re-render
+    if (typeof lcAtualizarSelecao === 'function') lcAtualizarSelecao();
+  }
+
+  // ===== SELEÇÃO EM LOTE (Lista de Compras — só admin) =====
+  function lcMostrarColunaCheck() {
+    // Mostra/esconde coluna de checkbox conforme papel
+    const th = document.getElementById('lc-col-check');
+    if (!th) return;
+    th.style.display = (window._papelAtual === 'admin') ? '' : 'none';
+  }
+
+  function lcToggleTodos(marcar) {
+    document.querySelectorAll('.lc-check-item').forEach(chk => {
+      chk.checked = marcar;
+    });
+    lcAtualizarSelecao();
+  }
+
+  function lcAtualizarSelecao() {
+    const marcados = document.querySelectorAll('.lc-check-item:checked');
+    const barra = document.getElementById('lc-barra-lote');
+    const contador = document.getElementById('lc-lote-contador');
+    if (marcados.length === 0) {
+      barra.style.display = 'none';
+      const chkTodos = document.getElementById('lc-check-todos');
+      if (chkTodos) chkTodos.checked = false;
+    } else {
+      barra.style.display = 'flex';
+      contador.textContent = `${marcados.length} ${marcados.length === 1 ? 'item selecionado' : 'itens selecionados'}`;
+      // Atualiza checkbox "todos" se todos os visíveis estão marcados
+      const todos = document.querySelectorAll('.lc-check-item');
+      const chkTodos = document.getElementById('lc-check-todos');
+      if (chkTodos) chkTodos.checked = (marcados.length === todos.length && todos.length > 0);
+    }
+  }
+
+  function lcLimparSelecao() {
+    document.querySelectorAll('.lc-check-item:checked').forEach(chk => chk.checked = false);
+    const chkTodos = document.getElementById('lc-check-todos');
+    if (chkTodos) chkTodos.checked = false;
+    lcAtualizarSelecao();
+  }
+
+  async function lcExcluirSelecionados() {
+    const marcados = [...document.querySelectorAll('.lc-check-item:checked')];
+    if (marcados.length === 0) return;
+    const ids = marcados.map(chk => parseInt(chk.dataset.id)).filter(Boolean);
+    if (ids.length === 0) return;
+
+    // Monta preview dos nomes
+    const nomes = ids.map(id => {
+      const item = _listaComprasCache.find(x => x.id === id);
+      return item ? `• ${item.produtoNome} (${item.status})` : '';
+    }).filter(Boolean);
+
+    const msg = `Excluir ${ids.length} item(ns) da Lista de Compras?\n\n` +
+                nomes.slice(0, 10).join('\n') +
+                (nomes.length > 10 ? `\n... e mais ${nomes.length - 10} item(ns)` : '') +
+                `\n\n⚠️ Esta ação é permanente e não reverte compras já pedidas/recebidas.`;
+    if (!confirm(msg)) return;
+
+    try {
+      const r = await api('POST', '/api/lista-compras/excluir-lote', { ids });
+      alert(`✅ ${r.excluidos} item(ns) removido(s) da Lista de Compras.`);
+      await carregarListaCompras();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('❌ Erro: ' + (e.message || 'Não foi possível excluir.'));
+    }
+  }
+
+  async function excluirItemLc(id, nome) {
+    const item = _listaComprasCache.find(x => x.id === id);
+    if (!item) return;
+    let msgConfirm = `Excluir "${nome}" da Lista de Compras?`;
+    if (item.status === 'pedido' || item.status === 'recebido') {
+      msgConfirm += `\n\n⚠️ Este item está com status "${item.status.toUpperCase()}".`;
+      msgConfirm += `\nEsta ação NÃO reverte a compra — apenas remove o registro da lista.`;
+    }
+    if (item.orcamentoNumero) {
+      msgConfirm += `\n\n📎 Item está vinculado ao Orçamento #${item.orcamentoNumero}.`;
+    }
+    if (!confirm(msgConfirm)) return;
+    try {
+      await api('DELETE', `/api/lista-compras/${id}`);
+      alert('✅ Item removido da Lista de Compras.');
+      await carregarListaCompras();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('❌ Erro: ' + (e.message || 'Não foi possível excluir.'));
+    }
   }
 
   function abrirModalLcStatus(id) {
