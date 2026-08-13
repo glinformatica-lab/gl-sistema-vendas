@@ -5757,6 +5757,286 @@ https://sistema.glinformatica.com.br
     return data;
   }
 
+  // ============================================
+  // 💾 AUTOSAVE UNIVERSAL - Sistema Híbrido
+  // ============================================
+  // Salva localStorage a cada 3s (instantâneo, offline-safe)
+  // Sincroniza servidor a cada 30s (backup em outro PC)
+  // Se rede cair: continua no localStorage, sync quando voltar
+  // Ao abrir form: restaura automaticamente
+  //
+  // Uso:
+  //   const auto = new AutoSaveManager('orcamento', {
+  //     coletar: () => ({ campo1: valor1, ... }),
+  //     restaurar: (dados) => { preencher campos... },
+  //     limpar: () => { limpar campos... }
+  //   });
+  //   auto.iniciar();  // ao abrir form
+  //   auto.parar();    // ao sair
+  //   auto.finalizar(); // ao salvar de verdade (limpa rascunho)
+
+  class AutoSaveManager {
+    constructor(tipoForm, opts) {
+      this.tipoForm = tipoForm;
+      this.chave = opts.chave || ''; // pra distinguir múltiplos rascunhos (ex: id de edição)
+      this.coletar = opts.coletar;   // função () => dados do form
+      this.restaurar = opts.restaurar; // função (dados) => preencher form
+      this.storageKey = `_rascunho_${tipoForm}_${this.chave}`;
+      this.timerLocal = null;
+      this.timerServer = null;
+      this.ultimoHash = null; // hash pra detectar se mudou
+      this.indicadorEl = null;
+      this.pendenteSincronizar = false;
+      this.online = navigator.onLine;
+      this.iniciado = false;
+
+      // Monitora rede
+      this._onOnline = () => {
+        this.online = true;
+        this._log('rede voltou');
+        this._sincronizarServidor(); // tenta sync pendente
+      };
+      this._onOffline = () => {
+        this.online = false;
+        this._log('rede caiu (localStorage continua)');
+        this._atualizarIndicador('⚠️ Sem conexão · salvo localmente');
+      };
+    }
+
+    _log(msg) {
+      console.log(`[autosave/${this.tipoForm}]`, msg);
+    }
+
+    _hash(obj) {
+      try {
+        return JSON.stringify(obj);
+      } catch(e) { return ''; }
+    }
+
+    // Verifica se dados são "não-vazios" (evita salvar form em branco)
+    _temDados(obj) {
+      if (!obj || typeof obj !== 'object') return false;
+      for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        if (Array.isArray(v) && v.length > 0) return true;
+        if (typeof v === 'string' && v.trim().length > 0) return true;
+        if (typeof v === 'number' && v !== 0) return true;
+        if (typeof v === 'object' && v !== null && Object.keys(v).length > 0) return true;
+        if (typeof v === 'boolean' && v) return true;
+      }
+      return false;
+    }
+
+    // Cria o indicador visual no rodapé do form (posiciona automaticamente)
+    _criarIndicador() {
+      // Reaproveita se existe (mesma pagina)
+      let el = document.getElementById(`_autosave_indicator_${this.tipoForm}`);
+      if (el) {
+        this.indicadorEl = el;
+        el.style.display = '';
+        return;
+      }
+      el = document.createElement('div');
+      el.id = `_autosave_indicator_${this.tipoForm}`;
+      el.style.cssText = 'position:fixed;bottom:14px;right:20px;background:#0f172a;color:#94a3b8;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;z-index:10005;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:opacity 0.3s,background 0.3s;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+      el.textContent = '💾 Rascunho ativo';
+      document.body.appendChild(el);
+      this.indicadorEl = el;
+    }
+
+    _atualizarIndicador(texto, cor = '#0f172a') {
+      if (!this.indicadorEl) return;
+      this.indicadorEl.textContent = texto;
+      this.indicadorEl.style.background = cor;
+    }
+
+    _removerIndicador() {
+      if (this.indicadorEl) {
+        this.indicadorEl.style.display = 'none';
+      }
+    }
+
+    // Salva no localStorage (sempre disponível)
+    _salvarLocal() {
+      try {
+        const dados = this.coletar();
+        if (!this._temDados(dados)) {
+          // Form vazio: se tem rascunho antigo salvo, mantém
+          return;
+        }
+        const hashAtual = this._hash(dados);
+        if (hashAtual === this.ultimoHash) return; // não mudou
+
+        const payload = {
+          conteudo: dados,
+          salvoEm: new Date().toISOString()
+        };
+        localStorage.setItem(this.storageKey, JSON.stringify(payload));
+        this.ultimoHash = hashAtual;
+        this.pendenteSincronizar = true;
+
+        const agora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        this._atualizarIndicador(`💾 Salvo local · ${agora}`, '#0f172a');
+      } catch(e) {
+        console.warn('[autosave] localStorage', e);
+      }
+    }
+
+    // Sincroniza com o servidor (usa dados do localStorage)
+    async _sincronizarServidor() {
+      if (!this.pendenteSincronizar || !this.online) return;
+      try {
+        const local = localStorage.getItem(this.storageKey);
+        if (!local) return;
+        const payload = JSON.parse(local);
+        if (!payload.conteudo) return;
+
+        const url = `/api/rascunhos/${this.tipoForm}${this.chave ? '?chave=' + encodeURIComponent(this.chave) : ''}`;
+        await api('POST', url, { conteudo: payload.conteudo, chave: this.chave });
+        this.pendenteSincronizar = false;
+        this._atualizarIndicador('☁️ Sincronizado', '#059669');
+        // Volta pra "salvo local" após 2s
+        setTimeout(() => {
+          if (this.indicadorEl && this.indicadorEl.style.display !== 'none') {
+            const agora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+            this._atualizarIndicador(`💾 Salvo · ${agora}`, '#0f172a');
+          }
+        }, 2000);
+      } catch(e) {
+        // Falha silenciosa - vai tentar de novo depois
+        console.warn('[autosave] sync server falhou:', e.message);
+        this._atualizarIndicador('⚠️ Salvo local (servidor offline)', '#dc2626');
+      }
+    }
+
+    // Restaura rascunho (localStorage tem prioridade, servidor como fallback)
+    async restaurarSeExistir() {
+      try {
+        // 1. Tenta localStorage primeiro (mais recente)
+        const local = localStorage.getItem(this.storageKey);
+        if (local) {
+          const payload = JSON.parse(local);
+          if (payload.conteudo && this._temDados(payload.conteudo)) {
+            this._log('restaurando do localStorage');
+            this.restaurar(payload.conteudo);
+            this.ultimoHash = this._hash(payload.conteudo);
+            return { restaurado: true, fonte: 'local', salvoEm: payload.salvoEm };
+          }
+        }
+
+        // 2. Tenta servidor
+        if (this.online) {
+          const url = `/api/rascunhos/${this.tipoForm}${this.chave ? '?chave=' + encodeURIComponent(this.chave) : ''}`;
+          const r = await api('GET', url);
+          if (r && r.existe && r.conteudo && this._temDados(r.conteudo)) {
+            this._log('restaurando do servidor');
+            this.restaurar(r.conteudo);
+            this.ultimoHash = this._hash(r.conteudo);
+            // Sync pro localStorage
+            localStorage.setItem(this.storageKey, JSON.stringify({
+              conteudo: r.conteudo,
+              salvoEm: r.atualizadoEm
+            }));
+            return { restaurado: true, fonte: 'servidor', salvoEm: r.atualizadoEm };
+          }
+        }
+        return { restaurado: false };
+      } catch(e) {
+        console.warn('[autosave] restaurar', e);
+        return { restaurado: false };
+      }
+    }
+
+    // Inicia monitoramento automático
+    iniciar() {
+      if (this.iniciado) return;
+      this.iniciado = true;
+      this._log('iniciando');
+      this._criarIndicador();
+
+      window.addEventListener('online', this._onOnline);
+      window.addEventListener('offline', this._onOffline);
+
+      // Salva local a cada 3s
+      this.timerLocal = setInterval(() => this._salvarLocal(), 3000);
+      // Sincroniza com servidor a cada 30s
+      this.timerServer = setInterval(() => this._sincronizarServidor(), 30000);
+    }
+
+    // Para monitoramento (não limpa rascunho)
+    parar() {
+      if (!this.iniciado) return;
+      this.iniciado = false;
+      this._log('parando');
+      if (this.timerLocal) clearInterval(this.timerLocal);
+      if (this.timerServer) clearInterval(this.timerServer);
+      window.removeEventListener('online', this._onOnline);
+      window.removeEventListener('offline', this._onOffline);
+      this._removerIndicador();
+    }
+
+    // Finaliza: LIMPA o rascunho (chamar após salvar com sucesso)
+    async finalizar() {
+      this.parar();
+      try {
+        localStorage.removeItem(this.storageKey);
+        if (this.online) {
+          const url = `/api/rascunhos/${this.tipoForm}${this.chave ? '?chave=' + encodeURIComponent(this.chave) : ''}`;
+          await api('DELETE', url);
+        }
+        this._log('rascunho limpo');
+      } catch(e) {
+        console.warn('[autosave] finalizar', e);
+      }
+    }
+  }
+
+  // Referências globais dos gerenciadores ativos (pra evitar múltiplos por form)
+  window._autoSaveManagers = window._autoSaveManagers || {};
+
+  function iniciarAutoSave(tipoForm, opts) {
+    // Se já tinha um gerenciador ativo, para ele antes
+    if (window._autoSaveManagers[tipoForm]) {
+      window._autoSaveManagers[tipoForm].parar();
+    }
+    const auto = new AutoSaveManager(tipoForm, opts);
+    window._autoSaveManagers[tipoForm] = auto;
+    return auto;
+  }
+
+  function pararAutoSave(tipoForm) {
+    const auto = window._autoSaveManagers[tipoForm];
+    if (auto) { auto.parar(); delete window._autoSaveManagers[tipoForm]; }
+  }
+
+  async function finalizarAutoSave(tipoForm) {
+    const auto = window._autoSaveManagers[tipoForm];
+    if (auto) { await auto.finalizar(); delete window._autoSaveManagers[tipoForm]; }
+  }
+
+  // Toast discreto para notificações do autosave
+  function mostrarToastAutosave(texto) {
+    let el = document.getElementById('_autosave_toast');
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = '_autosave_toast';
+    el.style.cssText = 'position:fixed;top:20px;right:20px;background:#0891b2;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:10010;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:autosaveSlideIn 0.3s ease-out;';
+    el.textContent = texto;
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'opacity 0.4s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 400);
+    }, 4500);
+  }
+  // CSS da animação (inserida uma vez)
+  if (!document.getElementById('_autosave_style')) {
+    const style = document.createElement('style');
+    style.id = '_autosave_style';
+    style.textContent = '@keyframes autosaveSlideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }';
+    document.head.appendChild(style);
+  }
+
   // ====== Funções de PERSISTÊNCIA antigas, agora vazias (eram pro localStorage) ======
   function salvarTudo() {} // não faz nada — agora salva via API a cada ação
   function carregarTudo() { return false; } // dados vêm via API.recarregarTudo
@@ -9158,9 +9438,81 @@ https://sistema.glinformatica.com.br
       const selTransp = document.getElementById('nv-transportadora');
       if (selTransp) selTransp.value = '';
     }
+
+    // 💾 AUTOSAVE — Venda
+    const chaveVenda = _vendaEditandoId ? ('edit_' + _vendaEditandoId) : 'novo';
+    const autoV = iniciarAutoSave('venda', {
+      chave: chaveVenda,
+      coletar: () => _coletarDadosVenda(),
+      restaurar: (dados) => _restaurarDadosVenda(dados)
+    });
+    autoV.restaurarSeExistir().then(r => {
+      if (r.restaurado) {
+        const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
+        mostrarToastAutosave(`♻️ Venda em progresso recuperada (${quando})`);
+      }
+    });
+    autoV.iniciar();
+  }
+
+  // Helper: coleta dados atuais da venda pra rascunho
+  function _coletarDadosVenda() {
+    const dados = {
+      cliente: document.getElementById('nv-cliente')?.value || '',
+      data: document.getElementById('nv-data')?.value || '',
+      tipoDesconto: document.getElementById('nv-tipo-desconto')?.value || 'valor',
+      desconto: document.getElementById('nv-desconto')?.value || 0,
+      pagamento: document.getElementById('nv-pagamento')?.value || 'Dinheiro',
+      nParcelas: document.getElementById('nv-n-parcelas')?.value || 1,
+      dataPrimeiraParcela: document.getElementById('nv-data-primeira-parcela')?.value || '',
+      intervaloParcelas: document.getElementById('nv-intervalo-parcelas')?.value || 30,
+      obs: document.getElementById('nv-obs')?.value || '',
+      transportadoraId: document.getElementById('nv-transportadora')?.value || '',
+      itens: []
+    };
+    // Coleta itens da tabela
+    document.querySelectorAll('#tbody-itens-venda tr').forEach(tr => {
+      const nome = tr.querySelector('.nv-item-produto')?.value || '';
+      const qtd = tr.querySelector('.nv-item-qtd')?.value || 1;
+      const preco = tr.querySelector('.nv-item-preco')?.value || 0;
+      if (nome.trim() || Number(preco) > 0) {
+        dados.itens.push({ produto: nome, qtd, preco });
+      }
+    });
+    return dados;
+  }
+
+  // Helper: restaura dados de venda pro form
+  function _restaurarDadosVenda(dados) {
+    try {
+      if (dados.cliente) document.getElementById('nv-cliente').value = dados.cliente;
+      if (dados.data) document.getElementById('nv-data').value = dados.data;
+      if (dados.tipoDesconto) document.getElementById('nv-tipo-desconto').value = dados.tipoDesconto;
+      if (dados.desconto) document.getElementById('nv-desconto').value = dados.desconto;
+      if (dados.pagamento) document.getElementById('nv-pagamento').value = dados.pagamento;
+      if (dados.nParcelas) document.getElementById('nv-n-parcelas').value = dados.nParcelas;
+      if (dados.dataPrimeiraParcela) document.getElementById('nv-data-primeira-parcela').value = dados.dataPrimeiraParcela;
+      if (dados.intervaloParcelas) document.getElementById('nv-intervalo-parcelas').value = dados.intervaloParcelas;
+      if (dados.obs) document.getElementById('nv-obs').value = dados.obs;
+      if (dados.transportadoraId) {
+        const sel = document.getElementById('nv-transportadora');
+        if (sel) sel.value = dados.transportadoraId;
+      }
+      // Restaura itens: limpa tabela e usa adicionarItemVenda(dados)
+      if (Array.isArray(dados.itens) && dados.itens.length > 0) {
+        document.getElementById('tbody-itens-venda').innerHTML = '';
+        dados.itens.forEach(it => {
+          adicionarItemVenda({ produto: it.produto, qtd: it.qtd, preco: it.preco });
+        });
+        atualizarTotaisVenda();
+      }
+      toggleParcelasVenda();
+    } catch(e) { console.warn('[autosave/venda] restaurar', e); }
   }
   function closeNovaVenda() {
     document.getElementById('modal-nova-venda').style.display = 'none';
+    // 💾 Para autosave (mantém rascunho para próxima abertura)
+    pararAutoSave('venda');
     document.getElementById('form-nova-venda').reset();
     document.getElementById('tbody-itens-venda').innerHTML = '';
     document.getElementById('tbody-parcelas-preview').innerHTML = '';
@@ -9491,6 +9843,8 @@ https://sistema.glinformatica.com.br
         obs: document.getElementById('nv-obs').value.trim(),
         transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null
       });
+      // 💾 Limpa rascunho após salvar
+      await finalizarAutoSave('venda');
 
       // Se essa venda veio de uma conversão de orçamento, marca o orçamento como convertido
       const orcamentoOrigemId = window._convertendoOrcamento;
@@ -14483,6 +14837,49 @@ ${conteudo}
     }
     renderItensOrc();
     document.getElementById('modal-orcamento').style.display = 'flex';
+
+    // 💾 AUTOSAVE — Orçamento Novo
+    const autoOrc = iniciarAutoSave('orcamento', {
+      chave: 'novo',
+      coletar: () => ({
+        cliente_id: document.getElementById('orc-cliente-id')?.value || '',
+        cliente_nome: document.getElementById('orc-cliente-nome')?.value || '',
+        validade_dias: document.getElementById('orc-validade')?.value || 7,
+        observacoes: document.getElementById('orc-observacoes')?.value || '',
+        condicoes_pagamento: document.getElementById('orc-condicoes')?.value || '',
+        desconto: document.getElementById('orc-desconto')?.value || 0,
+        transportadora_id: document.getElementById('orc-transportadora')?.value || '',
+        itens: _orcItensTemp || [],
+        ambientes: _ambientesCache || []
+      }),
+      restaurar: (dados) => {
+        try {
+          if (dados.cliente_id) document.getElementById('orc-cliente-id').value = dados.cliente_id;
+          if (dados.cliente_nome) document.getElementById('orc-cliente-nome').value = dados.cliente_nome;
+          if (dados.validade_dias) document.getElementById('orc-validade').value = dados.validade_dias;
+          if (dados.observacoes) document.getElementById('orc-observacoes').value = dados.observacoes;
+          if (dados.condicoes_pagamento) document.getElementById('orc-condicoes').value = dados.condicoes_pagamento;
+          if (dados.desconto) document.getElementById('orc-desconto').value = dados.desconto;
+          if (dados.transportadora_id) {
+            const sel = document.getElementById('orc-transportadora');
+            if (sel) sel.value = dados.transportadora_id;
+          }
+          if (Array.isArray(dados.itens) && dados.itens.length > 0) {
+            _orcItensTemp = dados.itens;
+            renderItensOrc();
+          }
+        } catch(e) { console.warn('[autosave/orc] restaurar', e); }
+      }
+    });
+    // Tenta restaurar rascunho existente
+    autoOrc.restaurarSeExistir().then(r => {
+      if (r.restaurado) {
+        const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
+        // Notificação discreta (não modal - só um toast)
+        mostrarToastAutosave(`♻️ Rascunho recuperado (${quando})`);
+      }
+    });
+    autoOrc.iniciar();
   }
   async function editarOrc(id) {
     try {
@@ -14531,10 +14928,53 @@ ${conteudo}
       renderItensOrc();
       document.getElementById('orc-erro').style.display = 'none';
       document.getElementById('modal-orcamento').style.display = 'flex';
+
+      // 💾 AUTOSAVE — Orçamento em Edição
+      const autoOrc = iniciarAutoSave('orcamento', {
+        chave: 'edit_' + id,
+        coletar: () => ({
+          orc_id: id,
+          cliente_id: document.getElementById('orc-cliente-id')?.value || '',
+          cliente_nome: document.getElementById('orc-cliente-nome')?.value || '',
+          validade_dias: document.getElementById('orc-validade')?.value || 7,
+          observacoes: document.getElementById('orc-observacoes')?.value || '',
+          condicoes_pagamento: document.getElementById('orc-condicoes')?.value || '',
+          desconto: document.getElementById('orc-desconto')?.value || 0,
+          transportadora_id: document.getElementById('orc-transportadora')?.value || '',
+          itens: _orcItensTemp || []
+        }),
+        restaurar: (dados) => {
+          try {
+            if (dados.cliente_id) document.getElementById('orc-cliente-id').value = dados.cliente_id;
+            if (dados.cliente_nome) document.getElementById('orc-cliente-nome').value = dados.cliente_nome;
+            if (dados.validade_dias) document.getElementById('orc-validade').value = dados.validade_dias;
+            if (dados.observacoes !== undefined) document.getElementById('orc-observacoes').value = dados.observacoes;
+            if (dados.condicoes_pagamento !== undefined) document.getElementById('orc-condicoes').value = dados.condicoes_pagamento;
+            if (dados.desconto !== undefined) document.getElementById('orc-desconto').value = dados.desconto;
+            if (dados.transportadora_id) {
+              const sel = document.getElementById('orc-transportadora');
+              if (sel) sel.value = dados.transportadora_id;
+            }
+            if (Array.isArray(dados.itens) && dados.itens.length > 0) {
+              _orcItensTemp = dados.itens;
+              renderItensOrc();
+            }
+          } catch(e) { console.warn('[autosave/orc] restaurar', e); }
+        }
+      });
+      autoOrc.restaurarSeExistir().then(r => {
+        if (r.restaurado) {
+          const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
+          mostrarToastAutosave(`♻️ Alterações não salvas recuperadas (${quando})`);
+        }
+      });
+      autoOrc.iniciar();
     } catch (err) { alert(err.message); }
   }
   function fecharOrcamento() {
     document.getElementById('modal-orcamento').style.display = 'none';
+    // 💾 Para autosave (mas mantém rascunho pra próxima vez que abrir)
+    pararAutoSave('orcamento');
   }
   async function carregarClientesParaOrc() {
     try {
@@ -15196,6 +15636,8 @@ ${conteudo}
       } else {
         await api('POST', '/api/orcamentos', dados);
       }
+      // 💾 Limpa rascunho (a chave é determinada pelo manager ativo)
+      await finalizarAutoSave('orcamento');
       fecharOrcamento();
       carregarOrcamentos();
     } catch (err) {

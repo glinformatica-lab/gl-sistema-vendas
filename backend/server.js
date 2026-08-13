@@ -20,7 +20,8 @@ app.use('/api/servicos',        autenticar, verificarAcesso, require('./routes/s
 app.use('/api/orcamentos',      autenticar, verificarAcesso, require('./routes/orcamentos'));
 app.use('/api/ambientes',       autenticar, verificarAcesso, require('./routes/ambientes'));
 app.use('/api/lista-compras',   autenticar, verificarAcesso, require('./routes/lista-compras'));
-app.use('/api/ordens-compra',   require('./routes/ordens-compra'));
+app.use('/api/ordens-compra',   autenticar, verificarAcesso, require('./routes/ordens-compra'));
+app.use('/api/rascunhos',       autenticar, verificarAcesso, require('./routes/rascunhos'));
 app.use('/api/transportadoras', autenticar, verificarAcesso, require('./routes/transportadoras'));
 app.use('/api/clientes',        autenticar, verificarAcesso, require('./routes/clientes'));
 app.use('/api/fornecedores',    autenticar, verificarAcesso, require('./routes/fornecedores'));
