@@ -2367,6 +2367,37 @@
   </div>
 
   <!-- Modal de Serviço -->
+  <!-- Modal: Recuperar Rascunho -->
+  <div id="modal-recuperar-rascunho" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10015;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:480px;width:100%;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:44px;margin-bottom:6px;">♻️</div>
+        <h2 style="color:#0891b2;margin:0;font-size:20px;">Rascunho encontrado</h2>
+      </div>
+
+      <div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:13px;color:#1e40af;margin-bottom:6px;">
+          Você tem um <strong id="rasc-tipo">formulário</strong> não salvo:
+        </div>
+        <div style="font-size:15px;font-weight:700;color:#0f172a;" id="rasc-quando">—</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;" id="rasc-fonte">—</div>
+      </div>
+
+      <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#92400e;">
+        💡 <strong>Dica:</strong> Se optar por começar do zero, o rascunho anterior será perdido.
+      </div>
+
+      <div style="display:flex;gap:10px;flex-direction:column;">
+        <button type="button" id="btn-continuar-rascunho" style="padding:14px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">
+          ♻️ Continuar de onde parei
+        </button>
+        <button type="button" id="btn-comecar-zero" style="padding:12px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">
+          🆕 Começar do zero
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Nova Ordem de Compra -->
   <div id="modal-nova-oc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -5909,42 +5940,77 @@ https://sistema.glinformatica.com.br
       }
     }
 
-    // Restaura rascunho (localStorage tem prioridade, servidor como fallback)
-    async restaurarSeExistir() {
+    // Verifica se existe rascunho SEM restaurar (retorna metadados)
+    async verificarExistente() {
       try {
-        // 1. Tenta localStorage primeiro (mais recente)
+        // 1. Tenta localStorage primeiro
         const local = localStorage.getItem(this.storageKey);
         if (local) {
           const payload = JSON.parse(local);
           if (payload.conteudo && this._temDados(payload.conteudo)) {
-            this._log('restaurando do localStorage');
-            this.restaurar(payload.conteudo);
-            this.ultimoHash = this._hash(payload.conteudo);
-            return { restaurado: true, fonte: 'local', salvoEm: payload.salvoEm };
+            return {
+              existe: true,
+              fonte: 'local',
+              salvoEm: payload.salvoEm,
+              conteudo: payload.conteudo
+            };
           }
         }
-
         // 2. Tenta servidor
         if (this.online) {
           const url = `/api/rascunhos/${this.tipoForm}${this.chave ? '?chave=' + encodeURIComponent(this.chave) : ''}`;
           const r = await api('GET', url);
           if (r && r.existe && r.conteudo && this._temDados(r.conteudo)) {
-            this._log('restaurando do servidor');
-            this.restaurar(r.conteudo);
-            this.ultimoHash = this._hash(r.conteudo);
-            // Sync pro localStorage
-            localStorage.setItem(this.storageKey, JSON.stringify({
-              conteudo: r.conteudo,
-              salvoEm: r.atualizadoEm
-            }));
-            return { restaurado: true, fonte: 'servidor', salvoEm: r.atualizadoEm };
+            return {
+              existe: true,
+              fonte: 'servidor',
+              salvoEm: r.atualizadoEm,
+              conteudo: r.conteudo
+            };
           }
         }
-        return { restaurado: false };
+        return { existe: false };
       } catch(e) {
-        console.warn('[autosave] restaurar', e);
-        return { restaurado: false };
+        console.warn('[autosave] verificarExistente', e);
+        return { existe: false };
       }
+    }
+
+    // Aplica o conteúdo (sem verificação - útil quando já foi verificado antes)
+    aplicarConteudo(conteudo) {
+      try {
+        this.restaurar(conteudo);
+        this.ultimoHash = this._hash(conteudo);
+        // Garante que também está no localStorage
+        localStorage.setItem(this.storageKey, JSON.stringify({
+          conteudo: conteudo,
+          salvoEm: new Date().toISOString()
+        }));
+      } catch(e) { console.warn('[autosave] aplicarConteudo', e); }
+    }
+
+    // DESCARTA o rascunho existente (usuário clicou "começar do zero")
+    async descartar() {
+      try {
+        localStorage.removeItem(this.storageKey);
+        this.ultimoHash = null;
+        if (this.online) {
+          const url = `/api/rascunhos/${this.tipoForm}${this.chave ? '?chave=' + encodeURIComponent(this.chave) : ''}`;
+          await api('DELETE', url);
+        }
+        this._log('rascunho descartado pelo usuário');
+      } catch(e) { console.warn('[autosave] descartar', e); }
+    }
+
+    // Restaura rascunho (localStorage tem prioridade, servidor como fallback)
+    async restaurarSeExistir() {
+      const r = await this.verificarExistente();
+      if (r.existe) {
+        this._log(`restaurando do ${r.fonte}`);
+        this.aplicarConteudo(r.conteudo);
+        return { restaurado: true, fonte: r.fonte, salvoEm: r.salvoEm };
+      }
+      return { restaurado: false };
     }
 
     // Inicia monitoramento automático
@@ -6012,6 +6078,62 @@ https://sistema.glinformatica.com.br
   async function finalizarAutoSave(tipoForm) {
     const auto = window._autoSaveManagers[tipoForm];
     if (auto) { await auto.finalizar(); delete window._autoSaveManagers[tipoForm]; }
+  }
+
+  // Mostra modal perguntando se quer continuar rascunho ou começar do zero
+  // Retorna Promise que resolve com: true (continuou) / false (começou do zero) / null (sem rascunho)
+  async function perguntarSeRestaurar(auto, labelForm) {
+    const r = await auto.verificarExistente();
+    if (!r.existe) return null; // Não tem rascunho, não pergunta
+
+    return new Promise((resolve) => {
+      const modal = document.getElementById('modal-recuperar-rascunho');
+      const tipoEl = document.getElementById('rasc-tipo');
+      const quandoEl = document.getElementById('rasc-quando');
+      const fonteEl = document.getElementById('rasc-fonte');
+      const btnCont = document.getElementById('btn-continuar-rascunho');
+      const btnZero = document.getElementById('btn-comecar-zero');
+
+      // Formata tempo "há X"
+      let tempoAtras = '';
+      try {
+        const dt = new Date(r.salvoEm);
+        const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
+        if (diff < 60) tempoAtras = 'agora há pouco';
+        else if (diff < 3600) tempoAtras = `há ${Math.floor(diff/60)} minuto${Math.floor(diff/60)===1?'':'s'}`;
+        else if (diff < 86400) tempoAtras = `há ${Math.floor(diff/3600)} hora${Math.floor(diff/3600)===1?'':'s'}`;
+        else tempoAtras = `há ${Math.floor(diff/86400)} dia${Math.floor(diff/86400)===1?'':'s'}`;
+      } catch(e) { tempoAtras = 'recentemente'; }
+
+      const dataFmt = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
+      const fonteFmt = r.fonte === 'local' ? '💻 Salvo neste computador' : '☁️ Salvo no servidor';
+
+      tipoEl.textContent = labelForm || 'formulário';
+      quandoEl.textContent = tempoAtras;
+      fonteEl.textContent = `${fonteFmt} · ${dataFmt}`;
+
+      // Handlers (novos a cada abertura pra evitar acúmulo)
+      const onContinuar = async () => {
+        cleanup();
+        modal.style.display = 'none';
+        auto.aplicarConteudo(r.conteudo);
+        resolve(true);
+      };
+      const onZero = async () => {
+        cleanup();
+        modal.style.display = 'none';
+        await auto.descartar();
+        resolve(false);
+      };
+      const cleanup = () => {
+        btnCont.removeEventListener('click', onContinuar);
+        btnZero.removeEventListener('click', onZero);
+      };
+      btnCont.addEventListener('click', onContinuar);
+      btnZero.addEventListener('click', onZero);
+
+      modal.style.display = 'flex';
+    });
   }
 
   // Toast discreto para notificações do autosave
@@ -9446,13 +9568,8 @@ https://sistema.glinformatica.com.br
       coletar: () => _coletarDadosVenda(),
       restaurar: (dados) => _restaurarDadosVenda(dados)
     });
-    autoV.restaurarSeExistir().then(r => {
-      if (r.restaurado) {
-        const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
-        mostrarToastAutosave(`♻️ Venda em progresso recuperada (${quando})`);
-      }
-    });
     autoV.iniciar();
+    perguntarSeRestaurar(autoV, 'venda em progresso');
   }
 
   // Helper: coleta dados atuais da venda pra rascunho
@@ -14872,14 +14989,8 @@ ${conteudo}
       }
     });
     // Tenta restaurar rascunho existente
-    autoOrc.restaurarSeExistir().then(r => {
-      if (r.restaurado) {
-        const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
-        // Notificação discreta (não modal - só um toast)
-        mostrarToastAutosave(`♻️ Rascunho recuperado (${quando})`);
-      }
-    });
     autoOrc.iniciar();
+    perguntarSeRestaurar(autoOrc, 'orçamento em progresso');
   }
   async function editarOrc(id) {
     try {
@@ -14962,13 +15073,8 @@ ${conteudo}
           } catch(e) { console.warn('[autosave/orc] restaurar', e); }
         }
       });
-      autoOrc.restaurarSeExistir().then(r => {
-        if (r.restaurado) {
-          const quando = r.salvoEm ? new Date(r.salvoEm).toLocaleString('pt-BR') : '';
-          mostrarToastAutosave(`♻️ Alterações não salvas recuperadas (${quando})`);
-        }
-      });
       autoOrc.iniciar();
+      perguntarSeRestaurar(autoOrc, 'edição em progresso deste orçamento');
     } catch (err) { alert(err.message); }
   }
   function fecharOrcamento() {
