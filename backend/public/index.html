@@ -930,12 +930,12 @@
     <!-- Ordens de Compra (Módulo Iluminação - grupo Estoque) -->
     <div id="page-ordens-compra" style="display:none;">
       <div class="page-title">📋 Ordens de Compra</div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Agrupe itens da Lista de Compras em ordens por fornecedor. Envie a ordem em PDF e acompanhe até o recebimento.</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Ordens de compra são geradas a partir de <strong style="color:#7c3aed;">Cotações</strong>. Cote com múltiplos fornecedores, compare preços e escolha o vencedor por item.</div>
 
       <!-- Botão + filtros -->
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-        <button class="btn" type="button" onclick="abrirNovaOrdemCompra()" style="background:#0891b2;color:#fff;font-weight:700;">
-          ➕ Nova Ordem de Compra
+        <button class="btn" type="button" onclick="showPage('cotacoes')" style="background:#7c3aed;color:#fff;font-weight:700;" title="Ordens são geradas a partir de cotações">
+          💬 Nova via Cotação
         </button>
         <input type="text" id="oc-busca" oninput="renderOrdensCompra()" placeholder="🔎 Buscar por nº ou fornecedor"
                style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
@@ -14861,7 +14861,7 @@ ${conteudo}
 
     if (filtrados.length === 0) {
       const msg = _ocFiltro === 'rascunho'
-        ? '📭 Nenhum rascunho. Clique em "Nova Ordem de Compra" pra criar.'
+        ? '📭 Nenhum rascunho. Crie uma <strong style="color:#7c3aed;">Cotação</strong> primeiro — as ordens são geradas ao fechar uma cotação.'
         : `Nenhuma ordem "${_ocFiltro}" encontrada.`;
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
       return;
@@ -14907,6 +14907,15 @@ ${conteudo}
 
   // ===== NOVA ORDEM =====
   async function abrirNovaOrdemCompra() {
+    // LOTE D: fluxo antigo desabilitado. Ordens são geradas via Cotações.
+    alert('📋 Ordens de Compra agora são geradas a partir de Cotações.\n\nCote com múltiplos fornecedores, compare preços e escolha o vencedor por item — o sistema gera as ordens automaticamente.');
+    showPage('cotacoes');
+    setTimeout(() => {
+      if (typeof abrirNovaCotacao === 'function') abrirNovaCotacao();
+    }, 300);
+  }
+
+  async function _abrirNovaOrdemCompra_LEGADO() {
     try {
       // Carrega itens pendentes da lista_compras (sem ordem vinculada)
       const todos = await api('GET', '/api/lista-compras');

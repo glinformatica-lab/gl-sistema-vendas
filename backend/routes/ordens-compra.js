@@ -86,6 +86,18 @@ router.get('/:id', async (req, res) => {
 //   observacao: 'texto'
 // }
 router.post('/', async (req, res) => {
+  // BLOQUEADO: Ordens de compra agora só via cotação
+  return res.status(400).json({
+    error: 'Criação direta de ordem foi desabilitada. Ordens são geradas ao fechar uma Cotação. Acesse Menu Estoque → Cotações.'
+  });
+});
+
+// ==========================================
+// (LEGADO — mantido comentado como referência)
+// Rota antiga de criar ordem direto da Lista de Compras
+// Substituída pelo fluxo via Cotações (LOTE D)
+// ==========================================
+async function _createOrdemLegado(req, res) {
   const { listaComprasIds, fornecedorId, observacao } = req.body || {};
 
   if (!Array.isArray(listaComprasIds) || listaComprasIds.length === 0) {
@@ -221,7 +233,7 @@ router.post('/', async (req, res) => {
   } finally {
     client.release();
   }
-});
+}
 
 // POST /:id/enviada — Marca ordem como enviada + coloca itens da lista como 'pedido'
 router.post('/:id/enviada', async (req, res) => {
