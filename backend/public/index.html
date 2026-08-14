@@ -13655,7 +13655,7 @@ ${conteudo}
     };
 
     tbody.innerHTML = filtrados.map(o => {
-      const fornecedor = o.fornecedor_nome_atual || o.fornecedor_nome || '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
+      const fornecedor = o.fornecedor_nome || o.fornecedor_nome_atual || '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
       let acoes = `<button onclick="visualizarOrdemCompra(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes">👁️</button>`;
 
       if (o.status === 'rascunho') {
@@ -13886,11 +13886,8 @@ ${conteudo}
           </div>
 
           <div class="bloco">
-            <strong>🏢 Fornecedor:</strong> ${escapeHtml(o.fornecedor_nome_atual || o.fornecedor_nome || '— Não definido —')}
-            ${o.fornecedor_cnpj ? `<br><strong>CNPJ:</strong> ${escapeHtml(o.fornecedor_cnpj)}` : ''}
-            ${o.fornecedor_email ? `<br><strong>E-mail:</strong> ${escapeHtml(o.fornecedor_email)}` : ''}
-            ${o.fornecedor_telefone ? `<br><strong>Telefone:</strong> ${escapeHtml(o.fornecedor_telefone)}` : ''}
-            ${o.fornecedor_endereco ? `<br><strong>Endereço:</strong> ${escapeHtml(o.fornecedor_endereco)}${o.fornecedor_cidade ? ', ' + escapeHtml(o.fornecedor_cidade) : ''}${o.fornecedor_uf ? '/' + escapeHtml(o.fornecedor_uf) : ''}` : ''}
+            <strong>🏢 Fornecedor:</strong> ${escapeHtml(o.fornecedor_nome || o.fornecedor_nome_atual || '— Não definido —')}
+            ${o.fornecedor_doc ? `<br><strong>CPF/CNPJ:</strong> ${escapeHtml(o.fornecedor_doc)}` : ''}
           </div>
 
           ${o.observacao ? `<div class="bloco"><strong>📝 Observações:</strong><br>${escapeHtml(o.observacao)}</div>` : ''}

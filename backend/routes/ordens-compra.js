@@ -58,10 +58,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const rOc = await db.query(
-      `SELECT oc.*, f.nome AS fornecedor_nome_atual,
-              f.email AS fornecedor_email, f.telefone AS fornecedor_telefone,
-              f.cnpj AS fornecedor_cnpj, f.endereco AS fornecedor_endereco,
-              f.cidade AS fornecedor_cidade, f.uf AS fornecedor_uf
+      `SELECT oc.*,
+              f.nome AS fornecedor_nome_atual,
+              f.doc  AS fornecedor_doc
        FROM ordens_compra oc
        LEFT JOIN fornecedores f ON f.id = oc.fornecedor_id
        WHERE oc.id = $1 AND oc.empresa_id = $2`,
