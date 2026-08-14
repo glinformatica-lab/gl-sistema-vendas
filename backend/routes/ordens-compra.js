@@ -7,9 +7,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { autenticar } = require('../middleware/auth');
 
-router.use(autenticar);
+// autenticar e verificarAcesso já vêm do server.js
+// Só precisamos validar módulo iluminação + papel estoque/admin
 
 // Middleware: bloqueia se empresa não usa iluminação
 async function requerAmbientes(req, res, next) {
@@ -111,7 +111,7 @@ router.post('/', async (req, res) => {
          AND lc.empresa_id = $2
          AND lc.status = 'pendente'
          AND lc.ordem_compra_id IS NULL
-       FOR UPDATE`,
+       FOR UPDATE OF lc`,
       [idsInt, req.user.empresaId]
     );
 
