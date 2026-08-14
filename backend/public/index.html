@@ -14202,7 +14202,7 @@ ${conteudo}
       sub.push(`${_vercotData.itens.length} item(ns)`);
       sub.push(`${_vercotData.fornecedores.length} fornecedor(es)`);
       if (c.observacao) sub.push(`Obs: ${c.observacao}`);
-      if (c.prazo_resposta) sub.push(`Prazo: ${new Date(c.prazo_resposta + 'T00:00:00').toLocaleDateString('pt-BR')}`);
+      if (c.prazo_resposta) sub.push(`Prazo: ${formatarDataBR(c.prazo_resposta)}`);
       document.getElementById('vercot-subtitulo').textContent = sub.join(' · ');
 
       // Renderiza aba padrão (preços)
@@ -14701,7 +14701,7 @@ ${conteudo}
               <h1>💬 SOLICITAÇÃO DE COTAÇÃO</h1>
               <div style="font-size:22px;color:#7c3aed;font-weight:700;">Nº ${String(c.numero).padStart(3, '0')}</div>
               <div style="font-size:12px;color:#666;margin-top:4px;">Emitida em ${new Date(c.data_criacao).toLocaleDateString('pt-BR')}</div>
-              ${c.prazo_resposta ? `<div style="font-size:12px;color:#dc2626;margin-top:4px;font-weight:700;">⏰ Responder até: ${new Date(c.prazo_resposta + 'T00:00:00').toLocaleDateString('pt-BR')}</div>` : ''}
+              ${c.prazo_resposta ? `<div style="font-size:12px;color:#dc2626;margin-top:4px;font-weight:700;">⏰ Responder até: ${formatarDataBR(c.prazo_resposta)}</div>` : ''}
             </div>
             <div class="empresa">
               <strong>${escapeHtml(empresa.nome || '')}</strong><br>
