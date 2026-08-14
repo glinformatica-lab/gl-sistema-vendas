@@ -14662,11 +14662,17 @@ ${conteudo}
   async function imprimirCotacaoPdf(id) {
     try {
       const r = await api('GET', `/api/cotacoes/${id}`);
+      console.log('[cotacao PDF] dados recebidos:', r);
+      console.log('[cotacao PDF] observacao:', JSON.stringify(r.cotacao?.observacao));
+
       const w = window.open('', '_blank');
       const c = r.cotacao;
       const itens = r.itens || [];
       const fornecedores = r.fornecedores || [];
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+
+      // Escape robusto pra evitar quebra do template string
+      const obsCotacao = c.observacao ? String(c.observacao).trim() : '';
 
       const html = `
         <!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -14710,7 +14716,11 @@ ${conteudo}
             <strong>📝 Prezado fornecedor:</strong> gostaríamos de receber sua cotação para os produtos abaixo. Por favor preencha os preços unitários, prazo de entrega e condições, e nos retorne por resposta.
           </div>
 
-          ${c.observacao ? `<div class="bloco"><strong>📌 Observações:</strong><br>${escapeHtml(c.observacao)}</div>` : ''}
+          ${obsCotacao ? `
+          <div class="bloco" style="background:#faf5ff;border-left-color:#7c3aed;">
+            <strong style="color:#6b21a8;">📌 Observações da cotação:</strong>
+            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(obsCotacao)}</div>
+          </div>` : ''}
 
           <table>
             <thead>
