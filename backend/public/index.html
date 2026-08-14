@@ -579,6 +579,7 @@
       <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('entrada-mercadorias')">&#128229; Entrada de Mercadorias</button>
       <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('cotacoes')">&#128172; Cotações <span id="badge-cotacoes" style="display:none;background:#7c3aed;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('ordens-compra')">&#128203; Ordens de Compra <span id="badge-ordens-compra" style="display:none;background:#0891b2;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
@@ -886,6 +887,44 @@
           <!-- renderizado dinamicamente -->
         </tbody>
       </table>
+    </div>
+
+    <!-- Cotações (Módulo Iluminação - grupo Estoque) -->
+    <div id="page-cotacoes" style="display:none;">
+      <div class="page-title">💬 Cotações</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:14px;">Cote produtos com múltiplos fornecedores, compare preços e converta em ordens de compra escolhendo item por item.</div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" type="button" onclick="abrirNovaCotacao()" style="background:#7c3aed;color:#fff;font-weight:700;">
+          ➕ Nova Cotação
+        </button>
+        <input type="text" id="cot-busca" oninput="renderCotacoes()" placeholder="🔎 Buscar por nº ou observação"
+               style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+        <button type="button" id="cot-filtro-aberta" onclick="filtrarCotacoes('aberta')" style="padding:8px 14px;border:2px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;">📤 Abertas</button>
+        <button type="button" id="cot-filtro-recebendo" onclick="filtrarCotacoes('recebendo')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">📥 Recebendo</button>
+        <button type="button" id="cot-filtro-fechada" onclick="filtrarCotacoes('fechada')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">✅ Fechadas</button>
+        <button type="button" id="cot-filtro-cancelada" onclick="filtrarCotacoes('cancelada')" style="padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">❌ Canceladas</button>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;width:80px;">Nº</th>
+              <th style="padding:10px;text-align:center;width:80px;">Itens</th>
+              <th style="padding:10px;text-align:center;width:120px;">Fornecedores</th>
+              <th style="padding:10px;text-align:center;width:130px;">Respostas</th>
+              <th style="padding:10px;text-align:left;">Observação</th>
+              <th style="padding:10px;text-align:left;width:120px;">Criada em</th>
+              <th style="padding:10px;text-align:center;width:110px;">Status</th>
+              <th style="padding:10px;text-align:center;width:200px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cotacoes">
+            <tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Ordens de Compra (Módulo Iluminação - grupo Estoque) -->
@@ -2568,6 +2607,78 @@
         <button type="button" id="btn-comecar-zero" style="padding:12px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">
           🆕 Começar do zero
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nova Cotação -->
+  <div id="modal-nova-cot" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:26px;border-radius:14px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+          <h2 style="color:#7c3aed;margin:0;font-size:22px;">💬 Nova Cotação</h2>
+          <div style="font-size:13px;color:#64748b;margin-top:4px;">Selecione os itens e os fornecedores para cotar.</div>
+        </div>
+        <button onclick="fecharNovaCot()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- Fornecedores -->
+      <div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:14px;margin-bottom:14px;">
+        <label style="font-weight:600;font-size:13px;color:#6b21a8;display:block;margin-bottom:8px;">🏢 Fornecedores para cotar * <span style="font-weight:400;color:#94a3b8;">(mínimo 2 recomendado)</span></label>
+        <div id="ncot-fornecedores-lista" style="max-height:150px;overflow-y:auto;background:#fff;border:1px solid #e9d5ff;border-radius:6px;padding:8px;">
+          <div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Carregando fornecedores...</div>
+        </div>
+        <div style="font-size:11px;color:#7c3aed;margin-top:6px;"><span id="ncot-forn-selecionados">0 fornecedor(es) selecionado(s)</span></div>
+      </div>
+
+      <!-- Observações + prazo -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">📝 Observações (opcional)</label>
+          <textarea id="ncot-obs" rows="2" placeholder="Ex: entrega urgente, cotar entrega em SP..."
+                    style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">📅 Prazo de resposta</label>
+          <input type="date" id="ncot-prazo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">Até quando os fornecedores devem responder</div>
+        </div>
+      </div>
+
+      <!-- Cabeçalho da lista -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="color:#334155;font-size:14px;">🛒 Itens pendentes na Lista de Compras</strong>
+        <span id="ncot-selecionados" style="font-size:12px;color:#7c3aed;font-weight:700;">0 selecionados</span>
+      </div>
+
+      <!-- Avisos -->
+      <div id="ncot-avisos" style="display:none;background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px;border-radius:6px;font-size:12px;margin-bottom:10px;"></div>
+
+      <!-- Lista de itens pendentes -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;max-height:340px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;position:sticky;top:0;">
+            <tr>
+              <th style="padding:10px;text-align:center;width:40px;"><input type="checkbox" id="ncot-check-todos" onclick="ncotToggleTodos(this.checked)" style="cursor:pointer;transform:scale(1.2);"></th>
+              <th style="padding:10px;text-align:left;">Produto</th>
+              <th style="padding:10px;text-align:center;width:70px;">Qtd</th>
+              <th style="padding:10px;text-align:left;width:150px;">Orçamento</th>
+              <th style="padding:10px;text-align:left;width:150px;">Cliente</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ncot-itens">
+            <tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="ncot-preview" style="display:none;margin-top:14px;background:#faf5ff;border:1px solid #a855f7;padding:12px;border-radius:8px;font-size:13px;color:#6b21a8;"></div>
+
+      <div id="ncot-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <button type="button" onclick="fecharNovaCot()" style="flex:1;padding:12px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="confirmarNovaCot()" style="flex:2;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💬 Criar Cotação</button>
       </div>
     </div>
   </div>
@@ -6603,6 +6714,7 @@ https://sistema.glinformatica.com.br
     'separacao': 'estoque',
     'entrada-mercadorias': 'estoque',
     'ordens-compra': 'estoque',
+    'cotacoes': 'estoque',
     'catalogo': 'vendas-online',
     'pedidos-online': 'vendas-online',
     'caixa': 'financeiro',
@@ -6737,7 +6849,7 @@ https://sistema.glinformatica.com.br
   const _paginasEstoque = [
     'dashboard', 'produtos', 'servicos', 'fornecedores', 'marcas', 'transportadoras',
     'orcamentos', 'lista-compras', 'separacao', 'entrada-mercadorias', 'ordens-compra',
-    'ambientes', 'minha-conta'
+    'cotacoes', 'ambientes', 'minha-conta'
   ];
   const _paginasVendedor = [
     'dashboard', 'vendas', 'orcamentos', 'clientes', 'ambientes', 'minha-conta'
@@ -6861,6 +6973,20 @@ https://sistema.glinformatica.com.br
         return;
       }
       carregarOrdensCompra();
+    }
+    if(pg === 'cotacoes') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      if (!['admin', 'estoque'].includes(window._papelAtual)) {
+        alert('Acesso restrito: apenas admin ou estoque pode acessar Cotações.');
+        showPage('dashboard');
+        return;
+      }
+      carregarCotacoes();
     }
     // Bloqueia páginas pra vendedor
     if (window._papelAtual === 'vendedor' && !podeAcessarPagina(pg)) {
@@ -13568,6 +13694,403 @@ ${conteudo}
     }
   }
 
+  // ====== COTAÇÕES ======
+  let _cotacoesCache = [];
+  let _cotFiltro = 'aberta';
+  let _ncotItensPendentes = [];
+  let _ncotFornecedoresCache = [];
+
+  async function carregarCotacoes() {
+    try {
+      _cotacoesCache = await api('GET', '/api/cotacoes') || [];
+      atualizarBadgeCotacoes();
+      renderCotacoes();
+    } catch (e) {
+      const tbody = document.getElementById('tbody-cotacoes');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function atualizarBadgeCotacoes() {
+    const badge = document.getElementById('badge-cotacoes');
+    if (!badge) return;
+    const papel = window._papelAtual;
+    if (!['admin', 'estoque'].includes(papel)) {
+      badge.style.display = 'none';
+      return;
+    }
+    // Badge mostra cotações abertas + recebendo (que precisam ação)
+    const ativas = _cotacoesCache.filter(c => ['aberta', 'recebendo'].includes(c.status)).length;
+    if (ativas > 0) {
+      badge.textContent = ativas;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+    if (typeof atualizarBadgeGrupoEstoque === 'function') atualizarBadgeGrupoEstoque();
+  }
+
+  function filtrarCotacoes(status) {
+    _cotFiltro = status;
+    const cores = {
+      'aberta':     { br: '#fbbf24', bg: '#fef3c7', tx: '#92400e' },
+      'recebendo':  { br: '#3b82f6', bg: '#dbeafe', tx: '#1e40af' },
+      'fechada':    { br: '#16a34a', bg: '#dcfce7', tx: '#166534' },
+      'cancelada':  { br: '#94a3b8', bg: '#f1f5f9', tx: '#475569' }
+    };
+    ['aberta', 'recebendo', 'fechada', 'cancelada'].forEach(s => {
+      const btn = document.getElementById('cot-filtro-' + s);
+      if (!btn) return;
+      if (s === status) {
+        const c = cores[s];
+        btn.style.cssText = `padding:8px 14px;border:2px solid ${c.br};background:${c.bg};color:${c.tx};border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;`;
+      } else {
+        btn.style.cssText = 'padding:8px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;';
+      }
+    });
+    renderCotacoes();
+  }
+
+  function renderCotacoes() {
+    const tbody = document.getElementById('tbody-cotacoes');
+    if (!tbody) return;
+    const termo = (document.getElementById('cot-busca')?.value || '').toLowerCase().trim();
+
+    let filtrados = _cotacoesCache.filter(c => c.status === _cotFiltro);
+    if (termo) {
+      filtrados = filtrados.filter(c =>
+        String(c.numero).includes(termo) ||
+        (c.observacao || '').toLowerCase().includes(termo)
+      );
+    }
+
+    if (filtrados.length === 0) {
+      const msg = _cotFiltro === 'aberta'
+        ? '📭 Nenhuma cotação aberta. Clique em "Nova Cotação" pra criar.'
+        : `Nenhuma cotação "${_cotFiltro}" encontrada.`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
+      return;
+    }
+
+    const statusBadges = {
+      aberta:    '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📤 Aberta</span>',
+      recebendo: '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">📥 Recebendo</span>',
+      fechada:   '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✅ Fechada</span>',
+      cancelada: '<span style="background:#f1f5f9;color:#475569;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">❌ Cancelada</span>'
+    };
+
+    tbody.innerHTML = filtrados.map(c => {
+      let acoes = `<button onclick="verCotacao(${c.id})" style="background:#faf5ff;color:#7c3aed;border:1px solid #d8b4fe;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes/preços">👁️</button>`;
+      acoes += `<button onclick="imprimirCotacaoPdf(${c.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Imprimir PDF (sem preços)">🖨️</button>`;
+      if (['aberta', 'recebendo'].includes(c.status)) {
+        acoes += `<button onclick="cancelarCotacao(${c.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;" title="Cancelar">❌</button>`;
+      }
+
+      const respostas = `${c.total_respondeu || 0}/${c.total_fornecedores || 0}`;
+
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:10px;"><strong style="color:#7c3aed;">#${String(c.numero).padStart(3, '0')}</strong></td>
+          <td style="padding:10px;text-align:center;"><span style="background:#f3f4f6;color:#475569;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${c.total_itens || 0}</span></td>
+          <td style="padding:10px;text-align:center;"><span style="background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${c.total_fornecedores || 0}</span></td>
+          <td style="padding:10px;text-align:center;"><span style="background:${(c.total_respondeu || 0) === (c.total_fornecedores || 0) ? '#dcfce7' : '#fef3c7'};color:${(c.total_respondeu || 0) === (c.total_fornecedores || 0) ? '#166534' : '#92400e'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${respostas}</span></td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml((c.observacao || '').substring(0, 60))}${(c.observacao || '').length > 60 ? '...' : ''}</td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${c.data_criacao ? new Date(c.data_criacao).toLocaleDateString('pt-BR') : '—'}</td>
+          <td style="padding:10px;text-align:center;">${statusBadges[c.status] || c.status}</td>
+          <td style="padding:10px;text-align:center;">${acoes}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ===== NOVA COTAÇÃO =====
+  async function abrirNovaCotacao() {
+    try {
+      // Carrega itens pendentes (sem cotação vinculada ativa)
+      const todos = await api('GET', '/api/lista-compras');
+      _ncotItensPendentes = (todos || []).filter(x => x.status === 'pendente' && !x.ordemCompraId);
+
+      if (_ncotItensPendentes.length === 0) {
+        alert('📭 Nenhum item pendente na Lista de Compras.\n\nAdicione itens antes de criar uma cotação.');
+        return;
+      }
+
+      // Carrega fornecedores
+      _ncotFornecedoresCache = await api('GET', '/api/fornecedores') || [];
+      if (_ncotFornecedoresCache.length === 0) {
+        alert('⚠️ Nenhum fornecedor cadastrado.\n\nCadastre fornecedores antes de cotar (Menu Cadastros → Fornecedores).');
+        return;
+      }
+
+      // Popula fornecedores (checkbox list)
+      const contForn = document.getElementById('ncot-fornecedores-lista');
+      contForn.innerHTML = _ncotFornecedoresCache.map(f => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:4px;font-size:13px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background=''">
+          <input type="checkbox" class="ncot-forn-check" value="${f.id}" onclick="ncotAtualizarSelecaoForn()" style="cursor:pointer;transform:scale(1.15);">
+          <span style="font-weight:600;">${escapeHtml(f.nome)}</span>
+          ${f.doc ? `<span style="color:#94a3b8;font-size:11px;">${escapeHtml(f.doc)}</span>` : ''}
+        </label>
+      `).join('');
+
+      document.getElementById('ncot-obs').value = '';
+      document.getElementById('ncot-prazo').value = '';
+      document.getElementById('ncot-erro').style.display = 'none';
+      document.getElementById('ncot-preview').style.display = 'none';
+      document.getElementById('ncot-avisos').style.display = 'none';
+      document.getElementById('ncot-check-todos').checked = false;
+      document.getElementById('ncot-forn-selecionados').textContent = '0 fornecedor(es) selecionado(s)';
+      document.getElementById('ncot-selecionados').textContent = '0 selecionados';
+      renderNcotItens();
+      document.getElementById('modal-nova-cot').style.display = 'flex';
+    } catch (e) {
+      alert('Erro ao abrir: ' + e.message);
+    }
+  }
+
+  function renderNcotItens() {
+    const tbody = document.getElementById('tbody-ncot-itens');
+    if (!tbody) return;
+    tbody.innerHTML = _ncotItensPendentes.map(item => `
+      <tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:10px;text-align:center;"><input type="checkbox" class="ncot-check-item" data-id="${item.id}" onclick="ncotAtualizarSelecao()" style="cursor:pointer;transform:scale(1.2);"></td>
+        <td style="padding:10px;">
+          <div style="font-weight:600;">${escapeHtml(item.produtoNome)}</div>
+          ${item.referencia ? `<div style="font-size:11px;color:#7c3aed;">Ref: ${escapeHtml(item.referencia)}</div>` : ''}
+        </td>
+        <td style="padding:10px;text-align:center;font-weight:700;">${item.quantidade}</td>
+        <td style="padding:10px;font-size:12px;">${item.orcamentoNumero ? '#' + item.orcamentoNumero : '<em style="color:#94a3b8;">Avulso</em>'}</td>
+        <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(item.clienteNome || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function ncotToggleTodos(marcar) {
+    document.querySelectorAll('.ncot-check-item').forEach(chk => chk.checked = marcar);
+    ncotAtualizarSelecao();
+  }
+
+  function ncotAtualizarSelecaoForn() {
+    const marcados = document.querySelectorAll('.ncot-forn-check:checked').length;
+    document.getElementById('ncot-forn-selecionados').textContent = `${marcados} fornecedor(es) selecionado(s)`;
+  }
+
+  async function ncotAtualizarSelecao() {
+    const marcados = document.querySelectorAll('.ncot-check-item:checked');
+    document.getElementById('ncot-selecionados').textContent = `${marcados.length} ${marcados.length === 1 ? 'selecionado' : 'selecionados'}`;
+
+    const todos = document.querySelectorAll('.ncot-check-item');
+    const chkTodos = document.getElementById('ncot-check-todos');
+    if (chkTodos) chkTodos.checked = (marcados.length === todos.length && todos.length > 0);
+
+    const preview = document.getElementById('ncot-preview');
+    const avisos = document.getElementById('ncot-avisos');
+    if (marcados.length === 0) {
+      preview.style.display = 'none';
+      avisos.style.display = 'none';
+      return;
+    }
+
+    const ids = [...marcados].map(chk => parseInt(chk.dataset.id));
+    const selecionados = _ncotItensPendentes.filter(x => ids.includes(x.id));
+
+    // Preview de agrupamento
+    const grupos = new Map();
+    selecionados.forEach(it => {
+      const chave = it.produtoNome.toLowerCase();
+      if (!grupos.has(chave)) grupos.set(chave, { nome: it.produtoNome, qtd: 0 });
+      grupos.get(chave).qtd += Number(it.quantidade);
+    });
+    let html = `<strong>💬 Preview:</strong> ${grupos.size} produto(s) diferentes, total ${selecionados.length} item(ns) da lista`;
+    preview.innerHTML = html;
+    preview.style.display = 'block';
+
+    // Verifica se itens já estão em outra cotação
+    try {
+      const r = await api('GET', `/api/cotacoes/verificar/itens?listaComprasIds=${ids.join(',')}`);
+      if (r.avisos && r.avisos.length > 0) {
+        const listaAvisos = r.avisos.map(a =>
+          `• <strong>${escapeHtml(a.produto_nome)}</strong> já está na Cotação #${String(a.cotacao_numero).padStart(3,'0')} (${a.status})`
+        ).join('<br>');
+        avisos.innerHTML = `⚠️ <strong>Atenção:</strong> alguns itens já estão em outras cotações:<br>${listaAvisos}<br><br>Você pode continuar mesmo assim, mas cuidado com duplicação.`;
+        avisos.style.display = 'block';
+      } else {
+        avisos.style.display = 'none';
+      }
+    } catch(e) { /* falha silenciosa */ }
+  }
+
+  function fecharNovaCot() {
+    document.getElementById('modal-nova-cot').style.display = 'none';
+    _ncotItensPendentes = [];
+    _ncotFornecedoresCache = [];
+  }
+
+  async function confirmarNovaCot() {
+    const marcados = [...document.querySelectorAll('.ncot-check-item:checked')];
+    const fornMarcados = [...document.querySelectorAll('.ncot-forn-check:checked')];
+    const erro = document.getElementById('ncot-erro');
+    erro.style.display = 'none';
+
+    if (marcados.length === 0) {
+      erro.textContent = 'Selecione ao menos um item.';
+      erro.style.display = 'block';
+      return;
+    }
+    if (fornMarcados.length === 0) {
+      erro.textContent = 'Selecione ao menos um fornecedor pra cotar.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    const ids = marcados.map(chk => parseInt(chk.dataset.id));
+    const fornIds = fornMarcados.map(chk => parseInt(chk.value));
+    const observacao = document.getElementById('ncot-obs').value.trim() || null;
+    const prazoResposta = document.getElementById('ncot-prazo').value || null;
+
+    try {
+      const r = await api('POST', '/api/cotacoes', {
+        listaComprasIds: ids,
+        fornecedoresIds: fornIds,
+        observacao,
+        prazoResposta
+      });
+      fecharNovaCot();
+      alert(`✅ Cotação #${String(r.cotacao.numero).padStart(3, '0')} criada!\n\n` +
+            `💬 ${r.itensAgrupados} produto(s) para cotar com ${r.fornecedores} fornecedor(es).\n\n` +
+            `📥 Próximo passo: imprimir PDF e enviar aos fornecedores. Quando responderem, entre em cada cotação e preencha os preços.`);
+      await carregarCotacoes();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      erro.textContent = e.message || 'Erro ao criar cotação.';
+      erro.style.display = 'block';
+    }
+  }
+
+  // ===== VER COTAÇÃO (stub por enquanto - LOTE C vai completar) =====
+  async function verCotacao(id) {
+    alert('📋 Tela de preenchimento de preços será implementada no próximo lote (LOTE C).\n\nPor enquanto, use o botão 🖨️ pra imprimir o PDF e enviar aos fornecedores.');
+  }
+
+  // ===== IMPRIMIR PDF (sem preços) =====
+  async function imprimirCotacaoPdf(id) {
+    try {
+      const r = await api('GET', `/api/cotacoes/${id}`);
+      const w = window.open('', '_blank');
+      const c = r.cotacao;
+      const itens = r.itens || [];
+      const fornecedores = r.fornecedores || [];
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+
+      const html = `
+        <!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>Cotação #${String(c.numero).padStart(3, '0')}</title>
+        <style>
+          body { font-family: sans-serif; padding: 30px; color: #333; max-width: 800px; margin: 0 auto; }
+          h1 { color: #7c3aed; margin: 0 0 6px; }
+          .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #7c3aed; padding-bottom:16px; margin-bottom:20px; }
+          .header .empresa { text-align:right; font-size:12px; color:#666; }
+          .bloco { background:#faf5ff; padding:14px; border-radius:8px; margin-bottom:14px; font-size:13px; border-left:4px solid #7c3aed; }
+          .destaque { background:#fef3c7; border-left-color:#f59e0b; }
+          table { width:100%; border-collapse:collapse; margin-top:20px; }
+          th, td { border:1px solid #cbd5e1; padding:10px; text-align:left; font-size:13px; }
+          th { background:#f3e8ff; color:#6b21a8; }
+          .preencher { background:#fefce8; }
+          .footer { margin-top:30px; padding-top:14px; border-top:1px solid #e2e8f0; font-size:11px; color:#666; text-align:center; }
+          .campos-forn { background:#f8fafc; padding:14px; border-radius:8px; margin-top:20px; border:1px dashed #94a3b8; }
+          .linha { display:flex; gap:16px; margin-bottom:10px; align-items:baseline; }
+          .linha label { font-weight:700; min-width:180px; color:#334155; font-size:12px; }
+          .linha .campo { flex:1; border-bottom:1px solid #94a3b8; min-height:20px; }
+          @media print { .no-print { display:none; } }
+        </style>
+        </head><body>
+          <div class="header">
+            <div>
+              <h1>💬 SOLICITAÇÃO DE COTAÇÃO</h1>
+              <div style="font-size:22px;color:#7c3aed;font-weight:700;">Nº ${String(c.numero).padStart(3, '0')}</div>
+              <div style="font-size:12px;color:#666;margin-top:4px;">Emitida em ${new Date(c.data_criacao).toLocaleDateString('pt-BR')}</div>
+              ${c.prazo_resposta ? `<div style="font-size:12px;color:#dc2626;margin-top:4px;font-weight:700;">⏰ Responder até: ${new Date(c.prazo_resposta + 'T00:00:00').toLocaleDateString('pt-BR')}</div>` : ''}
+            </div>
+            <div class="empresa">
+              <strong>${escapeHtml(empresa.nome || '')}</strong><br>
+              ${empresa.cnpj || ''}<br>
+              ${empresa.endereco || ''}<br>
+              ${empresa.telefone || ''}<br>
+              ${empresa.email || ''}
+            </div>
+          </div>
+
+          <div class="bloco destaque">
+            <strong>📝 Prezado fornecedor:</strong> gostaríamos de receber sua cotação para os produtos abaixo. Por favor preencha os preços unitários, prazo de entrega e condições, e nos retorne por resposta.
+          </div>
+
+          ${c.observacao ? `<div class="bloco"><strong>📌 Observações:</strong><br>${escapeHtml(c.observacao)}</div>` : ''}
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:60px;">Item</th>
+                <th>Produto</th>
+                <th style="width:120px;">Marca/Ref</th>
+                <th style="width:80px;text-align:center;">Qtd</th>
+                <th class="preencher" style="width:130px;text-align:center;color:#a16207;">Preço Unit. (R$)</th>
+                <th class="preencher" style="width:80px;text-align:center;color:#a16207;">Prazo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itens.map((it, i) => `
+                <tr>
+                  <td style="text-align:center;">${i + 1}</td>
+                  <td><strong>${escapeHtml(it.produto_nome)}</strong>${it.produto_codigo ? `<br><span style="font-size:11px;color:#666;">Cód: ${escapeHtml(it.produto_codigo)}</span>` : ''}</td>
+                  <td style="font-size:11px;color:#666;">${escapeHtml(it.marca || '—')}${it.referencia ? '<br>Ref: ' + escapeHtml(it.referencia) : ''}</td>
+                  <td style="text-align:center;font-weight:700;">${it.quantidade}</td>
+                  <td class="preencher"></td>
+                  <td class="preencher"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="campos-forn">
+            <strong style="color:#334155;font-size:14px;">📋 Preencher pelo fornecedor:</strong>
+            <div style="margin-top:12px;">
+              <div class="linha"><label>Nome do fornecedor:</label><div class="campo"></div></div>
+              <div class="linha"><label>Nome do vendedor:</label><div class="campo"></div></div>
+              <div class="linha"><label>Telefone/WhatsApp:</label><div class="campo"></div></div>
+              <div class="linha"><label>Prazo de entrega:</label><div class="campo"></div></div>
+              <div class="linha"><label>Condição de pagamento:</label><div class="campo"></div></div>
+              <div class="linha"><label>Frete:</label><div class="campo"></div></div>
+              <div class="linha"><label>Validade da proposta:</label><div class="campo"></div></div>
+              <div style="margin-top:10px;"><label style="font-weight:700;font-size:12px;color:#334155;">Observações:</label><div style="border:1px solid #cbd5e1;min-height:60px;margin-top:4px;border-radius:4px;padding:6px;"></div></div>
+            </div>
+          </div>
+
+          <div class="footer">
+            Cotação enviada aos fornecedores: ${fornecedores.map(f => escapeHtml(f.fornecedor_nome)).join(' · ')}<br>
+            Emitida por ${escapeHtml(c.criado_por_nome || '—')} em ${new Date(c.data_criacao).toLocaleString('pt-BR')}
+          </div>
+
+          <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:12px 24px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px;">🖨️ Imprimir / Salvar PDF</button>
+        </body></html>
+      `;
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      alert('Erro ao imprimir: ' + e.message);
+    }
+  }
+
+  async function cancelarCotacao(id) {
+    if (!confirm('Cancelar esta cotação?\n\n⚠️ Os itens voltarão para "pendente" na Lista de Compras.')) return;
+    try {
+      await api('POST', `/api/cotacoes/${id}/cancelar`);
+      alert('✅ Cotação cancelada.');
+      await carregarCotacoes();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
   // ====== ORDENS DE COMPRA ======
   let _ordensCompraCache = [];
   let _ocFiltro = 'rascunho';
@@ -13665,10 +14188,15 @@ ${conteudo}
         acoes += `<button onclick="cancelarOc(${o.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;" title="Cancelar ordem">❌</button>`;
       }
 
+      const nomeForn = o.fornecedor_nome || o.fornecedor_nome_atual;
+      const fornecedorHtml = nomeForn
+        ? escapeHtml(nomeForn)
+        : '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
+
       return `
         <tr style="border-top:1px solid #f1f5f9;">
           <td style="padding:10px;"><strong>#${String(o.numero).padStart(3, '0')}</strong></td>
-          <td style="padding:10px;">${escapeHtml(fornecedor)}</td>
+          <td style="padding:10px;">${fornecedorHtml}</td>
           <td style="padding:10px;text-align:center;"><span style="background:#f3f4f6;color:#475569;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${o.total_itens || 0}</span></td>
           <td style="padding:10px;text-align:right;font-weight:700;color:#0891b2;">${formatarBRL(o.valor_estimado)}</td>
           <td style="padding:10px;font-size:12px;color:#64748b;">${o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : '—'}</td>
@@ -17593,6 +18121,10 @@ ${conteudo}
     // Atualiza badge de ordens de compra (só admin/estoque)
     if (ativo && ['admin', 'estoque'].includes(window._papelAtual) && typeof carregarOrdensCompra === 'function') {
       carregarOrdensCompra();
+    }
+    // Atualiza badge de cotações (só admin/estoque)
+    if (ativo && ['admin', 'estoque'].includes(window._papelAtual) && typeof carregarCotacoes === 'function') {
+      carregarCotacoes();
     }
   }
 
