@@ -2611,6 +2611,46 @@
     </div>
   </div>
 
+  <!-- Modal: Ver Cotação (preencher preços + comparar + gerar ordens) -->
+  <div id="modal-ver-cot" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:0;border-radius:14px;max-width:1200px;width:100%;max-height:95vh;overflow-y:auto;">
+      <!-- Header fixo -->
+      <div style="padding:20px 26px 14px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:2;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <h2 id="vercot-titulo" style="color:#7c3aed;margin:0;font-size:22px;">💬 Cotação #—</h2>
+            <div id="vercot-subtitulo" style="font-size:12px;color:#64748b;margin-top:4px;"></div>
+          </div>
+          <button onclick="fecharVerCot()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+        </div>
+
+        <!-- Abas -->
+        <div style="display:flex;gap:0;margin-top:14px;border-bottom:1px solid #e2e8f0;">
+          <button type="button" id="vercot-aba-precos" onclick="vercotTrocarAba('precos')"
+                  style="padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:8px 8px 0 0;font-weight:700;cursor:pointer;font-size:13px;">
+            📥 Preencher Preços
+          </button>
+          <button type="button" id="vercot-aba-comparar" onclick="vercotTrocarAba('comparar')"
+                  style="padding:10px 20px;background:transparent;color:#64748b;border:none;font-weight:600;cursor:pointer;font-size:13px;">
+            ⚖️ Comparar & Gerar Ordens
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo aba PREÇOS -->
+      <div id="vercot-content-precos" style="padding:20px 26px;">
+        <div id="vercot-fornecedores-cards" style="display:flex;flex-direction:column;gap:14px;">
+          <div style="text-align:center;color:#94a3b8;padding:30px;">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- Conteúdo aba COMPARAR -->
+      <div id="vercot-content-comparar" style="padding:20px 26px;display:none;">
+        <div id="vercot-comparar-content"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Nova Cotação -->
   <div id="modal-nova-cot" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -14147,9 +14187,475 @@ ${conteudo}
     }
   }
 
-  // ===== VER COTAÇÃO (stub por enquanto - LOTE C vai completar) =====
+  // ===== VER COTAÇÃO (preencher preços + comparar + gerar ordens) =====
+  let _vercotData = null; // { cotacao, itens, fornecedores, respostas }
+
   async function verCotacao(id) {
-    alert('📋 Tela de preenchimento de preços será implementada no próximo lote (LOTE C).\n\nPor enquanto, use o botão 🖨️ pra imprimir o PDF e enviar aos fornecedores.');
+    try {
+      _vercotData = await api('GET', `/api/cotacoes/${id}`);
+
+      // Preenche header
+      const c = _vercotData.cotacao;
+      document.getElementById('vercot-titulo').textContent = `💬 Cotação #${String(c.numero).padStart(3, '0')}`;
+
+      const sub = [];
+      sub.push(`${_vercotData.itens.length} item(ns)`);
+      sub.push(`${_vercotData.fornecedores.length} fornecedor(es)`);
+      if (c.observacao) sub.push(`Obs: ${c.observacao}`);
+      if (c.prazo_resposta) sub.push(`Prazo: ${new Date(c.prazo_resposta + 'T00:00:00').toLocaleDateString('pt-BR')}`);
+      document.getElementById('vercot-subtitulo').textContent = sub.join(' · ');
+
+      // Renderiza aba padrão (preços)
+      vercotTrocarAba('precos');
+
+      document.getElementById('modal-ver-cot').style.display = 'flex';
+    } catch (e) {
+      alert('Erro ao carregar: ' + e.message);
+    }
+  }
+
+  function fecharVerCot() {
+    document.getElementById('modal-ver-cot').style.display = 'none';
+    _vercotData = null;
+  }
+
+  function vercotTrocarAba(aba) {
+    const btnP = document.getElementById('vercot-aba-precos');
+    const btnC = document.getElementById('vercot-aba-comparar');
+    const contP = document.getElementById('vercot-content-precos');
+    const contC = document.getElementById('vercot-content-comparar');
+
+    if (aba === 'precos') {
+      btnP.style.background = '#7c3aed'; btnP.style.color = '#fff';
+      btnC.style.background = 'transparent'; btnC.style.color = '#64748b';
+      contP.style.display = ''; contC.style.display = 'none';
+      renderVercotPrecos();
+    } else {
+      btnC.style.background = '#7c3aed'; btnC.style.color = '#fff';
+      btnP.style.background = 'transparent'; btnP.style.color = '#64748b';
+      contC.style.display = ''; contP.style.display = 'none';
+      renderVercotComparar();
+    }
+  }
+
+  // ===== ABA: PREENCHER PREÇOS =====
+  function renderVercotPrecos() {
+    if (!_vercotData) return;
+    const div = document.getElementById('vercot-fornecedores-cards');
+    const { itens, fornecedores, respostas, cotacao } = _vercotData;
+
+    const podeEditar = !['fechada', 'cancelada'].includes(cotacao.status);
+
+    if (fornecedores.length === 0) {
+      div.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px;">Nenhum fornecedor.</div>';
+      return;
+    }
+
+    // Renderiza um CARD por fornecedor
+    div.innerHTML = fornecedores.map(f => {
+      const statusBadge = f.status === 'respondeu'
+        ? '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✅ Respondeu</span>'
+        : f.status === 'declinou'
+        ? '<span style="background:#fef2f2;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">❌ Declinou</span>'
+        : '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">⏳ Aguardando</span>';
+
+      // Mapeia respostas por item pra este fornecedor
+      const respostasForn = respostas.filter(r => r.cotacao_fornecedor_id === f.id);
+      const mapResp = new Map(respostasForn.map(r => [r.cotacao_item_id, r]));
+
+      const linhasItens = itens.map(it => {
+        const r = mapResp.get(it.id);
+        const precoAtual = r ? r.preco_unitario : '';
+        return `
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="padding:8px;">
+              <strong style="font-size:12px;">${escapeHtml(it.produto_nome)}</strong>
+              ${it.referencia ? `<div style="font-size:10px;color:#7c3aed;">Ref: ${escapeHtml(it.referencia)}</div>` : ''}
+              ${it.marca ? `<div style="font-size:10px;color:#4338ca;">${escapeHtml(it.marca)}</div>` : ''}
+            </td>
+            <td style="padding:8px;text-align:center;font-weight:700;">${it.quantidade}</td>
+            <td style="padding:8px;text-align:right;">
+              <input type="number" step="0.01" min="0" placeholder="0,00" value="${precoAtual != null && precoAtual !== '' ? Number(precoAtual).toFixed(2) : ''}"
+                     class="vercot-preco-input" data-forn="${f.id}" data-item="${it.id}"
+                     ${!podeEditar ? 'disabled' : ''}
+                     style="width:110px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;text-align:right;">
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div style="background:#fff;border:2px solid #e9d5ff;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div>
+              <strong style="color:#6b21a8;font-size:15px;">🏢 ${escapeHtml(f.fornecedor_nome)}</strong>
+              ${f.fornecedor_doc ? `<span style="color:#94a3b8;font-size:12px;margin-left:8px;">${escapeHtml(f.fornecedor_doc)}</span>` : ''}
+              ${f.respondeu_em ? `<div style="font-size:11px;color:#059669;margin-top:2px;">Respondeu em ${new Date(f.respondeu_em).toLocaleString('pt-BR')}</div>` : ''}
+            </div>
+            <div>${statusBadge}</div>
+          </div>
+
+          <!-- Tabela de preços por item -->
+          <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:12px;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead style="background:#faf5ff;">
+                <tr>
+                  <th style="padding:8px;text-align:left;">Produto</th>
+                  <th style="padding:8px;text-align:center;width:60px;">Qtd</th>
+                  <th style="padding:8px;text-align:right;width:130px;">Preço Unit. (R$)</th>
+                </tr>
+              </thead>
+              <tbody>${linhasItens}</tbody>
+            </table>
+          </div>
+
+          <!-- Condições do fornecedor -->
+          <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <label style="font-size:11px;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Prazo entrega (dias)</label>
+              <input type="number" min="0" step="1" class="vercot-forn-prazo" data-forn="${f.id}" value="${f.prazo_entrega_dias || ''}"
+                     ${!podeEditar ? 'disabled' : ''}
+                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Condição de pagamento</label>
+              <input type="text" class="vercot-forn-pagto" data-forn="${f.id}" value="${escapeAttr(f.condicao_pagamento || '')}"
+                     placeholder="Ex: 30/60/90, à vista, PIX"
+                     ${!podeEditar ? 'disabled' : ''}
+                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#64748b;font-weight:600;display:block;margin-bottom:3px;">Observações</label>
+              <input type="text" class="vercot-forn-obs" data-forn="${f.id}" value="${escapeAttr(f.observacao || '')}"
+                     placeholder="Ex: frete grátis acima de R$ 500"
+                     ${!podeEditar ? 'disabled' : ''}
+                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+
+          ${podeEditar ? `
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button type="button" onclick="vercotSalvarResposta(${f.id})"
+                      style="padding:10px 18px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">
+                💾 Salvar Resposta de ${escapeHtml(f.fornecedor_nome.substring(0, 25))}${f.fornecedor_nome.length > 25 ? '...' : ''}
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function vercotSalvarResposta(cotFornId) {
+    if (!_vercotData) return;
+
+    // Coleta preços deste fornecedor
+    const respostas = [];
+    document.querySelectorAll(`.vercot-preco-input[data-forn="${cotFornId}"]`).forEach(inp => {
+      const itemId = parseInt(inp.dataset.item);
+      const preco = inp.value.trim() === '' ? null : Number(inp.value);
+      respostas.push({
+        cotacao_item_id: itemId,
+        preco_unitario: preco
+      });
+    });
+
+    const prazoInp = document.querySelector(`.vercot-forn-prazo[data-forn="${cotFornId}"]`);
+    const pagtoInp = document.querySelector(`.vercot-forn-pagto[data-forn="${cotFornId}"]`);
+    const obsInp = document.querySelector(`.vercot-forn-obs[data-forn="${cotFornId}"]`);
+
+    try {
+      await api('POST', `/api/cotacoes/${_vercotData.cotacao.id}/responder/${cotFornId}`, {
+        respostas,
+        prazoEntregaDias: prazoInp?.value || null,
+        condicaoPagamento: pagtoInp?.value || null,
+        observacao: obsInp?.value || null
+      });
+      // Recarrega dados
+      _vercotData = await api('GET', `/api/cotacoes/${_vercotData.cotacao.id}`);
+      renderVercotPrecos();
+      mostrarToastAutosave('✅ Resposta salva!');
+      // Atualiza a listagem no fundo
+      carregarCotacoes();
+    } catch (e) {
+      alert('Erro ao salvar: ' + e.message);
+    }
+  }
+
+  // ===== ABA: COMPARAR & GERAR ORDENS =====
+  function renderVercotComparar() {
+    if (!_vercotData) return;
+    const div = document.getElementById('vercot-comparar-content');
+    const { itens, fornecedores, respostas, cotacao } = _vercotData;
+
+    const podeEditar = !['fechada', 'cancelada'].includes(cotacao.status);
+
+    // Filtra só fornecedores que responderam
+    const fornResp = fornecedores.filter(f => f.status === 'respondeu');
+
+    if (fornResp.length === 0) {
+      div.innerHTML = `
+        <div style="text-align:center;padding:40px;color:#94a3b8;">
+          <div style="font-size:44px;margin-bottom:10px;">📭</div>
+          <div style="font-size:14px;">Nenhum fornecedor respondeu ainda.</div>
+          <div style="font-size:12px;margin-top:6px;">Volte na aba "Preencher Preços" pra registrar as respostas.</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Mapa: respostas[itemId][fornId] = { preco, id }
+    const mapResp = {};
+    respostas.forEach(r => {
+      if (!mapResp[r.cotacao_item_id]) mapResp[r.cotacao_item_id] = {};
+      mapResp[r.cotacao_item_id][r.cotacao_fornecedor_id] = r;
+    });
+
+    // Calcula menor preço por item (só entre fornecedores que responderam)
+    const menorPrecoPorItem = {};
+    itens.forEach(it => {
+      let menor = null;
+      let fornMenor = null;
+      fornResp.forEach(f => {
+        const r = mapResp[it.id]?.[f.id];
+        if (r && r.preco_unitario != null && Number(r.preco_unitario) > 0) {
+          if (menor == null || Number(r.preco_unitario) < menor) {
+            menor = Number(r.preco_unitario);
+            fornMenor = f.id;
+          }
+        }
+      });
+      menorPrecoPorItem[it.id] = { preco: menor, fornId: fornMenor };
+    });
+
+    // Header da tabela (fornecedores como colunas)
+    const headerForn = fornResp.map(f => `
+      <th style="padding:8px;text-align:center;min-width:140px;background:#faf5ff;color:#6b21a8;">
+        <div style="font-size:12px;font-weight:700;">${escapeHtml(f.fornecedor_nome)}</div>
+        <div style="font-size:10px;color:#64748b;font-weight:normal;margin-top:2px;">
+          ${f.prazo_entrega_dias ? f.prazo_entrega_dias + ' dias' : '—'}
+          ${f.condicao_pagamento ? ' · ' + escapeHtml(f.condicao_pagamento) : ''}
+        </div>
+      </th>
+    `).join('');
+
+    // Linhas: uma por item
+    const linhasItens = itens.map(it => {
+      const menor = menorPrecoPorItem[it.id];
+      const colsForn = fornResp.map(f => {
+        const r = mapResp[it.id]?.[f.id];
+        const preco = r?.preco_unitario;
+        if (preco == null || preco === '' || Number(preco) === 0) {
+          return `<td style="padding:8px;text-align:center;color:#94a3b8;">—</td>`;
+        }
+        const ehMenor = menor.fornId === f.id;
+        const bg = ehMenor ? '#dcfce7' : '#fff';
+        const border = ehMenor ? '2px solid #16a34a' : '1px solid #e2e8f0';
+        return `
+          <td style="padding:6px;text-align:center;">
+            <label style="display:block;padding:8px;background:${bg};border:${border};border-radius:6px;cursor:${podeEditar ? 'pointer' : 'default'};">
+              <div style="font-size:14px;font-weight:700;color:${ehMenor ? '#166534' : '#334155'};">${formatarBRL(preco)}</div>
+              ${ehMenor ? '<div style="font-size:9px;color:#166534;font-weight:700;margin-top:2px;">🏆 MENOR</div>' : ''}
+              ${podeEditar ? `
+                <div style="margin-top:6px;">
+                  <input type="radio" name="vencedor-${it.id}" value="${f.id}" class="vercot-vencedor-radio" data-item="${it.id}" data-forn="${f.id}" onclick="vercotAtualizarResumo()"
+                         ${ehMenor ? 'checked' : ''}
+                         style="cursor:pointer;transform:scale(1.15);">
+                </div>
+              ` : ''}
+            </label>
+          </td>
+        `;
+      }).join('');
+
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px;background:#fafafa;">
+            <strong style="font-size:12px;">${escapeHtml(it.produto_nome)}</strong>
+            ${it.referencia ? `<div style="font-size:10px;color:#7c3aed;">Ref: ${escapeHtml(it.referencia)}</div>` : ''}
+            ${it.marca ? `<div style="font-size:10px;color:#4338ca;">${escapeHtml(it.marca)}</div>` : ''}
+          </td>
+          <td style="padding:8px;text-align:center;background:#fafafa;font-weight:700;">${it.quantidade}</td>
+          ${colsForn}
+          <td style="padding:8px;text-align:center;background:#fafafa;">
+            <button type="button" onclick="vercotNaoComprar(${it.id})"
+                    style="background:none;border:1px solid #cbd5e1;color:#64748b;padding:4px 8px;border-radius:6px;font-size:10px;cursor:${podeEditar ? 'pointer' : 'default'};"
+                    title="Não comprar este item">
+              ⊘
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    div.innerHTML = `
+      <div style="background:#f0f9ff;border:1px solid #93c5fd;padding:10px;border-radius:8px;font-size:12px;color:#1e40af;margin-bottom:14px;">
+        💡 <strong>Como escolher:</strong> o sistema já sugeriu o menor preço (verde) por item. Você pode alterar clicando em outro fornecedor. O botão ⊘ marca o item como "não comprar".
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;min-width:200px;">Produto</th>
+              <th style="padding:10px;text-align:center;width:60px;">Qtd</th>
+              ${headerForn}
+              <th style="padding:10px;text-align:center;width:50px;">×</th>
+            </tr>
+          </thead>
+          <tbody>${linhasItens}</tbody>
+        </table>
+      </div>
+
+      <!-- Resumo dinâmico -->
+      <div id="vercot-resumo" style="margin-top:16px;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:8px;"></div>
+
+      ${podeEditar ? `
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+          <button type="button" onclick="vercotGerarOrdens()"
+                  style="padding:14px 24px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">
+            🎯 Gerar Ordens de Compra
+          </button>
+        </div>
+      ` : `
+        <div style="margin-top:16px;padding:14px;background:#dcfce7;border:1px solid #16a34a;border-radius:8px;color:#166534;font-size:13px;text-align:center;">
+          ✅ Cotação já fechada — ordens de compra foram geradas.
+        </div>
+      `}
+    `;
+
+    vercotAtualizarResumo();
+  }
+
+  function vercotNaoComprar(itemId) {
+    // Desmarca qualquer radio deste item
+    document.querySelectorAll(`.vercot-vencedor-radio[data-item="${itemId}"]`).forEach(r => r.checked = false);
+    vercotAtualizarResumo();
+  }
+
+  function vercotAtualizarResumo() {
+    if (!_vercotData) return;
+    const div = document.getElementById('vercot-resumo');
+    if (!div) return;
+
+    const { itens, fornecedores, respostas } = _vercotData;
+
+    // Mapa preços
+    const mapResp = {};
+    respostas.forEach(r => {
+      if (!mapResp[r.cotacao_item_id]) mapResp[r.cotacao_item_id] = {};
+      mapResp[r.cotacao_item_id][r.cotacao_fornecedor_id] = r;
+    });
+
+    // Agrupa escolhas por fornecedor
+    const porForn = new Map();
+    let itensEscolhidos = 0;
+    let itensSemEscolha = 0;
+
+    itens.forEach(it => {
+      const radioMarcado = document.querySelector(`.vercot-vencedor-radio[data-item="${it.id}"]:checked`);
+      if (!radioMarcado) {
+        itensSemEscolha++;
+        return;
+      }
+      itensEscolhidos++;
+      const fornId = parseInt(radioMarcado.value);
+      const preco = Number(mapResp[it.id]?.[fornId]?.preco_unitario || 0);
+      const subtotal = preco * Number(it.quantidade);
+
+      if (!porForn.has(fornId)) {
+        porForn.set(fornId, { itens: 0, total: 0 });
+      }
+      const g = porForn.get(fornId);
+      g.itens += 1;
+      g.total += subtotal;
+    });
+
+    if (itensEscolhidos === 0) {
+      div.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:13px;">Nenhum vencedor escolhido ainda.</div>';
+      return;
+    }
+
+    let totalGeral = 0;
+    const linhas = [...porForn.entries()].map(([fornId, g]) => {
+      const f = fornecedores.find(x => x.id === fornId);
+      totalGeral += g.total;
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:6px;margin-bottom:6px;">
+          <div>
+            <strong style="color:#6b21a8;font-size:13px;">🏢 ${escapeHtml(f?.fornecedor_nome || '—')}</strong>
+            <span style="color:#64748b;font-size:11px;margin-left:8px;">${g.itens} item(ns)</span>
+          </div>
+          <strong style="color:#166534;font-size:14px;">${formatarBRL(g.total)}</strong>
+        </div>
+      `;
+    }).join('');
+
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <strong style="color:#334155;font-size:13px;">📊 Resumo das escolhas</strong>
+        <div style="font-size:12px;color:#64748b;">
+          ${itensEscolhidos}/${itens.length} escolhidos
+          ${itensSemEscolha > 0 ? `<span style="color:#dc2626;margin-left:8px;">· ${itensSemEscolha} sem escolha</span>` : ''}
+        </div>
+      </div>
+      ${linhas}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fef3c7;border-radius:6px;margin-top:10px;">
+        <strong style="color:#92400e;font-size:14px;">💰 TOTAL GERAL:</strong>
+        <strong style="color:#92400e;font-size:18px;">${formatarBRL(totalGeral)}</strong>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:8px;text-align:center;">
+        Será gerada 1 Ordem de Compra por fornecedor (${porForn.size} ordem(ns) total).
+      </div>
+    `;
+  }
+
+  async function vercotGerarOrdens() {
+    if (!_vercotData) return;
+
+    const vencedores = [];
+    _vercotData.itens.forEach(it => {
+      const radioMarcado = document.querySelector(`.vercot-vencedor-radio[data-item="${it.id}"]:checked`);
+      if (radioMarcado) {
+        vencedores.push({
+          cotacao_item_id: it.id,
+          cotacao_fornecedor_id: parseInt(radioMarcado.value)
+        });
+      }
+    });
+
+    if (vencedores.length === 0) {
+      alert('⚠️ Escolha ao menos um vencedor por item antes de gerar as ordens.');
+      return;
+    }
+
+    const semEscolha = _vercotData.itens.length - vencedores.length;
+    let confirmMsg = `🎯 Gerar Ordens de Compra?\n\n`;
+    confirmMsg += `${vencedores.length} de ${_vercotData.itens.length} itens serão comprados.\n`;
+    if (semEscolha > 0) {
+      confirmMsg += `\n⚠️ ${semEscolha} item(ns) SEM escolha serão IGNORADOS e voltam pra Lista de Compras.\n`;
+    }
+    confirmMsg += `\nA cotação será fechada. Confirma?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const r = await api('POST', `/api/cotacoes/${_vercotData.cotacao.id}/fechar`, { vencedores });
+
+      let msg = `✅ ${r.ordens.length} Ordem(ns) de Compra gerada(s)!\n\n`;
+      r.ordens.forEach(o => {
+        msg += `#${String(o.numero).padStart(3, '0')} · ${o.fornecedor} · ${o.itens} item(ns) · ${formatarBRL(o.valor)}\n`;
+      });
+      msg += `\n📋 Vá em "Ordens de Compra" pra enviar aos fornecedores.`;
+      alert(msg);
+
+      fecharVerCot();
+      carregarCotacoes();
+      if (typeof carregarOrdensCompra === 'function') carregarOrdensCompra();
+      if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
+    } catch (e) {
+      alert('❌ Erro ao gerar ordens: ' + e.message);
+    }
   }
 
   // ===== IMPRIMIR PDF (sem preços) =====
