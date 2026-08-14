@@ -2655,7 +2655,7 @@
       <div id="ncot-avisos" style="display:none;background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:10px;border-radius:6px;font-size:12px;margin-bottom:10px;"></div>
 
       <!-- Lista de itens pendentes -->
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;max-height:340px;overflow-y:auto;">
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;max-height:280px;overflow-y:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead style="background:#f8fafc;position:sticky;top:0;">
             <tr>
@@ -2670,6 +2670,40 @@
             <tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Seção: Itens Avulsos -->
+      <div style="margin-top:14px;background:#fef9c3;border:1px solid #eab308;border-radius:10px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="color:#713f12;font-size:14px;">➕ Adicionar produtos avulsos</strong>
+          <span style="font-size:11px;color:#a16207;">Ex: cotação pra reposição de estoque, sem orçamento vinculado</span>
+        </div>
+
+        <!-- Formulário de adicionar -->
+        <div style="display:grid;grid-template-columns:1fr 90px auto;gap:8px;align-items:end;">
+          <div>
+            <label style="font-size:11px;color:#713f12;font-weight:600;display:block;margin-bottom:3px;">Produto</label>
+            <input type="text" id="ncot-avulso-produto" list="lista-produtos-avulso"
+                   placeholder="Digite código, nome ou referência"
+                   style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <datalist id="lista-produtos-avulso"></datalist>
+          </div>
+          <div>
+            <label style="font-size:11px;color:#713f12;font-weight:600;display:block;margin-bottom:3px;">Qtd</label>
+            <input type="number" id="ncot-avulso-qtd" min="1" step="1" value="1"
+                   style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+          </div>
+          <button type="button" onclick="ncotAdicionarAvulso()"
+                  style="padding:8px 14px;background:#eab308;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;height:34px;">
+            ➕ Adicionar
+          </button>
+        </div>
+
+        <!-- Erro de adicionar -->
+        <div id="ncot-avulso-erro" style="display:none;font-size:12px;color:#991b1b;margin-top:6px;"></div>
+
+        <!-- Lista de itens avulsos adicionados -->
+        <div id="ncot-avulsos-lista" style="margin-top:12px;"></div>
       </div>
 
       <div id="ncot-preview" style="display:none;margin-top:14px;background:#faf5ff;border:1px solid #a855f7;padding:12px;border-radius:8px;font-size:13px;color:#6b21a8;"></div>
@@ -13699,6 +13733,7 @@ ${conteudo}
   let _cotFiltro = 'aberta';
   let _ncotItensPendentes = [];
   let _ncotFornecedoresCache = [];
+  let _ncotAvulsos = []; // itens adicionados manualmente na cotação
 
   async function carregarCotacoes() {
     try {
@@ -13810,11 +13845,6 @@ ${conteudo}
       const todos = await api('GET', '/api/lista-compras');
       _ncotItensPendentes = (todos || []).filter(x => x.status === 'pendente' && !x.ordemCompraId);
 
-      if (_ncotItensPendentes.length === 0) {
-        alert('📭 Nenhum item pendente na Lista de Compras.\n\nAdicione itens antes de criar uma cotação.');
-        return;
-      }
-
       // Carrega fornecedores
       _ncotFornecedoresCache = await api('GET', '/api/fornecedores') || [];
       if (_ncotFornecedoresCache.length === 0) {
@@ -13832,9 +13862,22 @@ ${conteudo}
         </label>
       `).join('');
 
+      // Popula datalist de produtos para autocomplete
+      const dlProdAvulso = document.getElementById('lista-produtos-avulso');
+      if (dlProdAvulso) {
+        dlProdAvulso.innerHTML = (dbProdutos || []).map(p => {
+          const label = [p.codigo, p.nome, p.referencia ? '(' + p.referencia + ')' : ''].filter(Boolean).join(' - ');
+          return `<option value="${escapeAttr(label)}" data-id="${p.id}">`;
+        }).join('');
+      }
+
+      _ncotAvulsos = [];
+      renderNcotAvulsos();
+
       document.getElementById('ncot-obs').value = '';
       document.getElementById('ncot-prazo').value = '';
       document.getElementById('ncot-erro').style.display = 'none';
+      document.getElementById('ncot-avulso-erro').style.display = 'none';
       document.getElementById('ncot-preview').style.display = 'none';
       document.getElementById('ncot-avisos').style.display = 'none';
       document.getElementById('ncot-check-todos').checked = false;
@@ -13850,6 +13893,10 @@ ${conteudo}
   function renderNcotItens() {
     const tbody = document.getElementById('tbody-ncot-itens');
     if (!tbody) return;
+    if (_ncotItensPendentes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">📭 Nenhum item pendente na Lista de Compras — use a seção abaixo pra adicionar avulsos</td></tr>';
+      return;
+    }
     tbody.innerHTML = _ncotItensPendentes.map(item => `
       <tr style="border-top:1px solid #f1f5f9;">
         <td style="padding:10px;text-align:center;"><input type="checkbox" class="ncot-check-item" data-id="${item.id}" onclick="ncotAtualizarSelecao()" style="cursor:pointer;transform:scale(1.2);"></td>
@@ -13869,6 +13916,111 @@ ${conteudo}
     ncotAtualizarSelecao();
   }
 
+  // Adiciona um produto avulso à lista
+  function ncotAdicionarAvulso() {
+    const input = document.getElementById('ncot-avulso-produto');
+    const qtdInp = document.getElementById('ncot-avulso-qtd');
+    const erro = document.getElementById('ncot-avulso-erro');
+    const texto = (input.value || '').trim();
+    const qtd = Number(qtdInp.value);
+    erro.style.display = 'none';
+
+    if (!texto) {
+      erro.textContent = 'Digite ou selecione um produto.';
+      erro.style.display = 'block';
+      return;
+    }
+    if (!(qtd > 0)) {
+      erro.textContent = 'Quantidade inválida.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    // Tenta achar produto pelo texto: primeiro exata, depois "começa com"
+    const textoLower = texto.toLowerCase();
+    let produto = (dbProdutos || []).find(p => {
+      const label = [p.codigo, p.nome, p.referencia ? '(' + p.referencia + ')' : ''].filter(Boolean).join(' - ').toLowerCase();
+      return label === textoLower;
+    });
+    if (!produto) {
+      // Match parcial: código exato OU nome contém
+      produto = (dbProdutos || []).find(p =>
+        (p.codigo && String(p.codigo).toLowerCase() === textoLower) ||
+        (p.referencia && String(p.referencia).toLowerCase() === textoLower) ||
+        (p.nome && p.nome.toLowerCase() === textoLower)
+      );
+    }
+    if (!produto) {
+      erro.textContent = 'Produto não encontrado no cadastro. Selecione um item da lista.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    // Verifica se já foi adicionado - se sim, soma quantidade
+    const existente = _ncotAvulsos.find(a => a.produtoId === produto.id);
+    if (existente) {
+      existente.quantidade += qtd;
+    } else {
+      _ncotAvulsos.push({
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        produtoCodigo: produto.codigo,
+        referencia: produto.referencia,
+        quantidade: qtd
+      });
+    }
+
+    // Reset campos
+    input.value = '';
+    qtdInp.value = '1';
+    input.focus();
+
+    renderNcotAvulsos();
+    ncotAtualizarSelecao(); // atualiza preview total
+  }
+
+  function ncotRemoverAvulso(produtoId) {
+    _ncotAvulsos = _ncotAvulsos.filter(a => a.produtoId !== produtoId);
+    renderNcotAvulsos();
+    ncotAtualizarSelecao();
+  }
+
+  function renderNcotAvulsos() {
+    const div = document.getElementById('ncot-avulsos-lista');
+    if (!div) return;
+    if (_ncotAvulsos.length === 0) {
+      div.innerHTML = '<div style="font-size:12px;color:#a16207;font-style:italic;text-align:center;padding:8px;">Nenhum item avulso adicionado</div>';
+      return;
+    }
+    div.innerHTML = `
+      <div style="background:#fff;border:1px solid #eab308;border-radius:6px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="background:#fef3c7;">
+            <tr>
+              <th style="padding:6px 8px;text-align:left;">Produto</th>
+              <th style="padding:6px 8px;text-align:center;width:60px;">Qtd</th>
+              <th style="padding:6px 8px;text-align:center;width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${_ncotAvulsos.map(a => `
+              <tr style="border-top:1px solid #fef3c7;">
+                <td style="padding:6px 8px;">
+                  <strong>${escapeHtml(a.produtoNome)}</strong>
+                  ${a.referencia ? `<span style="color:#7c3aed;font-size:10px;margin-left:6px;">Ref: ${escapeHtml(a.referencia)}</span>` : ''}
+                </td>
+                <td style="padding:6px 8px;text-align:center;font-weight:700;">${a.quantidade}</td>
+                <td style="padding:6px 8px;text-align:center;">
+                  <button type="button" onclick="ncotRemoverAvulso(${a.produtoId})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;" title="Remover">×</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   function ncotAtualizarSelecaoForn() {
     const marcados = document.querySelectorAll('.ncot-forn-check:checked').length;
     document.getElementById('ncot-forn-selecionados').textContent = `${marcados} fornecedor(es) selecionado(s)`;
@@ -13884,7 +14036,9 @@ ${conteudo}
 
     const preview = document.getElementById('ncot-preview');
     const avisos = document.getElementById('ncot-avisos');
-    if (marcados.length === 0) {
+    const totalItens = marcados.length + _ncotAvulsos.length;
+
+    if (totalItens === 0) {
       preview.style.display = 'none';
       avisos.style.display = 'none';
       return;
@@ -13893,36 +14047,50 @@ ${conteudo}
     const ids = [...marcados].map(chk => parseInt(chk.dataset.id));
     const selecionados = _ncotItensPendentes.filter(x => ids.includes(x.id));
 
-    // Preview de agrupamento
+    // Preview de agrupamento (junta lista + avulsos, mesmo produto = soma)
     const grupos = new Map();
     selecionados.forEach(it => {
       const chave = it.produtoNome.toLowerCase();
       if (!grupos.has(chave)) grupos.set(chave, { nome: it.produtoNome, qtd: 0 });
       grupos.get(chave).qtd += Number(it.quantidade);
     });
-    let html = `<strong>💬 Preview:</strong> ${grupos.size} produto(s) diferentes, total ${selecionados.length} item(ns) da lista`;
-    preview.innerHTML = html;
+    _ncotAvulsos.forEach(av => {
+      const chave = av.produtoNome.toLowerCase();
+      if (!grupos.has(chave)) grupos.set(chave, { nome: av.produtoNome, qtd: 0 });
+      grupos.get(chave).qtd += Number(av.quantidade);
+    });
+
+    const partes = [];
+    if (selecionados.length > 0) partes.push(`${selecionados.length} da lista`);
+    if (_ncotAvulsos.length > 0) partes.push(`${_ncotAvulsos.length} avulso(s)`);
+
+    preview.innerHTML = `<strong>💬 Preview:</strong> ${grupos.size} produto(s) diferentes · ${partes.join(' + ')}`;
     preview.style.display = 'block';
 
-    // Verifica se itens já estão em outra cotação
-    try {
-      const r = await api('GET', `/api/cotacoes/verificar/itens?listaComprasIds=${ids.join(',')}`);
-      if (r.avisos && r.avisos.length > 0) {
-        const listaAvisos = r.avisos.map(a =>
-          `• <strong>${escapeHtml(a.produto_nome)}</strong> já está na Cotação #${String(a.cotacao_numero).padStart(3,'0')} (${a.status})`
-        ).join('<br>');
-        avisos.innerHTML = `⚠️ <strong>Atenção:</strong> alguns itens já estão em outras cotações:<br>${listaAvisos}<br><br>Você pode continuar mesmo assim, mas cuidado com duplicação.`;
-        avisos.style.display = 'block';
-      } else {
-        avisos.style.display = 'none';
-      }
-    } catch(e) { /* falha silenciosa */ }
+    // Verifica se itens da lista já estão em outra cotação (só quando tem itens da lista)
+    if (ids.length > 0) {
+      try {
+        const r = await api('GET', `/api/cotacoes/verificar/itens?listaComprasIds=${ids.join(',')}`);
+        if (r.avisos && r.avisos.length > 0) {
+          const listaAvisos = r.avisos.map(a =>
+            `• <strong>${escapeHtml(a.produto_nome)}</strong> já está na Cotação #${String(a.cotacao_numero).padStart(3,'0')} (${a.status})`
+          ).join('<br>');
+          avisos.innerHTML = `⚠️ <strong>Atenção:</strong> alguns itens já estão em outras cotações:<br>${listaAvisos}<br><br>Você pode continuar mesmo assim, mas cuidado com duplicação.`;
+          avisos.style.display = 'block';
+        } else {
+          avisos.style.display = 'none';
+        }
+      } catch(e) { /* falha silenciosa */ }
+    } else {
+      avisos.style.display = 'none';
+    }
   }
 
   function fecharNovaCot() {
     document.getElementById('modal-nova-cot').style.display = 'none';
     _ncotItensPendentes = [];
     _ncotFornecedoresCache = [];
+    _ncotAvulsos = [];
   }
 
   async function confirmarNovaCot() {
@@ -13931,8 +14099,9 @@ ${conteudo}
     const erro = document.getElementById('ncot-erro');
     erro.style.display = 'none';
 
-    if (marcados.length === 0) {
-      erro.textContent = 'Selecione ao menos um item.';
+    const totalItens = marcados.length + _ncotAvulsos.length;
+    if (totalItens === 0) {
+      erro.textContent = 'Adicione ao menos um item (da lista de compras ou avulso).';
       erro.style.display = 'block';
       return;
     }
@@ -13947,17 +14116,29 @@ ${conteudo}
     const observacao = document.getElementById('ncot-obs').value.trim() || null;
     const prazoResposta = document.getElementById('ncot-prazo').value || null;
 
+    // Prepara itens avulsos (formato pro backend)
+    const itensAvulsos = _ncotAvulsos.map(a => ({
+      produtoId: a.produtoId,
+      quantidade: a.quantidade
+    }));
+
     try {
       const r = await api('POST', '/api/cotacoes', {
         listaComprasIds: ids,
+        itensAvulsos,
         fornecedoresIds: fornIds,
         observacao,
         prazoResposta
       });
       fecharNovaCot();
+
+      const partes = [];
+      if (r.itensDaLista > 0) partes.push(`${r.itensDaLista} da lista`);
+      if (r.itensAvulsos > 0) partes.push(`${r.itensAvulsos} avulso(s)`);
+
       alert(`✅ Cotação #${String(r.cotacao.numero).padStart(3, '0')} criada!\n\n` +
-            `💬 ${r.itensAgrupados} produto(s) para cotar com ${r.fornecedores} fornecedor(es).\n\n` +
-            `📥 Próximo passo: imprimir PDF e enviar aos fornecedores. Quando responderem, entre em cada cotação e preencha os preços.`);
+            `💬 ${r.itensAgrupados} produto(s) para cotar (${partes.join(' + ')}) com ${r.fornecedores} fornecedor(es).\n\n` +
+            `📥 Próximo passo: imprimir PDF e enviar aos fornecedores.`);
       await carregarCotacoes();
       if (typeof carregarResumoListaCompras === 'function') carregarResumoListaCompras();
     } catch (e) {

@@ -128,48 +128,87 @@ router.get('/verificar/itens', async (req, res) => {
 // ==========================================
 // POST / — Cria nova cotação
 // Body: {
-//   listaComprasIds: [1, 5, 7...],
+//   listaComprasIds: [1, 5, 7...],        // itens vindos da lista de compras
+//   itensAvulsos: [{ produtoId, quantidade, observacao? }],  // itens adicionados manualmente
 //   fornecedoresIds: [3, 8, 12...],
 //   observacao: '...',
 //   prazoResposta: '2026-08-25' (opcional)
 // }
+// Pelo menos UM dos dois (listaComprasIds ou itensAvulsos) deve ter itens.
 // ==========================================
 router.post('/', async (req, res) => {
-  const { listaComprasIds, fornecedoresIds, observacao, prazoResposta } = req.body || {};
+  const { listaComprasIds, itensAvulsos, fornecedoresIds, observacao, prazoResposta } = req.body || {};
 
-  if (!Array.isArray(listaComprasIds) || listaComprasIds.length === 0) {
-    return res.status(400).json({ error: 'Selecione ao menos um item da Lista de Compras.' });
+  const listaOk = Array.isArray(listaComprasIds) && listaComprasIds.length > 0;
+  const avulsosOk = Array.isArray(itensAvulsos) && itensAvulsos.length > 0;
+
+  if (!listaOk && !avulsosOk) {
+    return res.status(400).json({ error: 'Adicione ao menos um item (da lista de compras ou avulso).' });
   }
   if (!Array.isArray(fornecedoresIds) || fornecedoresIds.length === 0) {
     return res.status(400).json({ error: 'Selecione ao menos um fornecedor pra cotar.' });
   }
 
-  const idsInt = listaComprasIds.map(x => parseInt(x)).filter(x => Number.isInteger(x) && x > 0);
+  const idsInt = listaOk
+    ? listaComprasIds.map(x => parseInt(x)).filter(x => Number.isInteger(x) && x > 0)
+    : [];
   const fornIds = fornecedoresIds.map(x => parseInt(x)).filter(x => Number.isInteger(x) && x > 0);
 
-  if (idsInt.length === 0 || fornIds.length === 0) {
-    return res.status(400).json({ error: 'IDs inválidos.' });
+  if (fornIds.length === 0) {
+    return res.status(400).json({ error: 'IDs de fornecedores inválidos.' });
+  }
+  if (listaOk && idsInt.length === 0) {
+    return res.status(400).json({ error: 'IDs da lista inválidos.' });
   }
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Busca itens da lista_compras
-    const rItens = await client.query(
-      `SELECT lc.*, p.marca, p.marca_id
-       FROM lista_compras lc
-       LEFT JOIN produtos p ON p.id = lc.produto_id
-       WHERE lc.id = ANY($1::int[])
-         AND lc.empresa_id = $2
-         AND lc.status = 'pendente'
-       FOR UPDATE OF lc`,
-      [idsInt, req.user.empresaId]
-    );
+    // 1. Busca itens da lista_compras (se houver)
+    let rItens = { rows: [] };
+    if (idsInt.length > 0) {
+      rItens = await client.query(
+        `SELECT lc.*, p.marca, p.marca_id
+         FROM lista_compras lc
+         LEFT JOIN produtos p ON p.id = lc.produto_id
+         WHERE lc.id = ANY($1::int[])
+           AND lc.empresa_id = $2
+           AND lc.status = 'pendente'
+         FOR UPDATE OF lc`,
+        [idsInt, req.user.empresaId]
+      );
+    }
 
-    if (rItens.rows.length === 0) {
+    // 1b. Busca produtos dos itens avulsos (valida que existem na empresa)
+    let produtosAvulsos = [];
+    if (avulsosOk) {
+      const prodIds = itensAvulsos
+        .map(it => parseInt(it.produtoId))
+        .filter(x => Number.isInteger(x) && x > 0);
+      if (prodIds.length > 0) {
+        const rProd = await client.query(
+          `SELECT id, nome, codigo, referencia, marca, marca_id
+           FROM produtos WHERE id = ANY($1::int[]) AND empresa_id = $2`,
+          [prodIds, req.user.empresaId]
+        );
+        const mapProd = new Map(rProd.rows.map(p => [p.id, p]));
+        for (const it of itensAvulsos) {
+          const p = mapProd.get(parseInt(it.produtoId));
+          const qtd = Number(it.quantidade);
+          if (!p || !(qtd > 0)) continue;
+          produtosAvulsos.push({
+            produto: p,
+            quantidade: qtd,
+            observacao: it.observacao || null
+          });
+        }
+      }
+    }
+
+    if (rItens.rows.length === 0 && produtosAvulsos.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Nenhum item disponível (verifique se estão pendentes).' });
+      return res.status(400).json({ error: 'Nenhum item válido pra cotar.' });
     }
 
     // 2. Valida fornecedores
@@ -203,8 +242,10 @@ router.post('/', async (req, res) => {
     );
     const cotacao = rCot.rows[0];
 
-    // 6. Agrupa itens iguais (mesmo produto = soma quantidades)
+    // 6. Agrupa itens (mesmo produto = soma qtds). Combina lista_compras + avulsos.
     const grupos = new Map();
+
+    // Itens da lista de compras
     for (const item of rItens.rows) {
       const chave = item.produto_id ? `p_${item.produto_id}` : `n_${item.produto_nome.toLowerCase()}`;
       if (!grupos.has(chave)) {
@@ -229,7 +270,28 @@ router.post('/', async (req, res) => {
       g.listaComprasIds.push(item.id);
     }
 
-    // 7. Cria itens agrupados + vincula lista_compras (cotacao_id)
+    // Itens avulsos (adicionados manualmente na cotação)
+    for (const av of produtosAvulsos) {
+      const p = av.produto;
+      const chave = `p_${p.id}`;
+      if (!grupos.has(chave)) {
+        grupos.set(chave, {
+          produto_id: p.id,
+          produto_nome: p.nome,
+          produto_codigo: p.codigo,
+          referencia: p.referencia,
+          marca: p.marca,
+          quantidade: 0,
+          origens: [],
+          listaComprasIds: []
+        });
+      }
+      const g = grupos.get(chave);
+      g.quantidade += av.quantidade;
+      g.origens.push({ avulso: true, quantidade: av.quantidade });
+    }
+
+    // 7. Cria itens agrupados + vincula lista_compras (se houver)
     for (const g of grupos.values()) {
       await client.query(
         `INSERT INTO cotacoes_itens
@@ -238,10 +300,12 @@ router.post('/', async (req, res) => {
         [cotacao.id, g.produto_id, g.produto_nome, g.produto_codigo,
          g.referencia, g.marca, g.quantidade, JSON.stringify(g.origens)]
       );
-      await client.query(
-        `UPDATE lista_compras SET cotacao_id = $1 WHERE id = ANY($2::int[])`,
-        [cotacao.id, g.listaComprasIds]
-      );
+      if (g.listaComprasIds.length > 0) {
+        await client.query(
+          `UPDATE lista_compras SET cotacao_id = $1 WHERE id = ANY($2::int[])`,
+          [cotacao.id, g.listaComprasIds]
+        );
+      }
     }
 
     // 8. Cria fornecedores vinculados
@@ -259,7 +323,8 @@ router.post('/', async (req, res) => {
       ok: true,
       cotacao,
       itensAgrupados: grupos.size,
-      itensOrigem: rItens.rows.length,
+      itensDaLista: rItens.rows.length,
+      itensAvulsos: produtosAvulsos.length,
       fornecedores: rForn.rows.length
     });
   } catch (err) {
