@@ -917,7 +917,7 @@
               <th style="padding:10px;text-align:left;">Observação</th>
               <th style="padding:10px;text-align:left;width:120px;">Criada em</th>
               <th style="padding:10px;text-align:center;width:110px;">Status</th>
-              <th style="padding:10px;text-align:center;width:200px;">Ações</th>
+              <th style="padding:10px;text-align:center;width:240px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbody-cotacoes">
@@ -2607,6 +2607,116 @@
         <button type="button" id="btn-comecar-zero" style="padding:12px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">
           🆕 Começar do zero
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Editar Cotação -->
+  <div id="modal-editar-cot" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10002;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:0;border-radius:14px;max-width:1000px;width:100%;max-height:95vh;overflow-y:auto;">
+      <div style="padding:20px 26px 14px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:2;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <h2 id="ec-titulo" style="color:#7c3aed;margin:0;font-size:22px;">✏️ Editar Cotação</h2>
+            <div style="font-size:12px;color:#64748b;margin-top:4px;">Adicione ou remova itens/fornecedores, ajuste observação. Mudanças na quantidade desmarcam os preços do item.</div>
+          </div>
+          <button onclick="fecharEditarCot()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+        </div>
+      </div>
+
+      <div style="padding:20px 26px;">
+        <!-- Observações + prazo -->
+        <div style="background:#f8fafc;padding:14px;border-radius:10px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+            <div>
+              <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">📝 Observações</label>
+              <textarea id="ec-obs" rows="2" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;color:#334155;display:block;margin-bottom:6px;">📅 Prazo de resposta</label>
+              <input type="date" id="ec-prazo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+          <button type="button" onclick="ecSalvarObs()" style="margin-top:10px;padding:8px 16px;background:#0891b2;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">💾 Salvar observação e prazo</button>
+        </div>
+
+        <!-- Itens da cotação -->
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="color:#334155;font-size:14px;">🛒 Itens da cotação</strong>
+            <span id="ec-total-itens" style="font-size:12px;color:#64748b;">0 itens</span>
+          </div>
+
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead style="background:#f8fafc;">
+                <tr>
+                  <th style="padding:8px;text-align:left;">Produto</th>
+                  <th style="padding:8px;text-align:center;width:110px;">Qtd</th>
+                  <th style="padding:8px;text-align:center;width:60px;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="ec-tbody-itens"></tbody>
+            </table>
+          </div>
+
+          <!-- Adicionar novo item -->
+          <div style="background:#fef9c3;border:1px solid #eab308;border-radius:8px;padding:12px;margin-top:10px;">
+            <strong style="color:#713f12;font-size:13px;">➕ Adicionar produto</strong>
+            <div style="display:grid;grid-template-columns:1fr 90px auto;gap:8px;margin-top:8px;align-items:end;">
+              <div>
+                <input type="text" id="ec-add-produto" list="lista-produtos-avulso" placeholder="Digite código, nome ou referência"
+                       style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+              </div>
+              <div>
+                <input type="number" id="ec-add-qtd" min="1" step="1" value="1"
+                       style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+              </div>
+              <button type="button" onclick="ecAdicionarItem()" style="padding:8px 14px;background:#eab308;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">➕ Add</button>
+            </div>
+            <div id="ec-add-erro" style="display:none;font-size:12px;color:#991b1b;margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- Fornecedores -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="color:#334155;font-size:14px;">🏢 Fornecedores cotando</strong>
+            <span id="ec-total-forn" style="font-size:12px;color:#64748b;">0 fornecedores</span>
+          </div>
+
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead style="background:#f8fafc;">
+                <tr>
+                  <th style="padding:8px;text-align:left;">Fornecedor</th>
+                  <th style="padding:8px;text-align:center;width:120px;">Status</th>
+                  <th style="padding:8px;text-align:center;width:60px;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="ec-tbody-forn"></tbody>
+            </table>
+          </div>
+
+          <!-- Adicionar novo fornecedor -->
+          <div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:8px;padding:12px;margin-top:10px;">
+            <strong style="color:#6b21a8;font-size:13px;">➕ Adicionar fornecedor</strong>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;align-items:end;">
+              <select id="ec-add-fornecedor" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+                <option value="">— Escolha um fornecedor —</option>
+              </select>
+              <button type="button" onclick="ecAdicionarFornecedor()" style="padding:8px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">➕ Add</button>
+            </div>
+            <div id="ec-forn-erro" style="display:none;font-size:12px;color:#991b1b;margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- Botão fechar -->
+        <div style="margin-top:20px;padding-top:14px;border-top:1px solid #f1f5f9;">
+          <button type="button" onclick="fecharEditarCot()" style="width:100%;padding:12px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">
+            ✅ Concluir edição
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -13856,6 +13966,9 @@ ${conteudo}
 
     tbody.innerHTML = filtrados.map(c => {
       let acoes = `<button onclick="verCotacao(${c.id})" style="background:#faf5ff;color:#7c3aed;border:1px solid #d8b4fe;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes/preços">👁️</button>`;
+      if (['aberta', 'recebendo', 'decidindo'].includes(c.status)) {
+        acoes += `<button onclick="editarCotacao(${c.id})" style="background:#fef3c7;color:#92400e;border:1px solid #fbbf24;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Editar itens/fornecedores">✏️</button>`;
+      }
       acoes += `<button onclick="imprimirCotacaoPdf(${c.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Imprimir PDF (sem preços)">🖨️</button>`;
       if (['aberta', 'recebendo'].includes(c.status)) {
         acoes += `<button onclick="cancelarCotacao(${c.id})" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;" title="Cancelar">❌</button>`;
@@ -14185,6 +14298,320 @@ ${conteudo}
       erro.textContent = e.message || 'Erro ao criar cotação.';
       erro.style.display = 'block';
     }
+  }
+
+  // ===== EDITAR COTAÇÃO =====
+  let _ecCotacaoId = null;
+  let _ecDados = null; // { cotacao, itens, fornecedores, respostas }
+  let _ecFornecedoresTodos = [];
+
+  async function editarCotacao(id) {
+    _ecCotacaoId = id;
+    try {
+      _ecDados = await api('GET', `/api/cotacoes/${id}`);
+      if (['fechada', 'cancelada'].includes(_ecDados.cotacao.status)) {
+        alert(`⚠️ Cotação já está "${_ecDados.cotacao.status}" e não pode ser editada.`);
+        return;
+      }
+
+      // Carrega lista de fornecedores completa (pra popular select "adicionar")
+      _ecFornecedoresTodos = await api('GET', '/api/fornecedores') || [];
+
+      // Popula datalist de produtos (reusa o mesmo do modal novo)
+      const dlProdAvulso = document.getElementById('lista-produtos-avulso');
+      if (dlProdAvulso) {
+        dlProdAvulso.innerHTML = (dbProdutos || []).map(p => {
+          const label = [p.codigo, p.nome, p.referencia ? '(' + p.referencia + ')' : ''].filter(Boolean).join(' - ');
+          return `<option value="${escapeAttr(label)}" data-id="${p.id}">`;
+        }).join('');
+      }
+
+      const c = _ecDados.cotacao;
+      document.getElementById('ec-titulo').textContent = `✏️ Editar Cotação #${String(c.numero).padStart(3, '0')}`;
+      document.getElementById('ec-obs').value = c.observacao || '';
+      document.getElementById('ec-prazo').value = c.prazo_resposta ? String(c.prazo_resposta).slice(0, 10) : '';
+
+      renderEcItens();
+      renderEcFornecedores();
+      renderEcSelectFornecedor();
+
+      document.getElementById('ec-add-produto').value = '';
+      document.getElementById('ec-add-qtd').value = '1';
+      document.getElementById('ec-add-fornecedor').value = '';
+      document.getElementById('ec-add-erro').style.display = 'none';
+      document.getElementById('ec-forn-erro').style.display = 'none';
+
+      document.getElementById('modal-editar-cot').style.display = 'flex';
+    } catch (e) {
+      alert('Erro ao carregar cotação: ' + e.message);
+    }
+  }
+
+  async function ecRecarregar() {
+    if (!_ecCotacaoId) return;
+    _ecDados = await api('GET', `/api/cotacoes/${_ecCotacaoId}`);
+    renderEcItens();
+    renderEcFornecedores();
+    renderEcSelectFornecedor();
+  }
+
+  function renderEcItens() {
+    if (!_ecDados) return;
+    const tbody = document.getElementById('ec-tbody-itens');
+    const total = document.getElementById('ec-total-itens');
+    const itens = _ecDados.itens || [];
+    total.textContent = `${itens.length} ${itens.length === 1 ? 'item' : 'itens'}`;
+
+    if (itens.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">Nenhum item na cotação.</td></tr>';
+      return;
+    }
+
+    // Conta quantas respostas cada item tem (pra avisar antes de alterar)
+    const respostasPorItem = {};
+    (_ecDados.respostas || []).forEach(r => {
+      if (r.preco_unitario != null && r.preco_unitario !== '') {
+        respostasPorItem[r.cotacao_item_id] = (respostasPorItem[r.cotacao_item_id] || 0) + 1;
+      }
+    });
+
+    tbody.innerHTML = itens.map(it => {
+      const respCount = respostasPorItem[it.id] || 0;
+      const alertaResp = respCount > 0
+        ? `<div style="font-size:10px;color:#dc2626;margin-top:2px;">⚠️ ${respCount} preço(s) preenchido(s) — alterar quantidade vai descartar</div>`
+        : '';
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px;">
+            <strong>${escapeHtml(it.produto_nome)}</strong>
+            ${it.referencia ? `<div style="font-size:10px;color:#7c3aed;">Ref: ${escapeHtml(it.referencia)}</div>` : ''}
+            ${it.marca ? `<div style="font-size:10px;color:#4338ca;">${escapeHtml(it.marca)}</div>` : ''}
+            ${alertaResp}
+          </td>
+          <td style="padding:8px;text-align:center;">
+            <input type="number" min="1" step="1" value="${it.quantidade}" data-item-id="${it.id}" data-qtd-antiga="${it.quantidade}"
+                   onblur="ecAlterarQtd(this)"
+                   style="width:80px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;font-weight:700;">
+          </td>
+          <td style="padding:8px;text-align:center;">
+            <button type="button" onclick="ecRemoverItem(${it.id}, ${respCount})" title="Remover item"
+                    style="background:none;border:1px solid #fca5a5;color:#dc2626;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderEcFornecedores() {
+    if (!_ecDados) return;
+    const tbody = document.getElementById('ec-tbody-forn');
+    const total = document.getElementById('ec-total-forn');
+    const forn = _ecDados.fornecedores || [];
+    total.textContent = `${forn.length} ${forn.length === 1 ? 'fornecedor' : 'fornecedores'}`;
+
+    if (forn.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">Nenhum fornecedor.</td></tr>';
+      return;
+    }
+
+    const badges = {
+      aguardando: '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⏳ Aguardando</span>',
+      respondeu: '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✅ Respondeu</span>',
+      declinou: '<span style="background:#fef2f2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">❌ Declinou</span>'
+    };
+
+    // Conta respostas por fornecedor pra avisar antes de remover
+    const respostasPorForn = {};
+    (_ecDados.respostas || []).forEach(r => {
+      if (r.preco_unitario != null && r.preco_unitario !== '') {
+        respostasPorForn[r.cotacao_fornecedor_id] = (respostasPorForn[r.cotacao_fornecedor_id] || 0) + 1;
+      }
+    });
+
+    tbody.innerHTML = forn.map(f => {
+      const respCount = respostasPorForn[f.id] || 0;
+      return `
+        <tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px;">
+            <strong>${escapeHtml(f.fornecedor_nome)}</strong>
+            ${respCount > 0 ? `<div style="font-size:10px;color:#dc2626;margin-top:2px;">⚠️ ${respCount} preço(s) preenchido(s)</div>` : ''}
+          </td>
+          <td style="padding:8px;text-align:center;">${badges[f.status] || f.status}</td>
+          <td style="padding:8px;text-align:center;">
+            <button type="button" onclick="ecRemoverFornecedor(${f.id}, '${escapeAttr(f.fornecedor_nome)}', ${respCount})" title="Remover fornecedor"
+                    style="background:none;border:1px solid #fca5a5;color:#dc2626;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderEcSelectFornecedor() {
+    if (!_ecDados) return;
+    const sel = document.getElementById('ec-add-fornecedor');
+    const jaVinculados = new Set((_ecDados.fornecedores || []).map(f => f.fornecedor_id));
+    const disponiveis = _ecFornecedoresTodos.filter(f => !jaVinculados.has(f.id));
+
+    sel.innerHTML = '<option value="">— Escolha um fornecedor —</option>' +
+      disponiveis.map(f => `<option value="${f.id}">${escapeHtml(f.nome)}</option>`).join('');
+  }
+
+  async function ecSalvarObs() {
+    const observacao = document.getElementById('ec-obs').value.trim() || null;
+    const prazoResposta = document.getElementById('ec-prazo').value || null;
+    try {
+      await api('PUT', `/api/cotacoes/${_ecCotacaoId}`, { observacao, prazoResposta });
+      mostrarToastAutosave('✅ Observação e prazo salvos');
+      // atualiza dados local
+      _ecDados.cotacao.observacao = observacao;
+      _ecDados.cotacao.prazo_resposta = prazoResposta;
+      carregarCotacoes(); // atualiza listagem no fundo
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function ecAlterarQtd(inputEl) {
+    const itemId = parseInt(inputEl.dataset.itemId);
+    const qtdNova = Number(inputEl.value);
+    const qtdAntiga = Number(inputEl.dataset.qtdAntiga);
+
+    if (!(qtdNova > 0)) {
+      inputEl.value = qtdAntiga; // reverte
+      alert('Quantidade inválida.');
+      return;
+    }
+    if (qtdNova === qtdAntiga) return;
+
+    // Se tem respostas, confirma
+    const respostasPorItem = {};
+    (_ecDados.respostas || []).forEach(r => {
+      if (r.preco_unitario != null && r.preco_unitario !== '') {
+        respostasPorItem[r.cotacao_item_id] = (respostasPorItem[r.cotacao_item_id] || 0) + 1;
+      }
+    });
+    const respCount = respostasPorItem[itemId] || 0;
+    if (respCount > 0) {
+      if (!confirm(`⚠️ Este item tem ${respCount} preço(s) preenchido(s) por fornecedores.\n\nAlterar a quantidade vai APAGAR esses preços (fornecedores terão que reavaliar).\n\nConfirma?`)) {
+        inputEl.value = qtdAntiga;
+        return;
+      }
+    }
+
+    try {
+      const r = await api('PUT', `/api/cotacoes/${_ecCotacaoId}/itens/${itemId}`, { quantidade: qtdNova });
+      inputEl.dataset.qtdAntiga = qtdNova;
+      await ecRecarregar();
+      if (r.respostasDesmarcadas > 0) {
+        mostrarToastAutosave(`✅ Quantidade alterada. ${r.respostasDesmarcadas} preço(s) desmarcados.`);
+      } else {
+        mostrarToastAutosave('✅ Quantidade alterada');
+      }
+      carregarCotacoes();
+    } catch (e) {
+      inputEl.value = qtdAntiga;
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function ecAdicionarItem() {
+    const input = document.getElementById('ec-add-produto');
+    const qtdInp = document.getElementById('ec-add-qtd');
+    const erro = document.getElementById('ec-add-erro');
+    const texto = (input.value || '').trim();
+    const qtd = Number(qtdInp.value);
+    erro.style.display = 'none';
+
+    if (!texto) { erro.textContent = 'Selecione um produto.'; erro.style.display = 'block'; return; }
+    if (!(qtd > 0)) { erro.textContent = 'Quantidade inválida.'; erro.style.display = 'block'; return; }
+
+    const textoLower = texto.toLowerCase();
+    let produto = (dbProdutos || []).find(p => {
+      const label = [p.codigo, p.nome, p.referencia ? '(' + p.referencia + ')' : ''].filter(Boolean).join(' - ').toLowerCase();
+      return label === textoLower;
+    });
+    if (!produto) {
+      produto = (dbProdutos || []).find(p =>
+        (p.codigo && String(p.codigo).toLowerCase() === textoLower) ||
+        (p.referencia && String(p.referencia).toLowerCase() === textoLower) ||
+        (p.nome && p.nome.toLowerCase() === textoLower)
+      );
+    }
+    if (!produto) {
+      erro.textContent = 'Produto não encontrado. Selecione da lista.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    try {
+      await api('POST', `/api/cotacoes/${_ecCotacaoId}/itens`, { produtoId: produto.id, quantidade: qtd });
+      input.value = '';
+      qtdInp.value = '1';
+      input.focus();
+      await ecRecarregar();
+      mostrarToastAutosave('✅ Item adicionado');
+      carregarCotacoes();
+    } catch (e) {
+      erro.textContent = e.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function ecRemoverItem(itemId, respCount) {
+    let msg = 'Remover este item da cotação?';
+    if (respCount > 0) msg += `\n\n⚠️ ${respCount} preço(s) preenchido(s) serão APAGADOS.`;
+    if (!confirm(msg)) return;
+
+    try {
+      await api('DELETE', `/api/cotacoes/${_ecCotacaoId}/itens/${itemId}`);
+      await ecRecarregar();
+      mostrarToastAutosave('✅ Item removido');
+      carregarCotacoes();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  async function ecAdicionarFornecedor() {
+    const sel = document.getElementById('ec-add-fornecedor');
+    const erro = document.getElementById('ec-forn-erro');
+    const fornId = parseInt(sel.value);
+    erro.style.display = 'none';
+
+    if (!fornId) { erro.textContent = 'Escolha um fornecedor.'; erro.style.display = 'block'; return; }
+
+    try {
+      await api('POST', `/api/cotacoes/${_ecCotacaoId}/fornecedores`, { fornecedorId: fornId });
+      sel.value = '';
+      await ecRecarregar();
+      mostrarToastAutosave('✅ Fornecedor adicionado');
+      carregarCotacoes();
+    } catch (e) {
+      erro.textContent = e.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function ecRemoverFornecedor(cotFornId, nome, respCount) {
+    let msg = `Remover o fornecedor "${nome}" da cotação?`;
+    if (respCount > 0) msg += `\n\n⚠️ ${respCount} preço(s) que ele preencheu serão APAGADOS.`;
+    if (!confirm(msg)) return;
+
+    try {
+      await api('DELETE', `/api/cotacoes/${_ecCotacaoId}/fornecedores/${cotFornId}`);
+      await ecRecarregar();
+      mostrarToastAutosave('✅ Fornecedor removido');
+      carregarCotacoes();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  function fecharEditarCot() {
+    document.getElementById('modal-editar-cot').style.display = 'none';
+    _ecCotacaoId = null;
+    _ecDados = null;
+    _ecFornecedoresTodos = [];
   }
 
   // ===== VER COTAÇÃO (preencher preços + comparar + gerar ordens) =====

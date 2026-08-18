@@ -674,4 +674,352 @@ router.post('/:id/cancelar', async (req, res) => {
   }
 });
 
+// ==========================================
+// PUT /:id — Atualiza dados básicos da cotação (observação, prazo)
+// Body: { observacao, prazoResposta }
+// ==========================================
+router.put('/:id', async (req, res) => {
+  const { observacao, prazoResposta } = req.body || {};
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação já está "${rCot.rows[0].status}" e não pode ser editada.` });
+    }
+
+    await client.query(
+      `UPDATE cotacoes SET observacao=$1, prazo_resposta=$2 WHERE id=$3`,
+      [observacao || null, prazoResposta || null, req.params.id]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] PUT', err);
+    res.status(500).json({ error: 'Erro ao atualizar cotação.' });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /:id/itens — Adiciona item na cotação
+// Body: { produtoId, quantidade }
+// ==========================================
+router.post('/:id/itens', async (req, res) => {
+  const { produtoId, quantidade } = req.body || {};
+  const qtd = Number(quantidade);
+  const prodId = parseInt(produtoId);
+
+  if (!Number.isInteger(prodId) || prodId <= 0) {
+    return res.status(400).json({ error: 'produtoId inválido.' });
+  }
+  if (!(qtd > 0)) {
+    return res.status(400).json({ error: 'Quantidade inválida.' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação "${rCot.rows[0].status}" não pode receber novos itens.` });
+    }
+
+    // Busca produto
+    const rProd = await client.query(
+      `SELECT id, nome, codigo, referencia, marca FROM produtos
+       WHERE id=$1 AND empresa_id=$2`,
+      [prodId, req.user.empresaId]
+    );
+    if (rProd.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Produto não encontrado.' });
+    }
+    const p = rProd.rows[0];
+
+    // Se produto já está na cotação: soma quantidade
+    const rExist = await client.query(
+      `SELECT id, quantidade FROM cotacoes_itens
+       WHERE cotacao_id=$1 AND produto_id=$2 FOR UPDATE`,
+      [req.params.id, p.id]
+    );
+    if (rExist.rows.length > 0) {
+      const novaQtd = Number(rExist.rows[0].quantidade) + qtd;
+      await client.query(
+        `UPDATE cotacoes_itens SET quantidade=$1 WHERE id=$2`,
+        [novaQtd, rExist.rows[0].id]
+      );
+      // Desmarcar respostas deste item (quantidade mudou)
+      await client.query(
+        `DELETE FROM cotacoes_respostas
+         WHERE cotacao_item_id=$1 AND cotacao_id=$2`,
+        [rExist.rows[0].id, req.params.id]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO cotacoes_itens
+           (cotacao_id, produto_id, produto_nome, produto_codigo, referencia, marca, quantidade, origens)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, '[{"avulso":true,"origem":"edicao"}]'::jsonb)`,
+        [req.params.id, p.id, p.nome, p.codigo, p.referencia, p.marca, qtd]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] POST itens', err);
+    res.status(500).json({ error: 'Erro ao adicionar item: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// PUT /:id/itens/:itemId — Altera quantidade do item
+// Body: { quantidade }
+// Se mudar quantidade → desmarca respostas (preço precisa ser reavaliado)
+// ==========================================
+router.put('/:id/itens/:itemId', async (req, res) => {
+  const qtd = Number(req.body?.quantidade);
+  if (!(qtd > 0)) return res.status(400).json({ error: 'Quantidade inválida.' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação "${rCot.rows[0].status}" não pode ser editada.` });
+    }
+
+    const rItem = await client.query(
+      `SELECT id, quantidade FROM cotacoes_itens WHERE id=$1 AND cotacao_id=$2 FOR UPDATE`,
+      [req.params.itemId, req.params.id]
+    );
+    if (rItem.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item não encontrado.' });
+    }
+
+    const qtdAtual = Number(rItem.rows[0].quantidade);
+    let respostasDesmarcadas = 0;
+    if (qtdAtual !== qtd) {
+      // Muda qtd → desmarca respostas do item
+      const rDel = await client.query(
+        `DELETE FROM cotacoes_respostas WHERE cotacao_item_id=$1 AND cotacao_id=$2`,
+        [req.params.itemId, req.params.id]
+      );
+      respostasDesmarcadas = rDel.rowCount;
+
+      await client.query(
+        `UPDATE cotacoes_itens SET quantidade=$1 WHERE id=$2`,
+        [qtd, req.params.itemId]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true, respostasDesmarcadas });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] PUT itens', err);
+    res.status(500).json({ error: 'Erro ao atualizar item: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// DELETE /:id/itens/:itemId — Remove item + suas respostas
+// ==========================================
+router.delete('/:id/itens/:itemId', async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação "${rCot.rows[0].status}" não pode ser editada.` });
+    }
+
+    // Verifica que o item pertence à cotação e desvincula lista_compras
+    const rItem = await client.query(
+      `SELECT id, origens FROM cotacoes_itens WHERE id=$1 AND cotacao_id=$2`,
+      [req.params.itemId, req.params.id]
+    );
+    if (rItem.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item não encontrado.' });
+    }
+
+    // Desvincula da lista_compras (se veio de lá)
+    const origens = Array.isArray(rItem.rows[0].origens) ? rItem.rows[0].origens : [];
+    const listaIds = origens.map(o => o.lista_compras_id).filter(Boolean);
+    if (listaIds.length > 0) {
+      await client.query(
+        `UPDATE lista_compras SET cotacao_id = NULL
+         WHERE id = ANY($1::int[]) AND empresa_id = $2`,
+        [listaIds, req.user.empresaId]
+      );
+    }
+
+    // Deleta item (respostas caem em cascade)
+    await client.query(`DELETE FROM cotacoes_itens WHERE id=$1`, [req.params.itemId]);
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] DELETE itens', err);
+    res.status(500).json({ error: 'Erro ao remover item.' });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /:id/fornecedores — Adiciona novo fornecedor à cotação
+// Body: { fornecedorId }
+// ==========================================
+router.post('/:id/fornecedores', async (req, res) => {
+  const fornId = parseInt(req.body?.fornecedorId);
+  if (!Number.isInteger(fornId) || fornId <= 0) {
+    return res.status(400).json({ error: 'fornecedorId inválido.' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação "${rCot.rows[0].status}" não pode ser editada.` });
+    }
+
+    const rForn = await client.query(
+      `SELECT id, nome FROM fornecedores WHERE id=$1 AND empresa_id=$2`,
+      [fornId, req.user.empresaId]
+    );
+    if (rForn.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Fornecedor não encontrado.' });
+    }
+
+    try {
+      await client.query(
+        `INSERT INTO cotacoes_fornecedores
+           (cotacao_id, fornecedor_id, fornecedor_nome, status)
+         VALUES ($1, $2, $3, 'aguardando')`,
+        [req.params.id, rForn.rows[0].id, rForn.rows[0].nome]
+      );
+    } catch (e) {
+      if (e.code === '23505') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Fornecedor já está na cotação.' });
+      }
+      throw e;
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] POST fornecedor', err);
+    res.status(500).json({ error: 'Erro ao adicionar fornecedor: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// DELETE /:id/fornecedores/:cotFornId — Remove fornecedor da cotação
+// (respostas dele caem em cascade)
+// ==========================================
+router.delete('/:id/fornecedores/:cotFornId', async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rCot = await client.query(
+      `SELECT status FROM cotacoes WHERE id=$1 AND empresa_id=$2 FOR UPDATE`,
+      [req.params.id, req.user.empresaId]
+    );
+    if (rCot.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotação não encontrada.' });
+    }
+    if (['fechada', 'cancelada'].includes(rCot.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cotação "${rCot.rows[0].status}" não pode ser editada.` });
+    }
+
+    // Impede deletar o último fornecedor
+    const rCount = await client.query(
+      `SELECT COUNT(*)::int AS total FROM cotacoes_fornecedores WHERE cotacao_id=$1`,
+      [req.params.id]
+    );
+    if (rCount.rows[0].total <= 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cotação precisa ter pelo menos 1 fornecedor.' });
+    }
+
+    const rDel = await client.query(
+      `DELETE FROM cotacoes_fornecedores
+       WHERE id=$1 AND cotacao_id=$2 RETURNING id`,
+      [req.params.cotFornId, req.params.id]
+    );
+    if (rDel.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Fornecedor não vinculado a esta cotação.' });
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[cotacoes] DELETE fornecedor', err);
+    res.status(500).json({ error: 'Erro ao remover fornecedor.' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
