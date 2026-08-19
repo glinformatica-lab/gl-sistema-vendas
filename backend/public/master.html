@@ -559,13 +559,38 @@
 
       // Card BANCO
       const banco = r.banco;
-      const bancoHtml = `
-        <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:18px;">
-          <div style="font-size:13px;color:#1e40af;font-weight:600;">🗄️ Banco PostgreSQL</div>
-          <div style="font-size:32px;font-weight:700;color:#1e3a8a;margin-top:6px;">${formatarMB(banco.mb)}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:4px;">${banco.topTabelas.length} tabelas · ${r.totalEmpresas} empresa(s)</div>
-        </div>
-      `;
+      let bancoHtml;
+      if (banco.temLimite) {
+        const pctBanco = calcPct(banco.mb, banco.limiteMB);
+        bancoHtml = `
+          <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:18px;">
+            <div style="font-size:13px;color:#1e40af;font-weight:600;">🗄️ Banco PostgreSQL</div>
+            <div style="font-size:22px;font-weight:700;color:#1e3a8a;margin-top:6px;">${formatarMB(banco.mb)} / ${formatarMB(banco.limiteMB)}</div>
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:4px;overflow:hidden;">
+              <div style="height:100%;width:${pctBanco}%;background:${corBarra(pctBanco)};"></div>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:6px;">
+              <strong style="color:${corBarra(pctBanco)};">${pctBanco}% usado</strong> · disponível: <strong>${formatarMB(banco.disponivelMB)}</strong>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">
+              ${banco.topTabelas.length} tabelas · ${r.totalEmpresas} empresa(s)
+            </div>
+          </div>
+        `;
+      } else {
+        bancoHtml = `
+          <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:18px;">
+            <div style="font-size:13px;color:#1e40af;font-weight:600;">🗄️ Banco PostgreSQL</div>
+            <div style="font-size:32px;font-weight:700;color:#1e3a8a;margin-top:6px;">${formatarMB(banco.mb)}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">
+              ${banco.topTabelas.length} tabelas · ${r.totalEmpresas} empresa(s)
+            </div>
+            <div style="font-size:10px;color:#f59e0b;margin-top:6px;background:#fef3c7;padding:4px 8px;border-radius:4px;">
+              ⚠️ Configure <code>DB_STORAGE_LIMIT_MB</code> no Render pra ver o limite
+            </div>
+          </div>
+        `;
+      }
 
       // Card CLOUDINARY
       let cloudHtml = '';

@@ -83,6 +83,12 @@ router.get('/', async (req, res) => {
     const rTamTotal = await db.query(`SELECT pg_database_size(current_database()) AS bytes`);
     const bancoBytes = parseInt(rTamTotal.rows[0].bytes) || 0;
 
+    // Limite configurado via env var (ex: DB_STORAGE_LIMIT_MB=1024 para 1 GB)
+    const limiteMB = parseInt(process.env.DB_STORAGE_LIMIT_MB) || 0;
+    const usadoMB = bancoBytes / 1024 / 1024;
+    const disponivelMB = limiteMB > 0 ? Math.max(0, limiteMB - usadoMB) : 0;
+    const percentualUsado = limiteMB > 0 ? Math.min(100, (usadoMB / limiteMB) * 100) : 0;
+
     // Top tabelas por tamanho
     const rTopTabelas = await db.query(`
       SELECT
@@ -156,6 +162,10 @@ router.get('/', async (req, res) => {
         bytes: bancoBytes,
         mb: Math.round(bancoBytes / 1024 / 1024 * 100) / 100,
         gb: Math.round(bancoBytes / 1024 / 1024 / 1024 * 100) / 100,
+        limiteMB,
+        disponivelMB: Math.round(disponivelMB * 100) / 100,
+        percentualUsado: Math.round(percentualUsado * 10) / 10,
+        temLimite: limiteMB > 0,
         topTabelas
       },
       totais,
