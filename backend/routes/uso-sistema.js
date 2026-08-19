@@ -39,23 +39,27 @@ function cloudinaryUsage() {
           if (res.statusCode !== 200) {
             return resolve({ configurado: true, erro: json.error?.message || 'Erro ao consultar API' });
           }
+          const storageLimit = json.storage?.limit || parseInt(process.env.CLOUDINARY_STORAGE_LIMIT_BYTES) || 0;
+          const bandwidthLimit = json.bandwidth?.limit || parseInt(process.env.CLOUDINARY_BANDWIDTH_LIMIT_BYTES) || 0;
+          const transformationsLimit = json.transformations?.limit || parseInt(process.env.CLOUDINARY_TRANSFORMATIONS_LIMIT) || 0;
+
           resolve({
             configurado: true,
             storage: {
               usadoBytes: json.storage?.usage || 0,
-              limiteBytes: json.storage?.limit || 0,
+              limiteBytes: storageLimit,
               usadoMB: Math.round((json.storage?.usage || 0) / 1024 / 1024),
-              limiteMB: Math.round((json.storage?.limit || 0) / 1024 / 1024),
+              limiteMB: Math.round(storageLimit / 1024 / 1024),
             },
             bandwidth: {
               usadoBytes: json.bandwidth?.usage || 0,
-              limiteBytes: json.bandwidth?.limit || 0,
+              limiteBytes: bandwidthLimit,
               usadoMB: Math.round((json.bandwidth?.usage || 0) / 1024 / 1024),
-              limiteMB: Math.round((json.bandwidth?.limit || 0) / 1024 / 1024),
+              limiteMB: Math.round(bandwidthLimit / 1024 / 1024),
             },
             transformations: {
               usadas: json.transformations?.usage || 0,
-              limite: json.transformations?.limit || 0
+              limite: transformationsLimit
             },
             totalRecursos: json.resources || 0,
             totalDerivados: json.derived_resources || 0,

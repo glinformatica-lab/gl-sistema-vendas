@@ -612,20 +612,36 @@
       } else {
         const cs = r.cloudinary.storage;
         const cb = r.cloudinary.bandwidth;
-        const pctStorage = calcPct(cs.usadoMB, cs.limiteMB);
-        const pctBand = calcPct(cb.usadoMB, cb.limiteMB);
+        const temLimiteStorage = cs.limiteMB > 0;
+        const temLimiteBand = cb.limiteMB > 0;
+        const pctStorage = temLimiteStorage ? calcPct(cs.usadoMB, cs.limiteMB) : 0;
+        const pctBand = temLimiteBand ? calcPct(cb.usadoMB, cb.limiteMB) : 0;
+        const dispStorage = temLimiteStorage ? Math.max(0, cs.limiteMB - cs.usadoMB) : 0;
+        const dispBand = temLimiteBand ? Math.max(0, cb.limiteMB - cb.usadoMB) : 0;
+
         cloudHtml = `
           <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:18px;">
             <div style="font-size:13px;color:#166534;font-weight:600;">📸 Cloudinary</div>
-            <div style="font-size:22px;font-weight:700;color:#14532d;margin-top:6px;">${formatarMB(cs.usadoMB)} / ${formatarMB(cs.limiteMB)}</div>
-            <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:4px;overflow:hidden;">
-              <div style="height:100%;width:${pctStorage}%;background:${corBarra(pctStorage)};"></div>
+            <div style="font-size:22px;font-weight:700;color:#14532d;margin-top:6px;">
+              ${formatarMB(cs.usadoMB)} ${temLimiteStorage ? ' / ' + formatarMB(cs.limiteMB) : ''}
             </div>
-            <div style="font-size:10px;color:#64748b;margin-top:6px;">
+            ${temLimiteStorage ? `
+              <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:4px;overflow:hidden;">
+                <div style="height:100%;width:${pctStorage}%;background:${corBarra(pctStorage)};"></div>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-top:6px;">
+                <strong style="color:${corBarra(pctStorage)};">${pctStorage}% usado</strong> · disponível: <strong>${formatarMB(dispStorage)}</strong>
+              </div>
+            ` : `
+              <div style="font-size:10px;color:#f59e0b;margin-top:6px;background:#fef3c7;padding:4px 8px;border-radius:4px;">
+                ⚠️ Configure <code>CLOUDINARY_STORAGE_LIMIT_BYTES</code> no Render
+              </div>
+            `}
+            <div style="font-size:10px;color:#94a3b8;margin-top:6px;">
               ${r.cloudinary.totalRecursos} arquivo(s) · Plano ${escapeHtml(r.cloudinary.plano)}
             </div>
-            <div style="font-size:11px;color:#64748b;margin-top:8px;">
-              Bandwidth: ${formatarMB(cb.usadoMB)} / ${formatarMB(cb.limiteMB)} (${pctBand}%)
+            <div style="font-size:11px;color:#64748b;margin-top:8px;padding-top:8px;border-top:1px solid #dcfce7;">
+              <strong>Bandwidth:</strong> ${formatarMB(cb.usadoMB)}${temLimiteBand ? ' / ' + formatarMB(cb.limiteMB) + ' (' + pctBand + '%) · disp: ' + formatarMB(dispBand) : ''}
             </div>
           </div>
         `;
