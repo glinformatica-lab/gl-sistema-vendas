@@ -4208,6 +4208,54 @@
   </div>
 
   <!-- Modal/Novo Cliente -->
+  <!-- Modal: Histórico de Crédito -->
+  <div id="modal-hist-credito" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:0;border-radius:14px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;">
+      <div style="padding:18px 24px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h2 style="color:#16a34a;margin:0;font-size:20px;">📋 Histórico de Crédito</h2>
+          <div id="hist-cred-cliente" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
+        </div>
+        <button onclick="fecharHistCredito()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:16px 24px;">
+        <div id="hist-cred-tabela"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Lançar Crédito Manual (senha admin) -->
+  <div id="modal-cred-manual" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10015;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:22px 26px;border-radius:14px;max-width:480px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <h2 style="color:#16a34a;margin:0;font-size:19px;">➕ Lançar Crédito Manual</h2>
+          <div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:600;">🔒 Requer senha de administrador</div>
+        </div>
+        <button onclick="fecharCredManual()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+      </div>
+
+      <label style="display:block;margin-top:10px;font-size:12px;font-weight:600;color:#334155;">Valor (R$)</label>
+      <input type="number" id="cm-valor" min="0.01" step="0.01" placeholder="0,00"
+             style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:15px;font-weight:700;">
+
+      <label style="display:block;margin-top:12px;font-size:12px;font-weight:600;color:#334155;">Motivo</label>
+      <textarea id="cm-motivo" rows="2" placeholder="Ex: Ajuste manual autorizado, brinde promocional..."
+                style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;"></textarea>
+
+      <label style="display:block;margin-top:12px;font-size:12px;font-weight:600;color:#dc2626;">🔒 Senha do administrador</label>
+      <input type="password" id="cm-senha" placeholder="••••••••"
+             style="width:100%;padding:10px;border:2px solid #dc2626;border-radius:6px;font-size:13px;">
+
+      <div id="cm-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:8px;border-radius:6px;margin-top:10px;font-size:12px;"></div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button type="button" onclick="fecharCredManual()" style="flex:1;padding:12px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="confirmarCredManual()" style="flex:2;padding:12px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">💰 Lançar Crédito</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-novo-cliente">
     <form id="form-novo-cliente" autocomplete="off">
       <h2 style="color:#3960f9;margin-bottom:18px;">Novo Cliente</h2>
@@ -4223,6 +4271,21 @@
         <label style="display:flex;align-items:center;gap:6px;">
           <input type="checkbox" id="cli-fornecedor"> Também é fornecedor
         </label>
+
+        <!-- Bloco Crédito de Devolução (só edição + iluminação) -->
+        <div id="cli-bloco-credito" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:11px;color:#166534;font-weight:600;">💰 Crédito de Devolução</div>
+              <div id="cli-credito-saldo" style="font-size:22px;font-weight:700;color:#14532d;">R$ 0,00</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="verHistoricoCredito()" style="background:#0891b2;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">📋 Histórico</button>
+              <button type="button" onclick="abrirModalCreditoManual()" style="background:#16a34a;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">➕ Lançar</button>
+            </div>
+          </div>
+        </div>
+
         <div id="cli-erro"></div>
         <button type="submit" class="btn">Salvar Cliente</button>
         <button type="button" class="btn cancelar" onclick="closeNovoCliente()">Cancelar</button>
@@ -7760,7 +7823,122 @@ https://sistema.glinformatica.com.br
     document.getElementById('cli-uf').value       = c.uf || '';
     document.getElementById('cli-fornecedor').checked = !!c.eTambemFornecedor;
     document.getElementById('cli-erro').style.display = 'none';
+
+    // Mostra bloco crédito se módulo iluminação
+    const bloco = document.getElementById('cli-bloco-credito');
+    if (usaAmbientes && bloco) {
+      bloco.style.display = '';
+      carregarSaldoCredito(id);
+    } else if (bloco) {
+      bloco.style.display = 'none';
+    }
+
     document.getElementById('modal-novo-cliente').style.display = 'flex';
+  }
+
+  // ====== CRÉDITO DE DEVOLUÇÃO ======
+  async function carregarSaldoCredito(clienteId) {
+    try {
+      const r = await api('GET', `/api/creditos/cliente/${clienteId}`);
+      document.getElementById('cli-credito-saldo').textContent = formatarBRL(r.saldo || 0);
+    } catch (e) {
+      document.getElementById('cli-credito-saldo').textContent = 'R$ 0,00';
+    }
+  }
+
+  async function verHistoricoCredito() {
+    if (!_clienteEditandoId) return;
+    try {
+      const r = await api('GET', `/api/creditos/cliente/${_clienteEditandoId}`);
+      document.getElementById('hist-cred-cliente').textContent = `${r.cliente.nome} · Saldo atual: ${formatarBRL(r.saldo)}`;
+
+      const tabela = document.getElementById('hist-cred-tabela');
+      if (!r.historico || r.historico.length === 0) {
+        tabela.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px;">📭 Nenhum lançamento de crédito.</div>';
+      } else {
+        tabela.innerHTML = `
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:8px;text-align:left;">Data</th>
+                <th style="padding:8px;text-align:center;">Tipo</th>
+                <th style="padding:8px;text-align:right;">Valor</th>
+                <th style="padding:8px;text-align:right;">Saldo após</th>
+                <th style="padding:8px;text-align:left;">Motivo</th>
+                <th style="padding:8px;text-align:left;">Por</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${r.historico.map(h => {
+                const badge = h.tipo === 'entrada'
+                  ? '<span style="background:#dcfce7;color:#166534;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">↑ ENTRADA</span>'
+                  : h.tipo === 'uso'
+                  ? '<span style="background:#fef2f2;color:#991b1b;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">↓ USO</span>'
+                  : '<span style="background:#eef2ff;color:#4338ca;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">⚙️ AJUSTE</span>';
+                const cor = h.tipo === 'uso' ? '#dc2626' : '#16a34a';
+                const sinal = h.tipo === 'uso' ? '-' : '+';
+                return `
+                  <tr style="border-top:1px solid #f1f5f9;">
+                    <td style="padding:6px 8px;color:#64748b;">${new Date(h.criado_em).toLocaleString('pt-BR')}</td>
+                    <td style="padding:6px 8px;text-align:center;">${badge}</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:700;color:${cor};">${sinal} ${formatarBRL(h.valor)}</td>
+                    <td style="padding:6px 8px;text-align:right;">${formatarBRL(h.saldo_apos)}</td>
+                    <td style="padding:6px 8px;font-size:11px;">${escapeHtml(h.motivo || '—')}</td>
+                    <td style="padding:6px 8px;color:#64748b;font-size:11px;">${escapeHtml(h.criado_por_nome || '—')}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      document.getElementById('modal-hist-credito').style.display = 'flex';
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    }
+  }
+
+  function fecharHistCredito() {
+    document.getElementById('modal-hist-credito').style.display = 'none';
+  }
+
+  function abrirModalCreditoManual() {
+    if (!_clienteEditandoId) return;
+    document.getElementById('cm-valor').value = '';
+    document.getElementById('cm-motivo').value = '';
+    document.getElementById('cm-senha').value = '';
+    document.getElementById('cm-erro').style.display = 'none';
+    document.getElementById('modal-cred-manual').style.display = 'flex';
+    setTimeout(() => document.getElementById('cm-valor').focus(), 100);
+  }
+
+  function fecharCredManual() {
+    document.getElementById('modal-cred-manual').style.display = 'none';
+  }
+
+  async function confirmarCredManual() {
+    const valor = Number(document.getElementById('cm-valor').value);
+    const motivo = document.getElementById('cm-motivo').value.trim();
+    const senha = document.getElementById('cm-senha').value;
+    const erro = document.getElementById('cm-erro');
+    erro.style.display = 'none';
+
+    if (!(valor > 0)) { erro.textContent = 'Valor inválido.'; erro.style.display = 'block'; return; }
+    if (!motivo) { erro.textContent = 'Motivo é obrigatório.'; erro.style.display = 'block'; return; }
+    if (!senha) { erro.textContent = 'Senha do admin é obrigatória.'; erro.style.display = 'block'; return; }
+
+    try {
+      const r = await api('POST', '/api/creditos/lancar', {
+        clienteId: _clienteEditandoId,
+        valor, motivo, senhaAdmin: senha
+      });
+      fecharCredManual();
+      await carregarSaldoCredito(_clienteEditandoId);
+      alert(`✅ Crédito lançado!\n\nSaldo anterior: ${formatarBRL(r.saldoAnterior)}\nSaldo atual: ${formatarBRL(r.saldoAtual)}`);
+    } catch (e) {
+      erro.textContent = e.message;
+      erro.style.display = 'block';
+    }
   }
   async function excluirCliente(id) {
     const c = dbClientes.find(x => x.id === id);
@@ -10835,10 +11013,32 @@ https://sistema.glinformatica.com.br
     const btn = document.getElementById('cv-btn-confirmar');
     btn.disabled = true;
     btn.innerHTML = '⏳ Cancelando...';
+
+    // Pergunta se quer gerar crédito (só módulo iluminação + venda tem cliente)
+    let gerarCredito = false;
+    if (usaAmbientes) {
+      const venda = (_vendasCache || []).find(v => v.id === _vendaCancelandoId);
+      if (venda && venda.clienteId) {
+        gerarCredito = confirm(
+          '💰 Gerar CRÉDITO DE DEVOLUÇÃO para o cliente?\n\n' +
+          `Cliente: ${venda.clienteNome}\n` +
+          `Valor: ${formatarBRL(venda.valorTotal)}\n\n` +
+          'OK = gerar crédito (cliente usa em compra futura)\n' +
+          'Cancelar = não gerar (só cancela venda normalmente)'
+        );
+      }
+    }
+
     try {
-      const r = await api('POST', `/api/vendas/${_vendaCancelandoId}/cancelar`, { motivo, senha });
+      const r = await api('POST', `/api/vendas/${_vendaCancelandoId}/cancelar`, { motivo, senha, gerarCredito });
       fecharCancelarVenda();
-      alert(`✅ Venda cancelada!\n\nCancelada por: ${r.cancelada_por}\nMotivo: ${r.motivo}\n\nEstoque devolvido e contas a receber removidas.`);
+      let msg = `✅ Venda cancelada!\n\nCancelada por: ${r.cancelada_por}\nMotivo: ${r.motivo}\n\nEstoque devolvido e contas a receber removidas.`;
+      if (r.creditoGerado) {
+        msg += `\n\n💰 CRÉDITO GERADO: ${formatarBRL(r.creditoGerado.valor)}\n` +
+               `Saldo anterior: ${formatarBRL(r.creditoGerado.saldoAntes)}\n` +
+               `Saldo atual: ${formatarBRL(r.creditoGerado.saldoDepois)}`;
+      }
+      alert(msg);
       // atualizarTela() é chamado automaticamente pelo api()
     } catch (err) {
       erro.textContent = err.message || 'Erro ao cancelar venda.';

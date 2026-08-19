@@ -215,7 +215,7 @@ router.delete('/:id', async (req, res) => {
 // ==== CANCELAR VENDA (mantém no banco com status='cancelada') ====
 // Devolve estoque e remove contas a receber, mas mantém histórico
 router.post('/:id/cancelar', async (req, res) => {
-  const { motivo, senha } = req.body || {};
+  const { motivo, senha, gerarCredito } = req.body || {};
   const bcrypt = require('bcryptjs');
   if (!motivo || motivo.trim().length < 5) {
     return res.status(400).json({ error: 'Motivo obrigatório (mínimo 5 caracteres).' });
@@ -228,7 +228,7 @@ router.post('/:id/cancelar', async (req, res) => {
     await client.query('BEGIN');
     // 1. Valida se venda existe e não está cancelada
     const rVenda = await client.query(
-      'SELECT id, status FROM vendas WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      'SELECT id, status, cliente_id, cliente_nome, valor_total FROM vendas WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
       [req.params.id, req.user.empresaId]
     );
     if (rVenda.rows.length === 0) {
@@ -239,6 +239,7 @@ router.post('/:id/cancelar', async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Venda já está cancelada.' });
     }
+    const vendaAtual = rVenda.rows[0];
     // 2. Valida senha do usuário atual (que precisa ser admin)
     const rUser = await client.query(
       'SELECT id, nome, senha_hash, papel FROM usuarios WHERE id=$1 LIMIT 1',
@@ -288,11 +289,45 @@ router.post('/:id/cancelar', async (req, res) => {
        WHERE id=$3 AND empresa_id=$4`,
       [motivo.trim(), req.user.userId, req.params.id, req.user.empresaId]
     );
+
+    // 6. Se solicitado, gera crédito de devolução ao cliente
+    let creditoGerado = null;
+    if (gerarCredito && vendaAtual.cliente_id) {
+      // Só se módulo iluminação
+      const rEmp = await client.query('SELECT usa_ambientes FROM empresas WHERE id=$1', [req.user.empresaId]);
+      if (rEmp.rows[0]?.usa_ambientes) {
+        try {
+          const { adicionarCredito } = require('./creditos');
+          const valorCredito = Number(vendaAtual.valor_total) || 0;
+          if (valorCredito > 0) {
+            const r = await adicionarCredito(client, {
+              empresaId: req.user.empresaId,
+              clienteId: vendaAtual.cliente_id,
+              valor: valorCredito,
+              origemVendaId: parseInt(req.params.id),
+              motivo: `Devolução venda #${req.params.id}: ${motivo.trim()}`,
+              criadoPor: req.user.userId,
+              criadoPorNome: usr.nome
+            });
+            creditoGerado = {
+              valor: valorCredito,
+              saldoAntes: r.saldoAntes,
+              saldoDepois: r.saldoDepois
+            };
+          }
+        } catch (e) {
+          await client.query('ROLLBACK');
+          return res.status(500).json({ error: 'Erro ao gerar crédito: ' + e.message });
+        }
+      }
+    }
+
     await client.query('COMMIT');
     res.json({
       ok: true,
       cancelada_por: usr.nome,
-      motivo: motivo.trim()
+      motivo: motivo.trim(),
+      creditoGerado
     });
   } catch (err) {
     await client.query('ROLLBACK');
