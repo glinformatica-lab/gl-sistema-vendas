@@ -7847,7 +7847,8 @@ https://sistema.glinformatica.com.br
 
     // Mostra bloco crédito se módulo iluminação
     const bloco = document.getElementById('cli-bloco-credito');
-    if (usaAmbientes && bloco) {
+    const _empIlum = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_empIlum.usaAmbientes && bloco) {
       bloco.style.display = '';
       carregarSaldoCredito(id);
     } else if (bloco) {
@@ -10686,7 +10687,8 @@ https://sistema.glinformatica.com.br
 
     // Crédito de devolução (só iluminação)
     let creditoUsar = 0;
-    if (usaAmbientes) {
+    const _empCalc = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_empCalc.usaAmbientes) {
       const inpCred = document.getElementById('nv-credito-usar');
       if (inpCred) {
         creditoUsar = parseFloat(inpCred.value) || 0;
@@ -10737,7 +10739,8 @@ https://sistema.glinformatica.com.br
   async function nvBuscarCreditoCliente() {
     const bloco = document.getElementById('nv-bloco-credito');
     if (!bloco) return;
-    if (!usaAmbientes) { bloco.style.display = 'none'; return; }
+    const _empBusca = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (!_empBusca.usaAmbientes) { bloco.style.display = 'none'; return; }
 
     const nome = (document.getElementById('nv-cliente')?.value || '').trim();
     if (!nome) { bloco.style.display = 'none'; return; }
@@ -10907,7 +10910,8 @@ https://sistema.glinformatica.com.br
       if(_vendaEditandoId !== null) {
         await api('DELETE', `/api/vendas/${_vendaEditandoId}`);
       }
-      const creditoUsar = usaAmbientes ? (parseFloat(document.getElementById('nv-credito-usar')?.value) || 0) : 0;
+      const _empPost = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const creditoUsar = _empPost.usaAmbientes ? (parseFloat(document.getElementById('nv-credito-usar')?.value) || 0) : 0;
 
       const venda = await api('POST', '/api/vendas', {
         data, cliente, itens, desconto,
@@ -11132,7 +11136,8 @@ https://sistema.glinformatica.com.br
 
     // Pergunta se quer gerar crédito (só módulo iluminação + venda tem cliente)
     let gerarCredito = false;
-    if (usaAmbientes) {
+    const _empCanc = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (_empCanc.usaAmbientes) {
       const venda = (_vendasCache || []).find(v => v.id === _vendaCancelandoId);
       if (venda && venda.clienteId) {
         gerarCredito = confirm(
