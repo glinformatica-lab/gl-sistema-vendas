@@ -5644,7 +5644,7 @@ https://sistema.glinformatica.com.br
 
   function catRenderItemLinha(i) {
     const fotoHtml = i.fotoUrl
-      ? `<img src="${escapeAttr(i.fotoUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;">`
+      ? `<img src="${escapeAttr(cldOtimizada(i.fotoUrl, 'thumb'))}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;">`
       : `<div style="width:48px;height:48px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;opacity:0.4;">📦</div>`;
     return `
       <div class="cat-item-row" data-id="${i.id}" draggable="true" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:grab;">
@@ -5854,7 +5854,7 @@ https://sistema.glinformatica.com.br
         <label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f5f9;cursor:pointer;">
           <input type="checkbox" ${checked} onchange="catTogglePAdd(${p.id}, this.checked)" data-pid="${p.id}">
           ${p.fotoUrl
-            ? `<img src="${escapeAttr(p.fotoUrl)}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">`
+            ? `<img src="${escapeAttr(cldOtimizada(p.fotoUrl, 'thumb'))}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">`
             : `<div style="width:36px;height:36px;background:#f1f5f9;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.4;">📦</div>`}
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:13px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.nome)}</div>
@@ -8922,7 +8922,7 @@ https://sistema.glinformatica.com.br
     div.innerHTML = `
       <div style="position:absolute;top:20px;right:30px;color:#fff;font-size:30px;cursor:pointer;background:rgba(0,0,0,0.5);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">&times;</div>
       ${titulo ? `<div style="color:#fff;font-size:16px;margin-bottom:14px;text-align:center;max-width:90%;">${escapeHtml(titulo)}</div>` : ''}
-      <img src="${escapeAttr(url)}" style="max-width:90%;max-height:80%;object-fit:contain;border-radius:8px;background:#fff;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+      <img src="${escapeAttr(cldOtimizada(url, 'grande'))}" style="max-width:90%;max-height:80%;object-fit:contain;border-radius:8px;background:#fff;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.5);">
     `;
     document.body.appendChild(div);
     // ESC fecha
@@ -8940,6 +8940,27 @@ https://sistema.glinformatica.com.br
   const CLOUDINARY_CLOUD_NAME = 'dazuxozjs';
   const CLOUDINARY_PRESET = 'gl-sistema-produtos';
   const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+  // Otimiza URL do Cloudinary pra economizar bandwidth
+  // Tipos: 'thumb' (150px), 'card' (300px), 'detalhe' (600px), 'grande' (1200px)
+  // Usa f_auto (formato WebP quando possível) + q_auto (qualidade automática)
+  function cldOtimizada(url, tipo) {
+    if (!url) return '';
+    // Se não for URL do Cloudinary, retorna original
+    if (!/^https:\/\/res\.cloudinary\.com\//.test(url)) return url;
+    // Já tem transformação? não mexe
+    if (/\/upload\/[a-z]_[^/]+\//.test(url)) return url;
+
+    const tamanhos = {
+      thumb:   'w_150,h_150,c_fill',
+      card:    'w_300,h_300,c_fill',
+      detalhe: 'w_600,c_limit',
+      grande:  'w_1200,c_limit'
+    };
+    const tam = tamanhos[tipo] || tamanhos.card;
+    const transforms = `f_auto,q_auto,${tam}`;
+    return url.replace('/upload/', `/upload/${transforms}/`);
+  }
 
   async function uploadFotoProduto(inputEl) {
     const arquivo = inputEl.files && inputEl.files[0];
@@ -9043,11 +9064,11 @@ https://sistema.glinformatica.com.br
     const status = document.getElementById('npr-foto-status');
     if (!img) return; // elementos podem não existir se modal não carregou
     if (url) {
-      img.src = url;
+      img.src = cldOtimizada(url, 'detalhe');
       img.style.display = '';
       placeholder.style.display = 'none';
       btnRemover.style.display = '';
-      inputUrl.value = url;
+      inputUrl.value = url; // URL original salva no banco
     } else {
       img.src = '';
       img.style.display = 'none';
@@ -19047,7 +19068,7 @@ ${conteudo}
         : null;
       const fotoUrl = produto && produto.fotoUrl ? produto.fotoUrl : null;
       const imgHtml = fotoUrl
-        ? `<img src="${escapeAttr(fotoUrl)}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;" alt="${escapeAttr(it.descricao)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        ? `<img src="${escapeAttr(cldOtimizada(fotoUrl, 'card'))}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;" alt="${escapeAttr(it.descricao)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
            <div style="display:none;width:120px;height:120px;border-radius:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;font-size:11px;align-items:center;justify-content:center;text-align:center;padding:6px;">Foto indisponível</div>`
         : `<div style="width:120px;height:120px;border-radius:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#94a3b8;font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px;">SEM IMAGEM</div>`;
 
