@@ -4468,7 +4468,7 @@
         <div class="form-field" style="flex:2;">
           <label>Cliente*</label>
           <div class="field-com-botao">
-            <input type="text" id="nv-cliente" list="lista-clientes" placeholder="Digite ou selecione" required>
+            <input type="text" id="nv-cliente" list="lista-clientes" placeholder="Digite ou selecione" onblur="nvBuscarCreditoCliente()" required>
             <button type="button" class="btn-mais" title="Cadastrar novo cliente" onclick="openNovoClienteRapido()">+</button>
           </div>
           <datalist id="lista-clientes"></datalist>
@@ -4520,6 +4520,27 @@
           <span id="nv-desconto-info">Sem desconto</span>
         </div>
       </div>
+
+      <!-- Bloco Crédito de Devolução (só iluminação + cliente cadastrado com saldo) -->
+      <div id="nv-bloco-credito" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-top:10px;">
+        <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:11px;color:#166534;font-weight:600;">💰 Cliente tem crédito disponível</div>
+            <div style="font-size:16px;font-weight:700;color:#14532d;" id="nv-credito-saldo-txt">R$ 0,00</div>
+          </div>
+          <div style="max-width:160px;">
+            <label style="font-size:12px;color:#166534;font-weight:600;">Usar do crédito (R$)</label>
+            <input type="number" id="nv-credito-usar" min="0" step="0.01" value="0"
+                   oninput="atualizarTotalVenda()"
+                   style="width:100%;padding:8px;border:1px solid #86efac;border-radius:6px;font-size:14px;font-weight:700;">
+          </div>
+          <button type="button" onclick="nvUsarCreditoMax()"
+                  style="background:#16a34a;color:#fff;border:none;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;height:34px;">
+            📥 Usar tudo
+          </button>
+        </div>
+      </div>
+
       <div class="totais-box" style="background:#eef9f5;border-color:#c3edde;">
         <span class="label">Total Final</span>
         <span class="valor" id="nv-total-final">R$ 0,00</span>
@@ -10390,6 +10411,13 @@ https://sistema.glinformatica.com.br
     if(!document.getElementById('nv-data').value) document.getElementById('nv-data').value = hoje;
     const tbody = document.getElementById('tbody-itens-venda');
     if(tbody.children.length === 0) adicionarItemVenda();
+
+    // Reset crédito de devolução
+    const bloco = document.getElementById('nv-bloco-credito');
+    const inpCred = document.getElementById('nv-credito-usar');
+    if (bloco) bloco.style.display = 'none';
+    if (inpCred) { inpCred.value = '0'; inpCred.dataset.saldoMax = '0'; }
+
     renderListaClientes();
     renderListaProdutos();
     atualizarTotaisVenda();
@@ -10655,8 +10683,35 @@ https://sistema.glinformatica.com.br
       percentualReal = subtotal > 0 ? (descontoValor / subtotal * 100) : 0;
     }
     const total = Math.max(0, subtotal - descontoValor);
+
+    // Crédito de devolução (só iluminação)
+    let creditoUsar = 0;
+    if (usaAmbientes) {
+      const inpCred = document.getElementById('nv-credito-usar');
+      if (inpCred) {
+        creditoUsar = parseFloat(inpCred.value) || 0;
+        // Trava o máximo em min(saldo, total)
+        const saldoMax = Number(inpCred.dataset.saldoMax || 0);
+        const maxPermitido = Math.min(saldoMax, total);
+        if (creditoUsar > maxPermitido) {
+          creditoUsar = maxPermitido;
+          inpCred.value = creditoUsar.toFixed(2);
+        }
+        if (creditoUsar < 0) {
+          creditoUsar = 0;
+          inpCred.value = '0';
+        }
+      }
+    }
+    const totalAPagar = Math.max(0, total - creditoUsar);
+
     document.getElementById('nv-subtotal').textContent    = formatarBRL(subtotal);
-    document.getElementById('nv-total-final').textContent = formatarBRL(total);
+    document.getElementById('nv-total-final').textContent = formatarBRL(totalAPagar);
+    // Mostra breakdown se usa crédito
+    const elTot = document.getElementById('nv-total-final');
+    if (creditoUsar > 0 && elTot) {
+      elTot.title = `Total bruto: ${formatarBRL(total)} · Crédito: -${formatarBRL(creditoUsar)}`;
+    }
     // Info do desconto: alerta visual se acima de 10%
     const info = document.getElementById('nv-desconto-info');
     if (info) {
@@ -10677,6 +10732,61 @@ https://sistema.glinformatica.com.br
   }
   // Alias antigo (compatibilidade)
   function atualizarTotalVenda() { atualizarTotaisVenda(); }
+
+  // Busca crédito de devolução do cliente ao selecionar
+  async function nvBuscarCreditoCliente() {
+    const bloco = document.getElementById('nv-bloco-credito');
+    if (!bloco) return;
+    if (!usaAmbientes) { bloco.style.display = 'none'; return; }
+
+    const nome = (document.getElementById('nv-cliente')?.value || '').trim();
+    if (!nome) { bloco.style.display = 'none'; return; }
+
+    // Procura o cliente pelo nome
+    const cli = (dbClientes || []).find(c => String(c.nome).toLowerCase() === nome.toLowerCase());
+    if (!cli) { bloco.style.display = 'none'; return; }
+
+    try {
+      const r = await api('GET', `/api/creditos/cliente/${cli.id}`);
+      const saldo = Number(r.saldo) || 0;
+      if (saldo > 0) {
+        bloco.style.display = '';
+        document.getElementById('nv-credito-saldo-txt').textContent = formatarBRL(saldo);
+        const inp = document.getElementById('nv-credito-usar');
+        inp.dataset.saldoMax = saldo;
+        inp.max = saldo;
+        // Não sobrescreve se já tem valor
+        if (!inp.value || Number(inp.value) === 0) inp.value = '0';
+      } else {
+        bloco.style.display = 'none';
+      }
+    } catch (e) {
+      bloco.style.display = 'none';
+    }
+  }
+
+  // Usa TODO o crédito disponível (limitado ao total da venda)
+  function nvUsarCreditoMax() {
+    const inp = document.getElementById('nv-credito-usar');
+    if (!inp) return;
+    const saldoMax = Number(inp.dataset.saldoMax || 0);
+    // Total da venda (subtotal - desconto, sem contar crédito)
+    let subtotal = 0;
+    document.querySelectorAll('#tbody-itens-venda tr').forEach(tr => {
+      const qtd = parseFloat(tr.querySelector('.nv-item-qtd').value) || 0;
+      const preco = parseFloat(tr.querySelector('.nv-item-preco').value) || 0;
+      subtotal += qtd * preco;
+    });
+    const tipoDesc = document.getElementById('nv-tipo-desconto')?.value || 'valor';
+    const inputDesc = parseFloat(document.getElementById('nv-desconto').value) || 0;
+    let descontoValor = tipoDesc === 'percentual'
+      ? subtotal * (Math.min(inputDesc, 100) / 100)
+      : Math.min(inputDesc, subtotal);
+    const total = Math.max(0, subtotal - descontoValor);
+    const usar = Math.min(saldoMax, total);
+    inp.value = usar.toFixed(2);
+    atualizarTotalVenda();
+  }
   document.getElementById('nv-desconto').addEventListener('input', atualizarTotaisVenda);
   function toggleParcelasVenda() {
     const pag = document.getElementById('nv-pagamento').value;
@@ -10797,11 +10907,14 @@ https://sistema.glinformatica.com.br
       if(_vendaEditandoId !== null) {
         await api('DELETE', `/api/vendas/${_vendaEditandoId}`);
       }
+      const creditoUsar = usaAmbientes ? (parseFloat(document.getElementById('nv-credito-usar')?.value) || 0) : 0;
+
       const venda = await api('POST', '/api/vendas', {
         data, cliente, itens, desconto,
         pagamento, parcelamento,
         obs: document.getElementById('nv-obs').value.trim(),
-        transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null
+        transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null,
+        creditoUsado: creditoUsar
       });
       // 💾 Limpa rascunho após salvar
       await finalizarAutoSave('venda');
@@ -10830,7 +10943,10 @@ https://sistema.glinformatica.com.br
       }
       const ehEdicao = _vendaEditandoId !== null;
       const msgOrc = orcamentoOrigemId ? ' Orçamento marcado como convertido.' : '';
-      const msgPrincipal = `Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!${msgOrc}\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}`;
+      const msgCredito = venda.creditoAplicado
+        ? `\n💰 Crédito usado: ${formatarBRL(venda.creditoAplicado.valor)} · Saldo restante: ${formatarBRL(venda.creditoAplicado.saldoDepois)}`
+        : '';
+      const msgPrincipal = `Venda ${ehEdicao ? 'atualizada' : 'registrada'} com sucesso!${msgOrc}\n\nCliente: ${cliente}\nItens: ${itens.length}\nTotal: ${formatarBRL(venda.total)}\nPagamento: ${pagamento}${(venda.parcelas && venda.parcelas.length > 1) ? `\n${venda.parcelas.length} parcelas geradas.` : ''}${msgCredito}`;
       closeNovaVenda();
       // Pergunta se quer imprimir cupom (apenas em venda NOVA, não em edição)
       if (!ehEdicao && confirm(msgPrincipal + '\n\nDeseja imprimir o comprovante agora?')) {

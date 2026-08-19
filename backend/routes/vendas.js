@@ -55,10 +55,13 @@ router.get('/', async (req, res) => {
 
 // Criar venda — transação: dá baixa no estoque, cria movimentações, gera contas a receber
 router.post('/', async (req, res) => {
-  const { data, cliente, itens, desconto, pagamento, parcelamento, obs, transportadora_id } = req.body || {};
+  const { data, cliente, itens, desconto, pagamento, parcelamento, obs, transportadora_id, creditoUsado } = req.body || {};
   if (!cliente) return res.status(400).json({ error: 'Cliente é obrigatório.' });
   if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'Adicione ao menos um item.' });
+
+  const creditoValor = Number(creditoUsado) || 0;
+  if (creditoValor < 0) return res.status(400).json({ error: 'Crédito usado não pode ser negativo.' });
 
   // Valida itens
   for (const it of itens) {
@@ -98,14 +101,53 @@ router.post('/', async (req, res) => {
     const desc = Number(desconto) || 0;
     const total = Math.max(0, subtotal - desc);
 
-    // Calcula parcelas
+    // ===== VALIDAÇÃO DE CRÉDITO DE DEVOLUÇÃO (só módulo iluminação) =====
+    let creditoInfo = null;
+    let clienteRegistro = null;
+    if (creditoValor > 0) {
+      const rEmp = await client.query('SELECT usa_ambientes FROM empresas WHERE id=$1', [req.user.empresaId]);
+      if (!rEmp.rows[0]?.usa_ambientes) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Crédito de devolução disponível apenas no módulo Iluminação.' });
+      }
+
+      const rCli = await client.query(
+        `SELECT id, credito_saldo FROM clientes
+         WHERE empresa_id=$1 AND LOWER(nome)=LOWER($2) FOR UPDATE`,
+        [req.user.empresaId, cliente]
+      );
+      if (rCli.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Cliente precisa estar cadastrado para usar crédito.' });
+      }
+      clienteRegistro = rCli.rows[0];
+      const saldoAtual = Number(clienteRegistro.credito_saldo) || 0;
+      if (creditoValor > saldoAtual) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Saldo insuficiente. Disponível: R$ ${saldoAtual.toFixed(2)} · Solicitado: R$ ${creditoValor.toFixed(2)}`
+        });
+      }
+      if (creditoValor > total) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Crédito (R$ ${creditoValor.toFixed(2)}) maior que o total da venda (R$ ${total.toFixed(2)}).`
+        });
+      }
+      creditoInfo = { clienteId: clienteRegistro.id, valor: creditoValor };
+    }
+
+    // Total efetivamente a pagar (após abater crédito)
+    const totalAPagar = Math.max(0, total - creditoValor);
+
+    // Calcula parcelas (baseado no totalAPagar, não no total bruto)
     let parcelas = [];
-    if (pagamento === 'A Prazo' || pagamento === 'Boleto') {
+    if (totalAPagar > 0 && (pagamento === 'A Prazo' || pagamento === 'Boleto')) {
       if (!parcelamento || !parcelamento.n || !parcelamento.dataPrimeira) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Informe nº de parcelas e data da primeira para esse tipo de pagamento.' });
       }
-      parcelas = calcularParcelas(total, Number(parcelamento.n), parcelamento.dataPrimeira, Number(parcelamento.intervalo) || 30);
+      parcelas = calcularParcelas(totalAPagar, Number(parcelamento.n), parcelamento.dataPrimeira, Number(parcelamento.intervalo) || 30);
     }
 
     // Cria a venda
@@ -162,11 +204,37 @@ router.post('/', async (req, res) => {
       await client.query('INSERT INTO clientes (empresa_id, nome) VALUES ($1,$2)', [req.user.empresaId, cliente]);
     }
 
+    // ===== USA CRÉDITO DE DEVOLUÇÃO (se solicitado) =====
+    let creditoAplicado = null;
+    if (creditoInfo && creditoInfo.valor > 0) {
+      try {
+        const { usarCredito } = require('./creditos');
+        const rUser = await client.query('SELECT nome FROM usuarios WHERE id=$1', [req.user.userId]);
+        const r = await usarCredito(client, {
+          empresaId: req.user.empresaId,
+          clienteId: creditoInfo.clienteId,
+          valor: creditoInfo.valor,
+          destinoVendaId: venda.id,
+          criadoPor: req.user.userId,
+          criadoPorNome: rUser.rows[0]?.nome || null
+        });
+        creditoAplicado = {
+          valor: creditoInfo.valor,
+          saldoAntes: r.saldoAntes,
+          saldoDepois: r.saldoDepois
+        };
+      } catch (e) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Erro ao usar crédito: ' + e.message });
+      }
+    }
+
     await client.query('COMMIT');
     res.json({
       ...camelizar(venda),
       subtotal: toNum(venda.subtotal), desconto: toNum(venda.desconto), total: toNum(venda.total),
-      itens: venda.itens, parcelas: venda.parcelas
+      itens: venda.itens, parcelas: venda.parcelas,
+      creditoAplicado
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -227,8 +295,11 @@ router.post('/:id/cancelar', async (req, res) => {
   try {
     await client.query('BEGIN');
     // 1. Valida se venda existe e não está cancelada
+    // Busca cliente_id via nome (tabela vendas guarda só o nome do cliente)
     const rVenda = await client.query(
-      'SELECT id, status, cliente_id, cliente_nome, valor_total FROM vendas WHERE id=$1 AND empresa_id=$2 FOR UPDATE',
+      `SELECT v.id, v.status, v.cliente, v.total,
+              (SELECT id FROM clientes WHERE empresa_id=v.empresa_id AND LOWER(nome)=LOWER(v.cliente) LIMIT 1) AS cliente_id
+       FROM vendas v WHERE v.id=$1 AND v.empresa_id=$2 FOR UPDATE`,
       [req.params.id, req.user.empresaId]
     );
     if (rVenda.rows.length === 0) {
@@ -298,7 +369,7 @@ router.post('/:id/cancelar', async (req, res) => {
       if (rEmp.rows[0]?.usa_ambientes) {
         try {
           const { adicionarCredito } = require('./creditos');
-          const valorCredito = Number(vendaAtual.valor_total) || 0;
+          const valorCredito = Number(vendaAtual.total) || 0;
           if (valorCredito > 0) {
             const r = await adicionarCredito(client, {
               empresaId: req.user.empresaId,
