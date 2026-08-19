@@ -332,9 +332,6 @@ router.get('/:id/movimentacoes', async (req, res) => {
   }
 });
 
-// ==========================================
-// MIGRAÇÃO DE OUTRO SISTEMA (Iluminação)
-// ==========================================
 // Fluxo específico pra clientes migrando de outro ERP:
 // - Fornecedor OPCIONAL (será preenchido nas entradas de mercadoria)
 // - Cria marcas automaticamente se não existirem
@@ -554,6 +551,136 @@ router.post('/migracao', async (req, res) => {
     await client.query('ROLLBACK');
     console.error('[produtos/migracao]', err);
     res.status(500).json({ error: 'Erro geral na migração: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// MIGRAÇÃO DE FORNECEDORES (Iluminação)
+// ==========================================
+// Body: { itens: [{ nome, doc, inscricaoEstadual, telefone, email, cidade }] }
+// - Detecta duplicata por doc (CNPJ/CPF) primeiro, depois por nome
+// - Suporta até 5000 fornecedores por lote
+router.post('/migracao-fornecedores', async (req, res) => {
+  const { itens } = req.body || {};
+
+  const empChk = await db.query('SELECT usa_ambientes FROM empresas WHERE id=$1', [req.user.empresaId]);
+  if (!empChk.rows[0]?.usa_ambientes) {
+    return res.status(403).json({ error: 'Migração disponível apenas com Módulo Iluminação ativo.' });
+  }
+
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ error: 'Nenhum fornecedor recebido.' });
+  }
+  if (itens.length > 5000) {
+    return res.status(400).json({ error: 'Máximo de 5000 fornecedores por lote.' });
+  }
+
+  const client = await db.pool.connect();
+  let criados = 0, atualizados = 0, ignorados = 0;
+  const erros = [];
+
+  try {
+    await client.query('BEGIN');
+
+    // Verifica quais colunas existem em fornecedores (por segurança)
+    const rCols = await client.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'fornecedores'`
+    );
+    const cols = new Set(rCols.rows.map(r => r.column_name));
+    const temIE = cols.has('inscricao_estadual');
+    const temTel = cols.has('telefone');
+    const temEmail = cols.has('email');
+    const temCidade = cols.has('cidade');
+
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      const linha = i + 2;
+      try {
+        const nome = String(it.nome || '').trim();
+        if (!nome) {
+          erros.push({ linha, motivo: 'Nome em branco' });
+          ignorados++;
+          continue;
+        }
+
+        const doc = it.doc ? String(it.doc).trim() : null;
+        const inscricaoEstadual = it.inscricaoEstadual ? String(it.inscricaoEstadual).trim() : null;
+        const telefone = it.telefone ? String(it.telefone).trim() : null;
+        const email = it.email ? String(it.email).trim() : null;
+        const cidade = it.cidade ? String(it.cidade).trim() : null;
+
+        // Busca duplicata: primeiro por doc (mais preciso), depois por nome
+        let existente = null;
+        if (doc) {
+          const rExist = await client.query(
+            `SELECT id FROM fornecedores WHERE empresa_id=$1 AND doc=$2 LIMIT 1`,
+            [req.user.empresaId, doc]
+          );
+          existente = rExist.rows[0];
+        }
+        if (!existente) {
+          const rExist = await client.query(
+            `SELECT id FROM fornecedores WHERE empresa_id=$1 AND LOWER(nome)=LOWER($2) LIMIT 1`,
+            [req.user.empresaId, nome]
+          );
+          existente = rExist.rows[0];
+        }
+
+        // Monta SETs/VALUES dinamicamente (só colunas que existem)
+        if (existente) {
+          const sets = ['nome=$1'];
+          const vals = [nome];
+          let idx = 2;
+          if (doc) { sets.push(`doc=$${idx++}`); vals.push(doc); }
+          if (temIE && inscricaoEstadual) { sets.push(`inscricao_estadual=$${idx++}`); vals.push(inscricaoEstadual); }
+          if (temTel && telefone) { sets.push(`telefone=$${idx++}`); vals.push(telefone); }
+          if (temEmail && email) { sets.push(`email=$${idx++}`); vals.push(email); }
+          if (temCidade && cidade) { sets.push(`cidade=$${idx++}`); vals.push(cidade); }
+          vals.push(existente.id, req.user.empresaId);
+          await client.query(
+            `UPDATE fornecedores SET ${sets.join(', ')} WHERE id=$${idx++} AND empresa_id=$${idx++}`,
+            vals
+          );
+          atualizados++;
+        } else {
+          const campos = ['empresa_id', 'nome'];
+          const placeholders = ['$1', '$2'];
+          const vals = [req.user.empresaId, nome];
+          let idx = 3;
+          if (doc) { campos.push('doc'); placeholders.push(`$${idx++}`); vals.push(doc); }
+          if (temIE && inscricaoEstadual) { campos.push('inscricao_estadual'); placeholders.push(`$${idx++}`); vals.push(inscricaoEstadual); }
+          if (temTel && telefone) { campos.push('telefone'); placeholders.push(`$${idx++}`); vals.push(telefone); }
+          if (temEmail && email) { campos.push('email'); placeholders.push(`$${idx++}`); vals.push(email); }
+          if (temCidade && cidade) { campos.push('cidade'); placeholders.push(`$${idx++}`); vals.push(cidade); }
+          await client.query(
+            `INSERT INTO fornecedores (${campos.join(', ')}) VALUES (${placeholders.join(', ')})`,
+            vals
+          );
+          criados++;
+        }
+      } catch (e) {
+        console.error(`[migracao-fornecedores] Linha ${linha}:`, e.message);
+        erros.push({ linha, motivo: e.message || 'Erro desconhecido' });
+        ignorados++;
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      criados,
+      atualizados,
+      ignorados,
+      total: itens.length,
+      erros: erros.slice(0, 100)
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[produtos/migracao-fornecedores]', err);
+    res.status(500).json({ error: 'Erro geral: ' + err.message });
   } finally {
     client.release();
   }

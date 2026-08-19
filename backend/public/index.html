@@ -2076,8 +2076,19 @@
     <div id="page-migracao" style="display:none;">
       <div class="page-title">🔄 Migração de Sistema</div>
       <div style="color:#64748b;font-size:13px;margin-bottom:16px;max-width:800px;">
-        Importe seus produtos vindos de outro ERP/sistema. Suportamos planilhas Excel (.xlsx, .xls) e CSV.
-        Marcas serão criadas automaticamente. Fornecedor pode ficar em branco (será preenchido automaticamente nas entradas de mercadoria).
+        Importe seus dados vindos de outro ERP/sistema. Suportamos planilhas Excel (.xlsx, .xls) e CSV.
+      </div>
+
+      <!-- Seletor de tipo -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;">
+        <button type="button" id="mg-tipo-produtos" onclick="mgTrocarTipo('produtos')"
+                style="flex:1;padding:14px;border:2px solid #0891b2;background:#e0f7fa;color:#075985;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;">
+          📦 Importar Produtos
+        </button>
+        <button type="button" id="mg-tipo-fornecedores" onclick="mgTrocarTipo('fornecedores')"
+                style="flex:1;padding:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;">
+          🏢 Importar Fornecedores
+        </button>
       </div>
 
       <!-- Stepper visual -->
@@ -2091,8 +2102,8 @@
       <div id="mg-panel-1" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;">
         <h3 style="color:#0891b2;margin:0 0 14px;">📤 Passo 1: Enviar Planilha</h3>
 
-        <div style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:16px;margin-bottom:16px;">
-          <strong style="color:#1e40af;">📋 Colunas aceitas (nomes flexíveis)</strong>
+        <div id="mg-guia-produtos" style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:10px;padding:16px;margin-bottom:16px;">
+          <strong style="color:#1e40af;">📋 Colunas aceitas — Produtos</strong>
           <div style="font-size:12px;color:#334155;margin-top:8px;line-height:1.7;">
             • <strong>Nome</strong> (ou "Descrição", "Produto") — <strong>obrigatório</strong><br>
             • <strong>Código</strong> (opcional, se vazio gera automático)<br>
@@ -2103,7 +2114,21 @@
             • <strong>preco_venda / Preço / Venda</strong> — <strong>obrigatório</strong><br>
             • <strong>Categoria</strong> (opcional)<br>
             <br>
-            <em style="color:#64748b;">Outras colunas serão ignoradas (ex: Unid., NCM, etc).</em>
+            <em style="color:#64748b;">Marcas serão criadas automaticamente. Fornecedor fica em branco (preenchido nas entradas). Outras colunas serão ignoradas.</em>
+          </div>
+        </div>
+
+        <div id="mg-guia-fornecedores" style="display:none;background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:16px;margin-bottom:16px;">
+          <strong style="color:#6b21a8;">📋 Colunas aceitas — Fornecedores</strong>
+          <div style="font-size:12px;color:#334155;margin-top:8px;line-height:1.7;">
+            • <strong>Nome / Razão Social / Fornecedor</strong> — <strong>obrigatório</strong><br>
+            • <strong>CPF/CNPJ / Doc / Documento</strong> (opcional)<br>
+            • <strong>Insc. Estadual / IE / Inscrição Estadual</strong> (opcional)<br>
+            • <strong>Telefone / Fone / Celular / Whatsapp</strong> (opcional)<br>
+            • <strong>E-mail / Email</strong> (opcional)<br>
+            • <strong>Cidade / Município</strong> (opcional)<br>
+            <br>
+            <em style="color:#64748b;">Duplicatas detectadas por CPF/CNPJ primeiro, depois por nome. Fornecedores existentes serão atualizados.</em>
           </div>
         </div>
 
@@ -2128,19 +2153,7 @@
 
         <div style="max-height:360px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <thead style="background:#f8fafc;position:sticky;top:0;">
-              <tr>
-                <th style="padding:8px;text-align:left;">Linha</th>
-                <th style="padding:8px;text-align:left;">Código</th>
-                <th style="padding:8px;text-align:left;">Referência</th>
-                <th style="padding:8px;text-align:left;">Nome</th>
-                <th style="padding:8px;text-align:left;">Marca</th>
-                <th style="padding:8px;text-align:center;">Qtd</th>
-                <th style="padding:8px;text-align:right;">Custo</th>
-                <th style="padding:8px;text-align:right;">Venda</th>
-                <th style="padding:8px;text-align:center;">Status</th>
-              </tr>
-            </thead>
+            <thead id="mg-preview-thead" style="background:#f8fafc;position:sticky;top:0;"></thead>
             <tbody id="mg-preview-body"></tbody>
           </table>
         </div>
@@ -13420,6 +13433,32 @@ ${conteudo}
   // ====== MIGRAÇÃO DE SISTEMA (Iluminação) ======
   let _mgItensPreview = [];
   let _mgMapeamentoDetectado = {};
+  let _mgTipo = 'produtos'; // 'produtos' ou 'fornecedores'
+
+  function mgTrocarTipo(tipo) {
+    _mgTipo = tipo;
+    _mgItensPreview = [];
+
+    // Botões
+    const btnP = document.getElementById('mg-tipo-produtos');
+    const btnF = document.getElementById('mg-tipo-fornecedores');
+    if (tipo === 'produtos') {
+      btnP.style.cssText = 'flex:1;padding:14px;border:2px solid #0891b2;background:#e0f7fa;color:#075985;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;';
+      btnF.style.cssText = 'flex:1;padding:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;';
+    } else {
+      btnF.style.cssText = 'flex:1;padding:14px;border:2px solid #7c3aed;background:#faf5ff;color:#6b21a8;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;';
+      btnP.style.cssText = 'flex:1;padding:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;';
+    }
+
+    // Guia condicional
+    document.getElementById('mg-guia-produtos').style.display = tipo === 'produtos' ? '' : 'none';
+    document.getElementById('mg-guia-fornecedores').style.display = tipo === 'fornecedores' ? '' : 'none';
+
+    // Reset arquivo + volta pro passo 1
+    document.getElementById('mg-arquivo').value = '';
+    document.getElementById('mg-erro-upload').style.display = 'none';
+    mgVoltarPasso1();
+  }
 
   function mgVoltarPasso1() {
     document.getElementById('mg-panel-1').style.display = '';
@@ -13452,7 +13491,7 @@ ${conteudo}
 
   function mgIrParaPasso3() {
     if (_mgItensPreview.length === 0) {
-      alert('Nenhum produto válido pra importar.');
+      alert(_mgTipo === 'fornecedores' ? 'Nenhum fornecedor válido pra importar.' : 'Nenhum produto válido pra importar.');
       return;
     }
     document.getElementById('mg-panel-2').style.display = 'none';
@@ -13465,19 +13504,33 @@ ${conteudo}
     // Resumo
     const novos = _mgItensPreview.filter(i => i._status === 'novo').length;
     const atualizar = _mgItensPreview.filter(i => i._status === 'atualizar').length;
-    const marcas = new Set(_mgItensPreview.map(i => i.marca).filter(Boolean));
-    const marcasExistentes = (_marcasCache || []).map(m => String(m.nome).toLowerCase());
-    const marcasNovas = [...marcas].filter(m => !marcasExistentes.includes(String(m).toLowerCase()));
 
-    document.getElementById('mg-confirmar-resumo').innerHTML = `
-      <strong style="color:#166534;font-size:14px;">📊 Resumo da Importação</strong>
-      <div style="margin-top:8px;font-size:13px;color:#065f46;line-height:1.8;">
-        • <strong>${novos}</strong> produto(s) novo(s) serão criados<br>
-        • <strong>${atualizar}</strong> produto(s) existente(s) serão atualizados<br>
-        • <strong>${marcasNovas.length}</strong> marca(s) nova(s) serão criadas automaticamente
-        ${marcasNovas.length > 0 && marcasNovas.length <= 10 ? `<div style="font-size:11px;color:#059669;margin-top:4px;">→ ${marcasNovas.slice(0, 10).map(m => `<code>${escapeHtml(m)}</code>`).join(', ')}</div>` : ''}
-      </div>
-    `;
+    if (_mgTipo === 'fornecedores') {
+      const comDoc = _mgItensPreview.filter(i => i.doc).length;
+      const semDoc = _mgItensPreview.length - comDoc;
+      document.getElementById('mg-confirmar-resumo').innerHTML = `
+        <strong style="color:#166534;font-size:14px;">📊 Resumo da Importação de Fornecedores</strong>
+        <div style="margin-top:8px;font-size:13px;color:#065f46;line-height:1.8;">
+          • <strong>${novos}</strong> fornecedor(es) novo(s) serão criados<br>
+          • <strong>${atualizar}</strong> fornecedor(es) existente(s) serão atualizados<br>
+          • <strong>${comDoc}</strong> com CPF/CNPJ · <strong>${semDoc}</strong> sem CPF/CNPJ
+        </div>
+      `;
+    } else {
+      const marcas = new Set(_mgItensPreview.map(i => i.marca).filter(Boolean));
+      const marcasExistentes = (_marcasCache || []).map(m => String(m.nome).toLowerCase());
+      const marcasNovas = [...marcas].filter(m => !marcasExistentes.includes(String(m).toLowerCase()));
+
+      document.getElementById('mg-confirmar-resumo').innerHTML = `
+        <strong style="color:#166534;font-size:14px;">📊 Resumo da Importação</strong>
+        <div style="margin-top:8px;font-size:13px;color:#065f46;line-height:1.8;">
+          • <strong>${novos}</strong> produto(s) novo(s) serão criados<br>
+          • <strong>${atualizar}</strong> produto(s) existente(s) serão atualizados<br>
+          • <strong>${marcasNovas.length}</strong> marca(s) nova(s) serão criadas automaticamente
+          ${marcasNovas.length > 0 && marcasNovas.length <= 10 ? `<div style="font-size:11px;color:#059669;margin-top:4px;">→ ${marcasNovas.slice(0, 10).map(m => `<code>${escapeHtml(m)}</code>`).join(', ')}</div>` : ''}
+        </div>
+      `;
+    }
   }
 
   function mgProcessarArquivo(event) {
@@ -13490,7 +13543,7 @@ ${conteudo}
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       try {
         const data = new Uint8Array(e.target.result);
         const wb = XLSX.read(data, { type: 'array', cellDates: false });
@@ -13517,23 +13570,34 @@ ${conteudo}
           return -1;
         };
 
-        const idx = {
-          codigo:      findCol(['codigo', 'cod', 'sku']),
-          referencia:  findCol(['grade referencia', 'grade/referencia', 'referencia', 'ref', 'grade']),
-          nome:        findCol(['nome', 'descricao', 'produto', 'item']),
-          marca:       findCol(['marca', 'fabricante']),
-          estoque:     findCol(['quantidade', 'estoque', 'qtd', 'quant']),
-          precoCusto:  findCol(['preco custo', 'precocusto', 'custo', 'valor custo']),
-          precoVenda:  findCol(['preco venda', 'precovenda', 'preco', 'venda', 'valor venda']),
-          categoria:   findCol(['categoria', 'grupo', 'departamento']),
-        };
+        const idx = _mgTipo === 'fornecedores'
+          ? {
+              nome:               findCol(['nome', 'razao social', 'razao', 'fornecedor', 'empresa']),
+              doc:                findCol(['cpf cnpj', 'cpf/cnpj', 'cnpj', 'cpf', 'doc', 'documento']),
+              inscricaoEstadual:  findCol(['insc estadual', 'inscricao estadual', 'ie', 'insc est']),
+              telefone:           findCol(['telefone', 'fone', 'celular', 'whatsapp', 'contato']),
+              email:              findCol(['email', 'e mail', 'e-mail']),
+              cidade:             findCol(['cidade', 'municipio', 'município'])
+            }
+          : {
+              codigo:      findCol(['codigo', 'cod', 'sku']),
+              referencia:  findCol(['grade referencia', 'grade/referencia', 'referencia', 'ref', 'grade']),
+              nome:        findCol(['nome', 'descricao', 'produto', 'item']),
+              marca:       findCol(['marca', 'fabricante']),
+              estoque:     findCol(['quantidade', 'estoque', 'qtd', 'quant']),
+              precoCusto:  findCol(['preco custo', 'precocusto', 'custo', 'valor custo']),
+              precoVenda:  findCol(['preco venda', 'precovenda', 'preco', 'venda', 'valor venda']),
+              categoria:   findCol(['categoria', 'grupo', 'departamento'])
+            };
 
         _mgMapeamentoDetectado = idx;
 
         if (idx.nome < 0) {
-          throw new Error('Coluna NOME não encontrada. É obrigatória (aceita: nome, descricao, produto, item).');
+          throw new Error(_mgTipo === 'fornecedores'
+            ? 'Coluna NOME/RAZÃO SOCIAL não encontrada. É obrigatória.'
+            : 'Coluna NOME não encontrada. É obrigatória (aceita: nome, descricao, produto, item).');
         }
-        if (idx.precoVenda < 0) {
+        if (_mgTipo === 'produtos' && idx.precoVenda < 0) {
           throw new Error('Coluna PREÇO DE VENDA não encontrada. É obrigatória (aceita: preco_venda, preco, venda).');
         }
 
@@ -13548,27 +13612,68 @@ ${conteudo}
           return Number(s) || 0;
         };
 
-        // Cache dos produtos existentes (por referência e por nome)
-        const mapaPorRef = new Map();
-        const mapaPorNome = new Map();
-        for (const p of (dbProdutos || [])) {
-          if (p.referencia) mapaPorRef.set(String(p.referencia).toUpperCase(), p);
-          if (p.nome) mapaPorNome.set(String(p.nome).toLowerCase(), p);
-        }
+        // ===== BRANCH POR TIPO =====
+        if (_mgTipo === 'fornecedores') {
+          // Cache de fornecedores atuais (nome/doc) — vamos pedir via API
+          let mapaPorDoc = new Map();
+          let mapaPorNome = new Map();
+          try {
+            const atuais = await api('GET', '/api/fornecedores') || [];
+            for (const f of atuais) {
+              if (f.doc) mapaPorDoc.set(String(f.doc).replace(/\D/g, ''), f);
+              if (f.nome) mapaPorNome.set(String(f.nome).toLowerCase(), f);
+            }
+          } catch (e) { /* ignore */ }
 
-        const itens = [];
-        for (let i = 1; i < linhas.length; i++) {
-          const l = linhas[i];
-          if (!l || l.length === 0) continue;
-          const nome = String(l[idx.nome] || '').trim();
-          if (!nome) continue;
+          const itens = [];
+          for (let i = 1; i < linhas.length; i++) {
+            const l = linhas[i];
+            if (!l || l.length === 0) continue;
+            const nome = String(l[idx.nome] || '').trim();
+            if (!nome) continue;
 
-          const referencia = idx.referencia >= 0 ? String(l[idx.referencia] || '').trim().toUpperCase() : '';
-          const codigo = idx.codigo >= 0 ? String(l[idx.codigo] || '').trim() : '';
-          const marca = idx.marca >= 0 ? String(l[idx.marca] || '').trim() : '';
-          const categoria = idx.categoria >= 0 ? String(l[idx.categoria] || '').trim() : '';
-          const estoque = idx.estoque >= 0 ? parseNumero(l[idx.estoque]) : 0;
-          const precoCusto = idx.precoCusto >= 0 ? parseNumero(l[idx.precoCusto]) : 0;
+            const doc = idx.doc >= 0 ? String(l[idx.doc] || '').trim() : '';
+            const inscricaoEstadual = idx.inscricaoEstadual >= 0 ? String(l[idx.inscricaoEstadual] || '').trim() : '';
+            const telefone = idx.telefone >= 0 ? String(l[idx.telefone] || '').trim() : '';
+            const email = idx.email >= 0 ? String(l[idx.email] || '').trim() : '';
+            const cidade = idx.cidade >= 0 ? String(l[idx.cidade] || '').trim() : '';
+
+            // Detecta duplicata
+            let status = 'novo';
+            const docNums = doc.replace(/\D/g, '');
+            if (docNums && mapaPorDoc.has(docNums)) status = 'atualizar';
+            else if (mapaPorNome.has(nome.toLowerCase())) status = 'atualizar';
+
+            itens.push({
+              linha: i + 1,
+              nome, doc, inscricaoEstadual, telefone, email, cidade,
+              _status: status,
+              _valido: true // fornecedor só precisa de nome, que já validamos
+            });
+          }
+          _mgItensPreview = itens;
+        } else {
+          // === PRODUTOS (fluxo já existente) ===
+          const mapaPorRef = new Map();
+          const mapaPorNome = new Map();
+          for (const p of (dbProdutos || [])) {
+            if (p.referencia) mapaPorRef.set(String(p.referencia).toUpperCase(), p);
+            if (p.nome) mapaPorNome.set(String(p.nome).toLowerCase(), p);
+          }
+
+          const itens = [];
+          for (let i = 1; i < linhas.length; i++) {
+            const l = linhas[i];
+            if (!l || l.length === 0) continue;
+            const nome = String(l[idx.nome] || '').trim();
+            if (!nome) continue;
+
+            const referencia = idx.referencia >= 0 ? String(l[idx.referencia] || '').trim().toUpperCase() : '';
+            const codigo = idx.codigo >= 0 ? String(l[idx.codigo] || '').trim() : '';
+            const marca = idx.marca >= 0 ? String(l[idx.marca] || '').trim() : '';
+            const categoria = idx.categoria >= 0 ? String(l[idx.categoria] || '').trim() : '';
+            const estoque = idx.estoque >= 0 ? parseNumero(l[idx.estoque]) : 0;
+            const precoCusto = idx.precoCusto >= 0 ? parseNumero(l[idx.precoCusto]) : 0;
           const precoVenda = idx.precoVenda >= 0 ? parseNumero(l[idx.precoVenda]) : 0;
 
           // Detecta duplicata
@@ -13585,7 +13690,8 @@ ${conteudo}
           });
         }
 
-        _mgItensPreview = itens;
+          _mgItensPreview = itens;
+        }
         mgRenderPreview();
 
       } catch (err) {
@@ -13606,11 +13712,93 @@ ${conteudo}
     document.getElementById('mg-step-2').style.background = '#0891b2';
     document.getElementById('mg-step-2').style.color = '#fff';
 
-    // Resumo
     const total = _mgItensPreview.length;
     const novos = _mgItensPreview.filter(i => i._status === 'novo').length;
     const atualizar = _mgItensPreview.filter(i => i._status === 'atualizar').length;
     const invalidos = _mgItensPreview.filter(i => !i._valido).length;
+
+    // === Cabeçalho e cards de resumo variam por tipo ===
+    if (_mgTipo === 'fornecedores') {
+      const comDoc = _mgItensPreview.filter(i => i.doc).length;
+      const comEmail = _mgItensPreview.filter(i => i.email).length;
+      document.getElementById('mg-resumo').innerHTML = `
+        <div style="background:#f0f9ff;border:1px solid #93c5fd;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#0891b2;">${total}</div>
+          <div style="font-size:11px;color:#334155;">Total lidos</div>
+        </div>
+        <div style="background:#dcfce7;border:1px solid #16a34a;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#166534;">${novos}</div>
+          <div style="font-size:11px;color:#166534;">Novos</div>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fbbf24;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#92400e;">${atualizar}</div>
+          <div style="font-size:11px;color:#92400e;">Atualizar</div>
+        </div>
+        <div style="background:#faf5ff;border:1px solid #a855f7;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#6b21a8;">${comDoc}</div>
+          <div style="font-size:11px;color:#6b21a8;">Com CPF/CNPJ</div>
+        </div>
+        <div style="background:#eef2ff;border:1px solid #6366f1;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#4338ca;">${comEmail}</div>
+          <div style="font-size:11px;color:#4338ca;">Com e-mail</div>
+        </div>
+      `;
+
+      // Mapeamento visual
+      const map = ['Nome'];
+      if (_mgMapeamentoDetectado.doc >= 0) map.push('CPF/CNPJ');
+      if (_mgMapeamentoDetectado.inscricaoEstadual >= 0) map.push('IE');
+      if (_mgMapeamentoDetectado.telefone >= 0) map.push('Telefone');
+      if (_mgMapeamentoDetectado.email >= 0) map.push('E-mail');
+      if (_mgMapeamentoDetectado.cidade >= 0) map.push('Cidade');
+      document.getElementById('mg-mapeamento').textContent = map.join(' · ');
+
+      // Sem avisos específicos
+      document.getElementById('mg-avisos').style.display = 'none';
+
+      // Cabeçalho tabela
+      document.getElementById('mg-preview-thead').innerHTML = `
+        <tr>
+          <th style="padding:8px;text-align:left;">Linha</th>
+          <th style="padding:8px;text-align:left;">Nome / Razão Social</th>
+          <th style="padding:8px;text-align:left;">CPF/CNPJ</th>
+          <th style="padding:8px;text-align:left;">IE</th>
+          <th style="padding:8px;text-align:left;">Telefone</th>
+          <th style="padding:8px;text-align:left;">E-mail</th>
+          <th style="padding:8px;text-align:left;">Cidade</th>
+          <th style="padding:8px;text-align:center;">Status</th>
+        </tr>
+      `;
+
+      // Corpo tabela (até 100)
+      const preview = _mgItensPreview.slice(0, 100);
+      document.getElementById('mg-preview-body').innerHTML = preview.map(it => {
+        const badgeStatus = it._status === 'novo'
+          ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">NOVO</span>'
+          : '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">ATUALIZAR</span>';
+        return `
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="padding:6px;color:#64748b;">${it.linha}</td>
+            <td style="padding:6px;font-weight:600;">${escapeHtml(it.nome)}</td>
+            <td style="padding:6px;font-family:monospace;">${escapeHtml(it.doc || '—')}</td>
+            <td style="padding:6px;font-family:monospace;">${escapeHtml(it.inscricaoEstadual || '—')}</td>
+            <td style="padding:6px;">${escapeHtml(it.telefone || '—')}</td>
+            <td style="padding:6px;color:#64748b;">${escapeHtml(it.email || '—')}</td>
+            <td style="padding:6px;">${escapeHtml(it.cidade || '—')}</td>
+            <td style="padding:6px;text-align:center;">${badgeStatus}</td>
+          </tr>
+        `;
+      }).join('');
+      if (_mgItensPreview.length > 100) {
+        document.getElementById('mg-preview-body').innerHTML += `
+          <tr><td colspan="8" style="text-align:center;padding:10px;color:#94a3b8;font-style:italic;">
+            + ${_mgItensPreview.length - 100} fornecedor(es) não mostrado(s) no preview (serão importados normalmente)
+          </td></tr>`;
+      }
+      return;
+    }
+
+    // === PRODUTOS (fluxo original) ===
     const comMarca = _mgItensPreview.filter(i => i.marca).length;
 
     document.getElementById('mg-resumo').innerHTML = `
@@ -13660,6 +13848,21 @@ ${conteudo}
       document.getElementById('mg-avisos').style.display = 'none';
     }
 
+    // Cabeçalho tabela produtos
+    document.getElementById('mg-preview-thead').innerHTML = `
+      <tr>
+        <th style="padding:8px;text-align:left;">Linha</th>
+        <th style="padding:8px;text-align:left;">Código</th>
+        <th style="padding:8px;text-align:left;">Referência</th>
+        <th style="padding:8px;text-align:left;">Nome</th>
+        <th style="padding:8px;text-align:left;">Marca</th>
+        <th style="padding:8px;text-align:center;">Qtd</th>
+        <th style="padding:8px;text-align:right;">Custo</th>
+        <th style="padding:8px;text-align:right;">Venda</th>
+        <th style="padding:8px;text-align:center;">Status</th>
+      </tr>
+    `;
+
     // Tabela preview (mostra até 100)
     const preview = _mgItensPreview.slice(0, 100);
     document.getElementById('mg-preview-body').innerHTML = preview.map(it => {
@@ -13692,7 +13895,8 @@ ${conteudo}
   }
 
   async function mgConfirmarImportacao() {
-    if (!confirm('⚠️ Confirmar importação de ' + _mgItensPreview.length + ' produtos?\n\nEsta ação não pode ser desfeita facilmente.')) return;
+    const tipoLabel = _mgTipo === 'fornecedores' ? 'fornecedores' : 'produtos';
+    if (!confirm(`⚠️ Confirmar importação de ${_mgItensPreview.length} ${tipoLabel}?\n\nEsta ação não pode ser desfeita facilmente.`)) return;
 
     document.getElementById('mg-btn-confirmar').disabled = true;
     document.getElementById('mg-btn-confirmar').style.opacity = '0.5';
@@ -13701,27 +13905,45 @@ ${conteudo}
     document.getElementById('mg-resultado').style.display = 'none';
 
     try {
-      // Envia só os válidos
       const validos = _mgItensPreview.filter(i => i._valido);
-      const r = await api('POST', '/api/produtos/migracao', { itens: validos });
+      const endpoint = _mgTipo === 'fornecedores'
+        ? '/api/produtos/migracao-fornecedores'
+        : '/api/produtos/migracao';
+      const r = await api('POST', endpoint, { itens: validos });
 
       document.getElementById('mg-progresso').style.display = 'none';
       const div = document.getElementById('mg-resultado');
       div.style.background = '#dcfce7';
       div.style.border = '1px solid #16a34a';
-      div.innerHTML = `
-        <strong style="color:#166534;font-size:15px;">✅ Importação concluída com sucesso!</strong>
-        <div style="margin-top:10px;font-size:13px;color:#065f46;line-height:1.8;">
-          • <strong>${r.criados}</strong> produto(s) criado(s)<br>
-          • <strong>${r.atualizados}</strong> produto(s) atualizado(s)<br>
-          • <strong>${r.marcasCriadas}</strong> marca(s) criada(s) automaticamente<br>
-          • <strong>${r.ignorados}</strong> ignorado(s)<br>
-          ${r.erros && r.erros.length > 0 ? `<div style="margin-top:8px;color:#991b1b;"><strong>Erros:</strong><br>${r.erros.slice(0, 5).map(e => `Linha ${e.linha}: ${escapeHtml(e.motivo)}`).join('<br>')}</div>` : ''}
-        </div>
-        <div style="margin-top:12px;">
-          <button type="button" onclick="location.reload()" style="padding:10px 16px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🔄 Recarregar Sistema</button>
-        </div>
-      `;
+
+      if (_mgTipo === 'fornecedores') {
+        div.innerHTML = `
+          <strong style="color:#166534;font-size:15px;">✅ Importação de fornecedores concluída!</strong>
+          <div style="margin-top:10px;font-size:13px;color:#065f46;line-height:1.8;">
+            • <strong>${r.criados}</strong> fornecedor(es) criado(s)<br>
+            • <strong>${r.atualizados}</strong> fornecedor(es) atualizado(s)<br>
+            • <strong>${r.ignorados}</strong> ignorado(s)<br>
+            ${r.erros && r.erros.length > 0 ? `<div style="margin-top:8px;color:#991b1b;"><strong>Erros:</strong><br>${r.erros.slice(0, 5).map(e => `Linha ${e.linha}: ${escapeHtml(e.motivo)}`).join('<br>')}</div>` : ''}
+          </div>
+          <div style="margin-top:12px;">
+            <button type="button" onclick="location.reload()" style="padding:10px 16px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🔄 Recarregar Sistema</button>
+          </div>
+        `;
+      } else {
+        div.innerHTML = `
+          <strong style="color:#166534;font-size:15px;">✅ Importação concluída com sucesso!</strong>
+          <div style="margin-top:10px;font-size:13px;color:#065f46;line-height:1.8;">
+            • <strong>${r.criados}</strong> produto(s) criado(s)<br>
+            • <strong>${r.atualizados}</strong> produto(s) atualizado(s)<br>
+            • <strong>${r.marcasCriadas}</strong> marca(s) criada(s) automaticamente<br>
+            • <strong>${r.ignorados}</strong> ignorado(s)<br>
+            ${r.erros && r.erros.length > 0 ? `<div style="margin-top:8px;color:#991b1b;"><strong>Erros:</strong><br>${r.erros.slice(0, 5).map(e => `Linha ${e.linha}: ${escapeHtml(e.motivo)}`).join('<br>')}</div>` : ''}
+          </div>
+          <div style="margin-top:12px;">
+            <button type="button" onclick="location.reload()" style="padding:10px 16px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🔄 Recarregar Sistema</button>
+          </div>
+        `;
+      }
       div.style.display = 'block';
     } catch (err) {
       document.getElementById('mg-progresso').style.display = 'none';
