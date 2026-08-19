@@ -725,46 +725,12 @@
         </div>
       `;
 
-      // Card CUSTOS MENSAIS
-      let custosHtml = '';
-      if (r.custos && r.custos.configurado) {
-        const linhasCusto = r.custos.itens.map(c => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #fecaca;">
-            <span style="font-size:12px;color:#7f1d1d;">
-              ${c.icone} ${escapeHtml(c.nome)}
-              ${c.origemUSD ? `<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(US$ ${c.valorUSD.toFixed(2)})</span>` : ''}
-            </span>
-            <strong style="font-size:12px;color:#7f1d1d;">R$ ${c.valorBRL.toFixed(2)}</strong>
-          </div>
-        `).join('');
-        custosHtml = `
-          <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px;margin-top:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <strong style="color:#7f1d1d;font-size:14px;">💰 Custos Mensais de Infraestrutura</strong>
-              <span style="font-size:10px;color:#64748b;">Câmbio: US$ 1 = R$ ${r.custos.cambio.toFixed(2)}</span>
-            </div>
-            ${linhasCusto}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid #dc2626;">
-              <strong style="color:#7f1d1d;font-size:15px;">💵 TOTAL MENSAL</strong>
-              <strong style="color:#dc2626;font-size:20px;">R$ ${r.custos.totalBRL.toFixed(2).replace('.', ',')}</strong>
-            </div>
-          </div>
-        `;
-      } else {
-        custosHtml = `
-          <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:14px;margin-top:16px;font-size:12px;color:#92400e;">
-            💡 <strong>Custos mensais:</strong> configure as env vars CUSTO_RENDER_WEB_USD, CUSTO_CLAUDE_USD, etc no Render pra ver quanto o sistema custa por mês.
-          </div>
-        `;
-      }
-
       div.innerHTML = `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
           ${bancoHtml}
           ${cloudHtml}
           ${totaisHtml}
         </div>
-        ${custosHtml}
         ${topHtml}
         ${empresasHtml}
         <div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:14px;">

@@ -161,62 +161,6 @@ router.get('/', async (req, res) => {
     // ===== CLOUDINARY =====
     const cloudinary = await cloudinaryUsage();
 
-    // ===== CUSTOS MENSAIS (configuráveis via env) =====
-    const cambio = parseFloat(process.env.CAMBIO_USD_BRL) || 5.22;
-    const custosItens = [
-      {
-        nome: 'Render Web Service',
-        icone: '🌐',
-        valorBRL: parseFloat(process.env.CUSTO_RENDER_WEB_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_RENDER_WEB_USD) || 0
-      },
-      {
-        nome: 'Render Banco PostgreSQL',
-        icone: '🗄️',
-        valorBRL: parseFloat(process.env.CUSTO_RENDER_DB_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_RENDER_DB_USD) || 0
-      },
-      {
-        nome: 'Cloudinary',
-        icone: '📸',
-        valorBRL: parseFloat(process.env.CUSTO_CLOUDINARY_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_CLOUDINARY_USD) || 0
-      },
-      {
-        nome: 'Domínio',
-        icone: '🌍',
-        valorBRL: parseFloat(process.env.CUSTO_DOMINIO_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_DOMINIO_USD) || 0
-      },
-      {
-        nome: 'Claude (IA)',
-        icone: '🤖',
-        valorBRL: parseFloat(process.env.CUSTO_CLAUDE_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_CLAUDE_USD) || 0
-      },
-      {
-        nome: 'Outros',
-        icone: '📦',
-        valorBRL: parseFloat(process.env.CUSTO_OUTROS_BRL) || 0,
-        valorUSD: parseFloat(process.env.CUSTO_OUTROS_USD) || 0
-      }
-    ];
-
-    // Converte USD → BRL usando o câmbio; se não tem valor, ignora
-    let totalBRL = 0;
-    const custosCalculados = custosItens.map(c => {
-      let brl = c.valorBRL;
-      if (!brl && c.valorUSD) brl = c.valorUSD * cambio;
-      totalBRL += brl;
-      return {
-        nome: c.nome,
-        icone: c.icone,
-        valorBRL: Math.round(brl * 100) / 100,
-        valorUSD: c.valorUSD || null,
-        origemUSD: !c.valorBRL && c.valorUSD > 0
-      };
-    }).filter(c => c.valorBRL > 0);
-
     res.json({
       banco: {
         bytes: bancoBytes,
@@ -232,12 +176,6 @@ router.get('/', async (req, res) => {
       totalEmpresas: empresas.length,
       empresas,
       cloudinary,
-      custos: {
-        itens: custosCalculados,
-        totalBRL: Math.round(totalBRL * 100) / 100,
-        cambio,
-        configurado: custosCalculados.length > 0
-      },
       geradoEm: new Date().toISOString()
     });
   } catch (err) {
