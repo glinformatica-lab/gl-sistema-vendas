@@ -37,6 +37,7 @@ app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/c
 app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
+app.use('/api/master/uso-sistema', autenticarMaster, require('./routes/uso-sistema'));
 app.use('/api/master-vendedores', autenticarMaster, require('./routes/vendedores-master'));
 // Healthcheck (Render usa)
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));

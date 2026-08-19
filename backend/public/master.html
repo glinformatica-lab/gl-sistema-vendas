@@ -150,6 +150,7 @@
       <button class="tab-btn active" data-tab="visao" onclick="trocarAba('visao')">🏠 Visão Geral</button>
       <button class="tab-btn" data-tab="empresas" onclick="trocarAba('empresas')">🏢 Empresas</button>
       <button class="tab-btn" data-tab="revendedores" onclick="trocarAba('revendedores')">🤝 Revendedores</button>
+      <button class="tab-btn" data-tab="uso-sistema" onclick="trocarAba('uso-sistema')">📊 Uso do Sistema</button>
     </div>
 
     <!-- ================ ABA: VISÃO GERAL ================ -->
@@ -234,6 +235,17 @@
         </thead>
         <tbody id="tbody-comissoes"><tr><td colspan="10" style="text-align:center;color:#94a3b8;">Carregando…</td></tr></tbody>
       </table>
+    </div>
+
+    <!-- ================ ABA: USO DO SISTEMA ================ -->
+    <div class="tab-panel" id="tab-uso-sistema">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>📊 Uso do Sistema</span>
+        <button onclick="carregarUsoSistema()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">🔄 Recarregar</button>
+      </h2>
+      <div id="uso-content">
+        <div style="text-align:center;padding:40px;color:#94a3b8;">Clique em "🔄 Recarregar" para consultar os dados.</div>
+      </div>
     </div>
   </main>
 </div>
@@ -515,6 +527,178 @@
     });
     const panel = document.getElementById('tab-' + nome);
     if (panel) panel.classList.add('active');
+    // Carregamento sob demanda
+    if (nome === 'uso-sistema') carregarUsoSistema();
+  }
+
+  // ====== USO DO SISTEMA ======
+  function formatarMB(mb) {
+    if (mb == null || isNaN(mb)) return '—';
+    if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB';
+    return mb.toFixed(2) + ' MB';
+  }
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function calcPct(usado, limite) {
+    if (!limite) return 0;
+    return Math.min(100, Math.round((usado / limite) * 100));
+  }
+  function corBarra(pct) {
+    if (pct >= 90) return '#dc2626';
+    if (pct >= 70) return '#f59e0b';
+    return '#16a34a';
+  }
+
+  async function carregarUsoSistema() {
+    const div = document.getElementById('uso-content');
+    div.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">⏳ Consultando dados...</div>';
+
+    try {
+      const r = await api('GET', '/api/master/uso-sistema');
+
+      // Card BANCO
+      const banco = r.banco;
+      const bancoHtml = `
+        <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:18px;">
+          <div style="font-size:13px;color:#1e40af;font-weight:600;">🗄️ Banco PostgreSQL</div>
+          <div style="font-size:32px;font-weight:700;color:#1e3a8a;margin-top:6px;">${formatarMB(banco.mb)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">${banco.topTabelas.length} tabelas · ${r.totalEmpresas} empresa(s)</div>
+        </div>
+      `;
+
+      // Card CLOUDINARY
+      let cloudHtml = '';
+      if (!r.cloudinary.configurado) {
+        cloudHtml = `
+          <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:18px;">
+            <div style="font-size:13px;color:#991b1b;font-weight:600;">📸 Cloudinary</div>
+            <div style="font-size:16px;color:#991b1b;margin-top:6px;">⚠️ Não configurado</div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">Configure CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no Render.</div>
+          </div>
+        `;
+      } else if (r.cloudinary.erro) {
+        cloudHtml = `
+          <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:18px;">
+            <div style="font-size:13px;color:#991b1b;font-weight:600;">📸 Cloudinary</div>
+            <div style="font-size:14px;color:#991b1b;margin-top:6px;">❌ ${escapeHtml(r.cloudinary.erro)}</div>
+          </div>
+        `;
+      } else {
+        const cs = r.cloudinary.storage;
+        const cb = r.cloudinary.bandwidth;
+        const pctStorage = calcPct(cs.usadoMB, cs.limiteMB);
+        const pctBand = calcPct(cb.usadoMB, cb.limiteMB);
+        cloudHtml = `
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:18px;">
+            <div style="font-size:13px;color:#166534;font-weight:600;">📸 Cloudinary</div>
+            <div style="font-size:22px;font-weight:700;color:#14532d;margin-top:6px;">${formatarMB(cs.usadoMB)} / ${formatarMB(cs.limiteMB)}</div>
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;margin-top:4px;overflow:hidden;">
+              <div style="height:100%;width:${pctStorage}%;background:${corBarra(pctStorage)};"></div>
+            </div>
+            <div style="font-size:10px;color:#64748b;margin-top:6px;">
+              ${r.cloudinary.totalRecursos} arquivo(s) · Plano ${escapeHtml(r.cloudinary.plano)}
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:8px;">
+              Bandwidth: ${formatarMB(cb.usadoMB)} / ${formatarMB(cb.limiteMB)} (${pctBand}%)
+            </div>
+          </div>
+        `;
+      }
+
+      // Card TOTAIS
+      const t = r.totais;
+      const totaisHtml = `
+        <div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:18px;">
+          <div style="font-size:13px;color:#6b21a8;font-weight:600;">📈 Totais Globais</div>
+          <div style="font-size:11px;color:#334155;margin-top:8px;line-height:1.8;">
+            • <strong>${t.produtos}</strong> produtos<br>
+            • <strong>${t.clientes}</strong> clientes · <strong>${t.fornecedores}</strong> fornecedores<br>
+            • <strong>${t.orcamentos}</strong> orçamentos · <strong>${t.vendas}</strong> vendas<br>
+            • <strong>${t.fotos}</strong> fotos vinculadas · <strong>${t.usuarios}</strong> usuários
+          </div>
+        </div>
+      `;
+
+      // Top tabelas
+      const topHtml = `
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-top:16px;">
+          <strong style="color:#334155;font-size:14px;">🔝 Top 15 tabelas por tamanho</strong>
+          <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:6px 8px;text-align:left;">Tabela</th>
+                <th style="padding:6px 8px;text-align:right;">Tamanho</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${banco.topTabelas.map(t => `
+                <tr style="border-top:1px solid #f1f5f9;">
+                  <td style="padding:6px 8px;font-family:monospace;">${escapeHtml(t.nome)}</td>
+                  <td style="padding:6px 8px;text-align:right;font-weight:600;">${formatarMB(t.mb)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Tabela por empresa
+      const empresasHtml = `
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-top:16px;">
+          <strong style="color:#334155;font-size:14px;">🏢 Uso por Empresa</strong>
+          <div style="overflow-x:auto;margin-top:10px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead style="background:#f8fafc;">
+                <tr>
+                  <th style="padding:6px 8px;text-align:left;">Empresa</th>
+                  <th style="padding:6px 8px;text-align:center;">Plano</th>
+                  <th style="padding:6px 8px;text-align:center;">Ilum.</th>
+                  <th style="padding:6px 8px;text-align:right;">Produtos</th>
+                  <th style="padding:6px 8px;text-align:right;">Fotos</th>
+                  <th style="padding:6px 8px;text-align:right;">Clientes</th>
+                  <th style="padding:6px 8px;text-align:right;">Fornec.</th>
+                  <th style="padding:6px 8px;text-align:right;">Orçam.</th>
+                  <th style="padding:6px 8px;text-align:right;">Vendas</th>
+                  <th style="padding:6px 8px;text-align:right;">Users</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${r.empresas.map(e => `
+                  <tr style="border-top:1px solid #f1f5f9;">
+                    <td style="padding:6px 8px;"><strong>${escapeHtml(e.nome)}</strong> <span style="color:#94a3b8;font-size:10px;">#${e.id}</span></td>
+                    <td style="padding:6px 8px;text-align:center;"><span style="background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700;">${escapeHtml(e.plano || '—')}</span></td>
+                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : '—'}</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:600;">${e.totalProdutos}</td>
+                    <td style="padding:6px 8px;text-align:right;color:#0891b2;">${e.totalFotos}</td>
+                    <td style="padding:6px 8px;text-align:right;">${e.totalClientes}</td>
+                    <td style="padding:6px 8px;text-align:right;">${e.totalFornecedores}</td>
+                    <td style="padding:6px 8px;text-align:right;">${e.totalOrcamentos}</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:600;color:#16a34a;">${e.totalVendas}</td>
+                    <td style="padding:6px 8px;text-align:right;">${e.totalUsuarios}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      div.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+          ${bancoHtml}
+          ${cloudHtml}
+          ${totaisHtml}
+        </div>
+        ${topHtml}
+        ${empresasHtml}
+        <div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:14px;">
+          Consultado em ${new Date(r.geradoEm).toLocaleString('pt-BR')}
+        </div>
+      `;
+    } catch (e) {
+      div.innerHTML = `<div style="background:#fef2f2;border:1px solid #fca5a5;padding:14px;border-radius:8px;color:#991b1b;">❌ ${escapeHtml(e.message)}</div>`;
+    }
   }
 
   function logoutMaster() {
