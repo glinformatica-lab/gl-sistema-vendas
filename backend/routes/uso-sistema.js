@@ -111,7 +111,7 @@ router.get('/', async (req, res) => {
     // Empresas com contadores em batch
     const rEmpresas = await db.query(`
       SELECT
-        e.id, e.nome, e.plano, e.usa_ambientes, e.criado_em,
+        e.id, e.nome, e.plano, e.usa_ambientes,
         COALESCE((SELECT COUNT(*) FROM produtos WHERE empresa_id=e.id), 0)::int      AS total_produtos,
         COALESCE((SELECT COUNT(*) FROM produtos WHERE empresa_id=e.id AND foto_url IS NOT NULL), 0)::int AS total_fotos,
         COALESCE((SELECT COUNT(*) FROM clientes WHERE empresa_id=e.id), 0)::int      AS total_clientes,
@@ -127,7 +127,6 @@ router.get('/', async (req, res) => {
       nome: e.nome,
       plano: e.plano,
       usaAmbientes: e.usa_ambientes,
-      criadoEm: e.criado_em,
       totalProdutos: e.total_produtos,
       totalFotos: e.total_fotos,
       totalClientes: e.total_clientes,
