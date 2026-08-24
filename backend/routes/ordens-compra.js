@@ -270,18 +270,19 @@ router.post('/:id/enviada', async (req, res) => {
     // Marca itens da lista_compras como 'pedido'
     const rUpd = await client.query(
       `UPDATE lista_compras
-       SET status='pedido', atualizado_por=$1, atualizado_por_nome=$2, atualizado_em=NOW()
-       WHERE ordem_compra_id=$3 AND empresa_id=$4
+       SET status='pedido', atualizado_por=$1, atualizado_em=NOW()
+       WHERE ordem_compra_id=$2 AND empresa_id=$3
        RETURNING id`,
-      [req.user.userId, nomeUsr, req.params.id, req.user.empresaId]
+      [req.user.userId, req.params.id, req.user.empresaId]
     );
 
     await client.query('COMMIT');
     res.json({ ok: true, itensPedidos: rUpd.rows.length });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('[ordens-compra] enviada', err);
-    res.status(500).json({ error: 'Erro ao marcar como enviada.' });
+    console.error('[ordens-compra] enviada ERRO:', err);
+    console.error('[ordens-compra] enviada STACK:', err.stack);
+    res.status(500).json({ error: 'Erro ao marcar como enviada: ' + (err.message || err.code || 'desconhecido') });
   } finally {
     client.release();
   }
