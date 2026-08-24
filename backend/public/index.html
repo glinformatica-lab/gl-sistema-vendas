@@ -2788,10 +2788,15 @@
       <!-- Fornecedores -->
       <div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:14px;margin-bottom:14px;">
         <label style="font-weight:600;font-size:13px;color:#6b21a8;display:block;margin-bottom:8px;">🏢 Fornecedores para cotar * <span style="font-weight:400;color:#94a3b8;">(mínimo 2 recomendado)</span></label>
-        <div id="ncot-fornecedores-lista" style="max-height:150px;overflow-y:auto;background:#fff;border:1px solid #e9d5ff;border-radius:6px;padding:8px;">
+        <input type="text" id="ncot-forn-busca" placeholder="🔎 Buscar fornecedor por nome, CPF/CNPJ ou cidade..." oninput="ncotFiltrarFornecedores()"
+               style="width:100%;padding:8px 10px;border:1px solid #d8b4fe;border-radius:6px;font-size:13px;margin-bottom:8px;background:#fff;">
+        <div id="ncot-fornecedores-lista" style="max-height:220px;overflow-y:auto;background:#fff;border:1px solid #e9d5ff;border-radius:6px;padding:8px;">
           <div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Carregando fornecedores...</div>
         </div>
-        <div style="font-size:11px;color:#7c3aed;margin-top:6px;"><span id="ncot-forn-selecionados">0 fornecedor(es) selecionado(s)</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#7c3aed;margin-top:6px;">
+          <span id="ncot-forn-selecionados">0 fornecedor(es) selecionado(s)</span>
+          <span id="ncot-forn-filtrados"></span>
+        </div>
       </div>
 
       <!-- Observações + prazo -->
@@ -14569,15 +14574,9 @@ ${conteudo}
         return;
       }
 
-      // Popula fornecedores (checkbox list)
-      const contForn = document.getElementById('ncot-fornecedores-lista');
-      contForn.innerHTML = _ncotFornecedoresCache.map(f => `
-        <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:4px;font-size:13px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background=''">
-          <input type="checkbox" class="ncot-forn-check" value="${f.id}" onclick="ncotAtualizarSelecaoForn()" style="cursor:pointer;transform:scale(1.15);">
-          <span style="font-weight:600;">${escapeHtml(f.nome)}</span>
-          ${f.doc ? `<span style="color:#94a3b8;font-size:11px;">${escapeHtml(f.doc)}</span>` : ''}
-        </label>
-      `).join('');
+      // Popula fornecedores (checkbox list com busca)
+      document.getElementById('ncot-forn-busca').value = '';
+      ncotRenderFornecedores('');
 
       // Popula datalist de produtos para autocomplete
       const dlProdAvulso = document.getElementById('lista-produtos-avulso');
@@ -14736,6 +14735,66 @@ ${conteudo}
         </table>
       </div>
     `;
+  }
+
+  // Renderiza a lista de fornecedores aplicando um filtro de busca
+  function ncotRenderFornecedores(filtro) {
+    const cont = document.getElementById('ncot-fornecedores-lista');
+    const stat = document.getElementById('ncot-forn-filtrados');
+    if (!cont) return;
+
+    // Preserva IDs já marcados antes de re-renderizar
+    const jaMarcados = new Set(
+      [...document.querySelectorAll('.ncot-forn-check:checked')].map(chk => chk.value)
+    );
+
+    const q = String(filtro || '').trim().toLowerCase();
+    const lista = _ncotFornecedoresCache.filter(f => {
+      if (!q) return true;
+      const alvo = [
+        f.nome || '',
+        f.doc || '',
+        f.cidade || '',
+        f.telefone || '',
+        f.email || ''
+      ].join(' ').toLowerCase();
+      return alvo.includes(q);
+    });
+
+    if (lista.length === 0) {
+      cont.innerHTML = `<div style="text-align:center;color:#94a3b8;font-size:12px;padding:14px;">🔍 Nenhum fornecedor encontrado pra "${escapeHtml(filtro)}"</div>`;
+    } else {
+      cont.innerHTML = lista.map(f => {
+        const marcado = jaMarcados.has(String(f.id)) ? 'checked' : '';
+        const linhaExtra = [
+          f.doc,
+          f.cidade
+        ].filter(Boolean).join(' · ');
+        return `
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:4px;font-size:13px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background=''">
+            <input type="checkbox" class="ncot-forn-check" value="${f.id}" ${marcado} onclick="ncotAtualizarSelecaoForn()" style="cursor:pointer;transform:scale(1.15);">
+            <span style="flex:1;">
+              <span style="font-weight:600;">${escapeHtml(f.nome)}</span>
+              ${linhaExtra ? `<span style="color:#94a3b8;font-size:11px;margin-left:6px;">${escapeHtml(linhaExtra)}</span>` : ''}
+            </span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    // Info de filtro
+    if (stat) {
+      if (q) {
+        stat.textContent = `${lista.length} de ${_ncotFornecedoresCache.length} mostrados`;
+      } else {
+        stat.textContent = '';
+      }
+    }
+  }
+
+  function ncotFiltrarFornecedores() {
+    const filtro = document.getElementById('ncot-forn-busca')?.value || '';
+    ncotRenderFornecedores(filtro);
   }
 
   function ncotAtualizarSelecaoForn() {
