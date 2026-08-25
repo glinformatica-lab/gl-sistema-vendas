@@ -772,7 +772,7 @@
         <button class="btn" onclick="openNovoCliente()">&#43; Novo Cliente</button>
         <input type="text" id="busca-clientes" placeholder="🔍 Buscar por nome, CPF/CNPJ, telefone ou cidade"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
-               oninput="renderClientes()">
+               oninput="_limiteClientes = 50; renderClientes();">
         <span id="contador-clientes" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
@@ -833,7 +833,7 @@
         <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="openEntradaMercadoria()">Entrada de Mercadoria</button>
         <input type="text" id="busca-fornecedores" placeholder="🔍 Buscar por nome, CPF/CNPJ ou cidade"
                style="flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
-               oninput="renderFornecedores()">
+               oninput="_limiteFornecedores = 50; renderFornecedores();">
         <span id="contador-fornecedores" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
@@ -1110,7 +1110,7 @@
         <button class="btn feature-ambientes" style="background:#7c3aed;display:none;" onclick="abrirEtiquetas()">🏷️ Etiquetas</button>
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria, fornecedor, referência ou código de barras"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
-               oninput="renderProdutos()">
+               oninput="_limiteProdutos = 50; renderProdutos();">
         <span id="contador-produtos" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
@@ -1173,7 +1173,7 @@
       <div class="page-title">Orçamentos</div>
       <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
         <button class="btn estoque-hide" onclick="openNovoOrcamento()">+ Novo Orçamento</button>
-        <select id="filtro-status-orc" onchange="carregarOrcamentos()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+        <select id="filtro-status-orc" onchange="_limiteOrcamentos = 50; carregarOrcamentos();" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
           <option value="">Todos status</option>
           <option value="aberto">📝 Aberto</option>
           <option value="aprovado">✅ Aprovado (vendedor)</option>
@@ -1185,7 +1185,7 @@
           <option value="convertido">🛒 Convertido</option>
           <option value="cancelado">❌ Cancelado</option>
         </select>
-        <input id="filtro-orc" type="text" placeholder="Buscar cliente ou número..." oninput="renderOrcamentos()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+        <input id="filtro-orc" type="text" placeholder="Buscar cliente ou número..." oninput="_limiteOrcamentos = 50; renderOrcamentos();" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
       </div>
       <table>
         <thead>
@@ -1381,19 +1381,19 @@
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;background:#f6f8fc;padding:12px 16px;border-radius:10px;">
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Mês
-          <input type="month" id="filtro-vd-mes" onchange="renderVendas()"
+          <input type="month" id="filtro-vd-mes" onchange="_limiteVendas = 50; renderVendas();"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Cliente
-          <select id="filtro-vd-cliente" onchange="renderVendas()"
+          <select id="filtro-vd-cliente" onchange="_limiteVendas = 50; renderVendas();"
                   style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;min-width:200px;">
             <option value="">Todos</option>
           </select>
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
           Buscar (produto, código, pagamento)
-          <input type="text" id="filtro-vd-busca" oninput="renderVendas()" placeholder="🔍 ex: 1234, mouse, PIX"
+          <input type="text" id="filtro-vd-busca" oninput="_limiteVendas = 50; renderVendas();" placeholder="🔍 ex: 1234, mouse, PIX"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <button class="btn" type="button" onclick="limparFiltrosVendas()"
@@ -8197,6 +8197,8 @@ https://sistema.glinformatica.com.br
     }
     return String(max + 1);
   }
+  let _limiteProdutos = 50;
+
   function renderProdutos() {
     const tbody = document.getElementById('tbody-produtos');
     if(!tbody) return;
@@ -8216,9 +8218,10 @@ https://sistema.glinformatica.com.br
     }
     const contador = document.getElementById('contador-produtos');
     if(contador) {
+      const mostrando = Math.min(_limiteProdutos, lista.length);
       contador.textContent = termo
-        ? `${lista.length} de ${dbProdutos.length} produto(s)`
-        : `${dbProdutos.length} produto(s)`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbProdutos.length})`
+        : `Mostrando ${mostrando} de ${dbProdutos.length} produto(s)`;
     }
     if(dbProdutos.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto cadastrado.</td></tr>';
@@ -8229,7 +8232,9 @@ https://sistema.glinformatica.com.br
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto encontrado para "${termo}".</td></tr>`;
       return;
     }
-    tbody.innerHTML = lista.map(p => {
+    // Só os primeiros _limiteProdutos
+    const listaVisivel = lista.slice(0, _limiteProdutos);
+    let html = listaVisivel.map(p => {
       const idxOriginal = dbProdutos.indexOf(p);
       const iconeFoto = p.fotoUrl
         ? `<span onclick="event.stopPropagation(); abrirFotoLightbox('${escapeAttr(p.fotoUrl)}', '${escapeAttr(p.nome)}')" style="cursor:pointer;margin-left:6px;color:#0891b2;" title="Ver foto">📷</span>`
@@ -8252,6 +8257,23 @@ https://sistema.glinformatica.com.br
       </tr>
       `;
     }).join('');
+    // Botão "Mostrar mais"
+    if (lista.length > _limiteProdutos) {
+      const restantes = lista.length - _limiteProdutos;
+      const proxLote = Math.min(50, restantes);
+      html += `
+        <tr>
+          <td colspan="8" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteProdutos += 50; renderProdutos();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteProdutos = ${lista.length}; renderProdutos();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = html;
     agendarSalvar();
   }
   let _produtoEditandoIdx = null;
@@ -9797,6 +9819,8 @@ https://sistema.glinformatica.com.br
   });
 
   // ====== RENDERIZAÇÃO: CLIENTES ======
+  let _limiteClientes = 50;
+
   function renderClientes() {
     const tbody = document.getElementById('tbody-clientes');
     if(!tbody) return;
@@ -9818,9 +9842,10 @@ https://sistema.glinformatica.com.br
     }
     const contador = document.getElementById('contador-clientes');
     if(contador) {
+      const mostrando = Math.min(_limiteClientes, lista.length);
       contador.textContent = termo
-        ? `${lista.length} de ${dbClientes.length} cliente(s)`
-        : `${dbClientes.length} cliente(s)`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbClientes.length})`
+        : `Mostrando ${mostrando} de ${dbClientes.length} cliente(s)`;
     }
     if(dbClientes.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum cliente cadastrado.</td></tr>';
@@ -9831,7 +9856,9 @@ https://sistema.glinformatica.com.br
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum cliente encontrado para "${termo}".</td></tr>`;
       return;
     }
-    tbody.innerHTML = lista.map((c, idx) => {
+    // Renderiza só os primeiros _limiteClientes
+    const listaVisivel = lista.slice(0, _limiteClientes);
+    let html = listaVisivel.map((c, idx) => {
       const endereco = [c.endereco, c.cidade && c.uf ? `${c.cidade}-${c.uf}` : c.cidade].filter(Boolean).join(', ') || '-';
       return `
         <tr>
@@ -9846,6 +9873,23 @@ https://sistema.glinformatica.com.br
         </tr>
       `;
     }).join('');
+    // Botão "Mostrar mais 50"
+    if (lista.length > _limiteClientes) {
+      const restantes = lista.length - _limiteClientes;
+      const proxLote = Math.min(50, restantes);
+      html += `
+        <tr>
+          <td colspan="5" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteClientes += 50; renderClientes();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteClientes = ${lista.length}; renderClientes();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = html;
     agendarSalvar();
   }
 
@@ -10005,6 +10049,8 @@ https://sistema.glinformatica.com.br
   }
 
   // ====== RENDERIZAÇÃO: VENDAS ======
+  let _limiteVendas = 50;
+
   function renderVendas() {
     const tbody = document.getElementById('tbody-vendas');
     if(!tbody) return;
@@ -10055,16 +10101,18 @@ https://sistema.glinformatica.com.br
     const c = document.getElementById('contador-vendas');
     if(c) {
       const totalFiltrado = lista.reduce((s, v) => s + (Number(v.total) || 0), 0);
+      const mostrando = Math.min(_limiteVendas, lista.length);
       c.textContent = (filtroMes || filtroCliente || filtroBusca)
-        ? `${lista.length} de ${dbVendas.length} · Total: ${formatarBRL(totalFiltrado)}`
-        : `${dbVendas.length} venda(s) · Total: ${formatarBRL(totalFiltrado)}`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbVendas.length}) · Total: ${formatarBRL(totalFiltrado)}`
+        : `Mostrando ${mostrando} de ${dbVendas.length} venda(s) · Total: ${formatarBRL(totalFiltrado)}`;
     }
     if(lista.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma venda encontrada com os filtros aplicados.</td></tr>';
       return;
     }
     const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' };
-    tbody.innerHTML = lista.map(v => {
+    const listaVisivel = lista.slice(0, _limiteVendas);
+    let htmlVendas = listaVisivel.map(v => {
       const pag = pagamentoLabel[v.pagamento] || v.pagamento;
       const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
       const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
@@ -10116,9 +10164,26 @@ https://sistema.glinformatica.com.br
         </tr>
       `;
     }).join('');
+    if (lista.length > _limiteVendas) {
+      const restantes = lista.length - _limiteVendas;
+      const proxLote = Math.min(50, restantes);
+      htmlVendas += `
+        <tr>
+          <td colspan="6" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteVendas += 50; renderVendas();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteVendas = ${lista.length}; renderVendas();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = htmlVendas;
     agendarSalvar();
   }
   function limparFiltrosVendas() {
+    _limiteVendas = 50;
     const m = document.getElementById('filtro-vd-mes');     if(m) m.value = '';
     const c = document.getElementById('filtro-vd-cliente'); if(c) c.value = '';
     const b = document.getElementById('filtro-vd-busca');   if(b) b.value = '';
@@ -18318,6 +18383,8 @@ ${conteudo}
       renderOrcamentos();
     } catch (err) { alert(err.message); }
   }
+  let _limiteOrcamentos = 50;
+
   function renderOrcamentos() {
     const filtro = (document.getElementById('filtro-orc')?.value || '').toLowerCase();
     const tbody = document.getElementById('tbody-orcamentos');
@@ -18330,7 +18397,8 @@ ${conteudo}
       return;
     }
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    tbody.innerHTML = lista.map(o => {
+    const listaVisivel = lista.slice(0, _limiteOrcamentos);
+    let htmlOrc = listaVisivel.map(o => {
       // Pega só YYYY-MM-DD do campo data_validade (pode vir como Date ISO ou string)
       const dataIso = o.data_validade ? String(o.data_validade).slice(0, 10) : null;
       const venc = dataIso ? new Date(dataIso + 'T00:00:00') : null;
@@ -18435,6 +18503,22 @@ ${conteudo}
         </tr>
       `;
     }).join('');
+    if (lista.length > _limiteOrcamentos) {
+      const restantes = lista.length - _limiteOrcamentos;
+      const proxLote = Math.min(50, restantes);
+      htmlOrc += `
+        <tr>
+          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteOrcamentos += 50; renderOrcamentos();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteOrcamentos = ${lista.length}; renderOrcamentos();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = htmlOrc;
   }
 
   async function openNovoOrcamento() {
@@ -21077,6 +21161,8 @@ ${conteudo}
   // ====== GERENCIAMENTO DE FORNECEDORES ======
   let _fornecedorEditandoId = null;
 
+  let _limiteFornecedores = 50;
+
   function renderFornecedores() {
     const tbody = document.getElementById('tbody-fornecedores');
     if(!tbody) return;
@@ -21098,9 +21184,11 @@ ${conteudo}
     }
     const contador = document.getElementById('contador-fornecedores');
     if(contador) {
+      const total = (dbFornecedores||[]).length;
+      const mostrando = Math.min(_limiteFornecedores, lista.length);
       contador.textContent = termo
-        ? `${lista.length} de ${(dbFornecedores||[]).length} fornecedor(es)`
-        : `${(dbFornecedores||[]).length} fornecedor(es)`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${total})`
+        : `Mostrando ${mostrando} de ${total} fornecedor(es)`;
     }
     if(!dbFornecedores || dbFornecedores.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum fornecedor cadastrado.</td></tr>';
@@ -21110,7 +21198,8 @@ ${conteudo}
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Nenhum fornecedor encontrado para "${termo}".</td></tr>`;
       return;
     }
-    tbody.innerHTML = lista.map(f => `
+    const listaVisivel = lista.slice(0, _limiteFornecedores);
+    let html = listaVisivel.map(f => `
       <tr>
         <td>${f.nome}</td>
         <td>${f.doc || '-'}</td>
@@ -21122,6 +21211,22 @@ ${conteudo}
         </td>
       </tr>
     `).join('');
+    if (lista.length > _limiteFornecedores) {
+      const restantes = lista.length - _limiteFornecedores;
+      const proxLote = Math.min(50, restantes);
+      html += `
+        <tr>
+          <td colspan="5" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteFornecedores += 50; renderFornecedores();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteFornecedores = ${lista.length}; renderFornecedores();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = html;
   }
 
   function openNovoFornecedor() {
