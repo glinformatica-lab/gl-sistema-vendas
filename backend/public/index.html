@@ -955,13 +955,14 @@
               <th style="padding:10px;text-align:center;width:80px;">Itens</th>
               <th style="padding:10px;text-align:right;width:120px;">Estimado</th>
               <th style="padding:10px;text-align:left;width:120px;">Criada em</th>
+              <th style="padding:10px;text-align:left;width:110px;">Previsão</th>
               <th style="padding:10px;text-align:left;width:120px;">Criada por</th>
               <th style="padding:10px;text-align:center;width:110px;">Status</th>
-              <th style="padding:10px;text-align:center;width:190px;">Ações</th>
+              <th style="padding:10px;text-align:center;width:220px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbody-ordens-compra">
-            <tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+            <tr><td colspan="9" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -15913,7 +15914,7 @@ ${conteudo}
       const msg = _ocFiltro === 'rascunho'
         ? '📭 Nenhum rascunho. Crie uma <strong style="color:#7c3aed;">Cotação</strong> primeiro — as ordens são geradas ao fechar uma cotação.'
         : `Nenhuma ordem "${_ocFiltro}" encontrada.`;
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8;">${msg}</td></tr>`;
       return;
     }
 
@@ -15925,8 +15926,11 @@ ${conteudo}
     };
 
     tbody.innerHTML = filtrados.map(o => {
-      const fornecedor = o.fornecedor_nome || o.fornecedor_nome_atual || '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
       let acoes = `<button onclick="visualizarOrdemCompra(${o.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Ver detalhes">👁️</button>`;
+
+      if (['rascunho', 'enviada'].includes(o.status)) {
+        acoes += `<button onclick="editarPrevisaoOc(${o.id})" style="background:#fef3c7;color:#92400e;border:1px solid #fbbf24;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Editar previsão de entrega">📅</button>`;
+      }
 
       if (o.status === 'rascunho') {
         acoes += `<button onclick="marcarOcEnviada(${o.id})" style="background:#16a34a;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;margin-right:4px;" title="Marcar como enviada">📤 Enviei</button>`;
@@ -15940,6 +15944,22 @@ ${conteudo}
         ? escapeHtml(nomeForn)
         : '<em style="color:#94a3b8;">— Sem fornecedor —</em>';
 
+      // Coluna Previsão
+      let previsaoHtml = '<em style="color:#94a3b8;font-size:11px;">—</em>';
+      if (o.previsao_entrega) {
+        const dtPrev = new Date(String(o.previsao_entrega).slice(0, 10) + 'T00:00:00');
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const diasDiff = Math.round((dtPrev - hoje) / (1000 * 60 * 60 * 24));
+        let cor = '#334155';
+        let extra = '';
+        if (o.status === 'rascunho' || o.status === 'enviada') {
+          if (diasDiff < 0) { cor = '#dc2626'; extra = ` <span style="font-size:9px;">(${Math.abs(diasDiff)}d atrasada)</span>`; }
+          else if (diasDiff <= 3) { cor = '#f59e0b'; extra = ` <span style="font-size:9px;">(em ${diasDiff}d)</span>`; }
+        }
+        previsaoHtml = `<span style="color:${cor};font-size:12px;font-weight:600;">${dtPrev.toLocaleDateString('pt-BR')}${extra}</span>`;
+      }
+
       return `
         <tr style="border-top:1px solid #f1f5f9;">
           <td style="padding:10px;"><strong>#${String(o.numero).padStart(3, '0')}</strong></td>
@@ -15947,6 +15967,7 @@ ${conteudo}
           <td style="padding:10px;text-align:center;"><span style="background:#f3f4f6;color:#475569;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${o.total_itens || 0}</span></td>
           <td style="padding:10px;text-align:right;font-weight:700;color:#0891b2;">${formatarBRL(o.valor_estimado)}</td>
           <td style="padding:10px;font-size:12px;color:#64748b;">${o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : '—'}</td>
+          <td style="padding:10px;">${previsaoHtml}</td>
           <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(o.criado_por_nome || '—')}</td>
           <td style="padding:10px;text-align:center;">${statusBadges[o.status] || o.status}</td>
           <td style="padding:10px;text-align:center;">${acoes}</td>
@@ -16093,6 +16114,48 @@ ${conteudo}
   }
 
   // ===== AÇÕES DA ORDEM =====
+  async function editarPrevisaoOc(id) {
+    const ordem = _ordensCompraCache.find(o => o.id === id);
+    if (!ordem) return;
+
+    const atualStr = ordem.previsao_entrega
+      ? String(ordem.previsao_entrega).slice(0, 10)
+      : '';
+    const atualBR = atualStr
+      ? new Date(atualStr + 'T00:00:00').toLocaleDateString('pt-BR')
+      : 'não definida';
+
+    const nova = prompt(
+      `📅 Previsão de entrega da Ordem #${String(ordem.numero).padStart(3, '0')}\n\n` +
+      `Fornecedor: ${ordem.fornecedor_nome || ordem.fornecedor_nome_atual || '—'}\n` +
+      `Previsão atual: ${atualBR}\n\n` +
+      `Digite a nova data (formato: AAAA-MM-DD)\n` +
+      `Ou deixe VAZIO e OK pra remover a previsão`,
+      atualStr
+    );
+
+    if (nova === null) return; // cancelou
+
+    const dataFinal = nova.trim();
+    if (dataFinal && !/^\d{4}-\d{2}-\d{2}$/.test(dataFinal)) {
+      alert('❌ Data inválida. Use o formato AAAA-MM-DD (ex: 2026-09-15)');
+      return;
+    }
+
+    try {
+      await api('PUT', `/api/ordens-compra/${id}/previsao`, {
+        previsaoEntrega: dataFinal || null
+      });
+      await carregarOrdensCompra();
+      const msg = dataFinal
+        ? `✅ Previsão atualizada: ${new Date(dataFinal + 'T00:00:00').toLocaleDateString('pt-BR')}`
+        : '✅ Previsão removida.';
+      mostrarToastAutosave(msg);
+    } catch (e) {
+      alert('❌ Erro: ' + e.message);
+    }
+  }
+
   async function marcarOcEnviada(id) {
     if (!confirm('Marcar esta Ordem de Compra como ENVIADA?\n\n📤 Os itens vinculados na Lista de Compras vão automaticamente pra status "pedido".')) return;
     try {

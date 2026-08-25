@@ -376,4 +376,28 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PUT /:id/previsao — Atualiza previsão de entrega
+router.put('/:id/previsao', async (req, res) => {
+  const { previsaoEntrega } = req.body || {};
+  // Aceita string YYYY-MM-DD ou null (pra remover)
+  if (previsaoEntrega !== null && previsaoEntrega !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(previsaoEntrega || '')) {
+    return res.status(400).json({ error: 'Data inválida. Use formato YYYY-MM-DD.' });
+  }
+  try {
+    const r = await db.query(
+      `UPDATE ordens_compra SET previsao_entrega=$1
+       WHERE id=$2 AND empresa_id=$3 AND status IN ('rascunho', 'enviada')
+       RETURNING id, previsao_entrega`,
+      [previsaoEntrega || null, req.params.id, req.user.empresaId]
+    );
+    if (r.rows.length === 0) {
+      return res.status(400).json({ error: 'Ordem não encontrada ou já concluída/cancelada.' });
+    }
+    res.json({ ok: true, previsao_entrega: r.rows[0].previsao_entrega });
+  } catch (err) {
+    console.error('[ordens-compra] PUT previsao', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
 module.exports = router;

@@ -540,17 +540,25 @@ router.post('/:id/fechar', async (req, res) => {
       );
       const numeroOc = rNumOc.rows[0].proximo;
 
+      // Calcula previsão de entrega: HOJE + prazo_entrega_dias do fornecedor (se informado)
+      let previsaoEntrega = null;
+      if (forn.prazo_entrega_dias && forn.prazo_entrega_dias > 0) {
+        const dt = new Date();
+        dt.setDate(dt.getDate() + Number(forn.prazo_entrega_dias));
+        previsaoEntrega = dt.toISOString().slice(0, 10); // YYYY-MM-DD
+      }
+
       // Cria ordem
       const rOc = await client.query(
         `INSERT INTO ordens_compra
            (empresa_id, numero, fornecedor_id, fornecedor_nome, status,
-            criado_por, criado_por_nome, observacao, cotacao_id, valor_estimado)
-         VALUES ($1, $2, $3, $4, 'rascunho', $5, $6, $7, $8, 0)
+            criado_por, criado_por_nome, observacao, cotacao_id, valor_estimado, previsao_entrega)
+         VALUES ($1, $2, $3, $4, 'rascunho', $5, $6, $7, $8, 0, $9)
          RETURNING *`,
         [req.user.empresaId, numeroOc, forn.fornecedor_id, forn.fornecedor_nome,
          req.user.userId, nomeUsr,
          `Gerada da Cotação #${String(cotacao.numero).padStart(3, '0')}${forn.condicao_pagamento ? ' · Pgto: ' + forn.condicao_pagamento : ''}${forn.prazo_entrega_dias ? ' · Entrega em ' + forn.prazo_entrega_dias + ' dias' : ''}`,
-         req.params.id]
+         req.params.id, previsaoEntrega]
       );
       const ordem = rOc.rows[0];
 
