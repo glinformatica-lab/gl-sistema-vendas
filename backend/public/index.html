@@ -2886,6 +2886,31 @@
     </div>
   </div>
 
+  <!-- Modal: Editar Previsão de Entrega -->
+  <div id="modal-previsao-oc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+    <div style="background:#fff;padding:22px 26px;border-radius:14px;max-width:420px;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <h2 id="pv-titulo" style="color:#92400e;margin:0;font-size:19px;">📅 Previsão de Entrega</h2>
+          <div style="font-size:12px;color:#64748b;margin-top:3px;">Fornecedor: <span id="pv-fornecedor" style="font-weight:600;color:#334155;">—</span></div>
+        </div>
+        <button onclick="fecharModalPrevisao()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <label style="display:block;margin-top:12px;font-size:12px;font-weight:600;color:#334155;">Data prevista de entrega</label>
+      <input type="date" id="pv-input-data"
+             style="width:100%;padding:10px;border:2px solid #fbbf24;border-radius:6px;font-size:15px;font-weight:700;">
+
+      <div id="pv-erro" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:8px;border-radius:6px;margin-top:10px;font-size:12px;"></div>
+
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button type="button" onclick="salvarPrevisaoOc(true)" style="flex:1;padding:10px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">🗑️ Remover previsão</button>
+        <button type="button" onclick="fecharModalPrevisao()" style="flex:1;padding:10px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button type="button" onclick="salvarPrevisaoOc(false)" style="flex:2;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Nova Ordem de Compra -->
   <div id="modal-nova-oc" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
     <div style="background:#fff;padding:26px;border-radius:14px;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;">
@@ -16114,45 +16139,65 @@ ${conteudo}
   }
 
   // ===== AÇÕES DA ORDEM =====
-  async function editarPrevisaoOc(id) {
+  let _ocPrevisaoEditandoId = null;
+
+  function editarPrevisaoOc(id) {
     const ordem = _ordensCompraCache.find(o => o.id === id);
     if (!ordem) return;
 
+    _ocPrevisaoEditandoId = id;
     const atualStr = ordem.previsao_entrega
       ? String(ordem.previsao_entrega).slice(0, 10)
       : '';
-    const atualBR = atualStr
-      ? new Date(atualStr + 'T00:00:00').toLocaleDateString('pt-BR')
-      : 'não definida';
 
-    const nova = prompt(
-      `📅 Previsão de entrega da Ordem #${String(ordem.numero).padStart(3, '0')}\n\n` +
-      `Fornecedor: ${ordem.fornecedor_nome || ordem.fornecedor_nome_atual || '—'}\n` +
-      `Previsão atual: ${atualBR}\n\n` +
-      `Digite a nova data (formato: AAAA-MM-DD)\n` +
-      `Ou deixe VAZIO e OK pra remover a previsão`,
-      atualStr
-    );
+    document.getElementById('pv-titulo').textContent =
+      `📅 Previsão da Ordem #${String(ordem.numero).padStart(3, '0')}`;
+    document.getElementById('pv-fornecedor').textContent =
+      ordem.fornecedor_nome || ordem.fornecedor_nome_atual || '—';
+    document.getElementById('pv-input-data').value = atualStr;
+    document.getElementById('pv-erro').style.display = 'none';
+    document.getElementById('modal-previsao-oc').style.display = 'flex';
+    setTimeout(() => document.getElementById('pv-input-data').focus(), 100);
+  }
 
-    if (nova === null) return; // cancelou
+  function fecharModalPrevisao() {
+    document.getElementById('modal-previsao-oc').style.display = 'none';
+    _ocPrevisaoEditandoId = null;
+  }
 
-    const dataFinal = nova.trim();
-    if (dataFinal && !/^\d{4}-\d{2}-\d{2}$/.test(dataFinal)) {
-      alert('❌ Data inválida. Use o formato AAAA-MM-DD (ex: 2026-09-15)');
-      return;
+  async function salvarPrevisaoOc(remover) {
+    if (!_ocPrevisaoEditandoId) return;
+    const erro = document.getElementById('pv-erro');
+    erro.style.display = 'none';
+
+    let dataFinal = null;
+    if (!remover) {
+      dataFinal = document.getElementById('pv-input-data').value;
+      if (!dataFinal) {
+        erro.textContent = 'Escolha uma data ou clique em "Remover previsão".';
+        erro.style.display = 'block';
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataFinal)) {
+        erro.textContent = 'Data inválida.';
+        erro.style.display = 'block';
+        return;
+      }
     }
 
     try {
-      await api('PUT', `/api/ordens-compra/${id}/previsao`, {
-        previsaoEntrega: dataFinal || null
+      await api('PUT', `/api/ordens-compra/${_ocPrevisaoEditandoId}/previsao`, {
+        previsaoEntrega: dataFinal
       });
+      fecharModalPrevisao();
       await carregarOrdensCompra();
       const msg = dataFinal
         ? `✅ Previsão atualizada: ${new Date(dataFinal + 'T00:00:00').toLocaleDateString('pt-BR')}`
         : '✅ Previsão removida.';
-      mostrarToastAutosave(msg);
+      if (typeof mostrarToastAutosave === 'function') mostrarToastAutosave(msg);
     } catch (e) {
-      alert('❌ Erro: ' + e.message);
+      erro.textContent = e.message || 'Erro ao salvar.';
+      erro.style.display = 'block';
     }
   }
 

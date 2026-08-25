@@ -378,17 +378,26 @@ router.delete('/:id', async (req, res) => {
 
 // PUT /:id/previsao — Atualiza previsão de entrega
 router.put('/:id/previsao', async (req, res) => {
-  const { previsaoEntrega } = req.body || {};
-  // Aceita string YYYY-MM-DD ou null (pra remover)
-  if (previsaoEntrega !== null && previsaoEntrega !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(previsaoEntrega || '')) {
-    return res.status(400).json({ error: 'Data inválida. Use formato YYYY-MM-DD.' });
+  let { previsaoEntrega } = req.body || {};
+
+  // Normaliza: null, string vazia ou undefined = remover
+  if (!previsaoEntrega || String(previsaoEntrega).trim() === '') {
+    previsaoEntrega = null;
+  } else {
+    // Aceita 'YYYY-MM-DD' direto OU ISO ('YYYY-MM-DDTHH:mm:ss...')
+    const s = String(previsaoEntrega).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return res.status(400).json({ error: 'Data inválida. Use formato YYYY-MM-DD.' });
+    }
+    previsaoEntrega = s;
   }
+
   try {
     const r = await db.query(
       `UPDATE ordens_compra SET previsao_entrega=$1
        WHERE id=$2 AND empresa_id=$3 AND status IN ('rascunho', 'enviada')
        RETURNING id, previsao_entrega`,
-      [previsaoEntrega || null, req.params.id, req.user.empresaId]
+      [previsaoEntrega, req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) {
       return res.status(400).json({ error: 'Ordem não encontrada ou já concluída/cancelada.' });
