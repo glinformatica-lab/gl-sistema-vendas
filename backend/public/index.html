@@ -1108,6 +1108,14 @@
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
         <button class="btn feature-ambientes" style="background:#7c3aed;display:none;" onclick="abrirEtiquetas()">🏷️ Etiquetas</button>
+        <select id="filtro-produtos" onchange="_limiteProdutos = 50; renderProdutos();"
+                style="padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;background:#fff;cursor:pointer;">
+          <option value="todos">📋 Todos os produtos</option>
+          <option value="com-estoque">📦 Com estoque</option>
+          <option value="sem-estoque">🚫 Sem estoque</option>
+          <option value="com-foto">📷 Com foto</option>
+          <option value="sem-foto">🖼️ Sem foto</option>
+        </select>
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria, fornecedor, referência ou código de barras"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="_limiteProdutos = 50; renderProdutos();">
@@ -8204,9 +8212,38 @@ https://sistema.glinformatica.com.br
     if(!tbody) return;
     const inputBusca = document.getElementById('busca-produtos');
     const termo = inputBusca ? inputBusca.value.trim().toLowerCase() : '';
+
+    // Atualiza os LABELS do dropdown com contadores em tempo real
+    const selFiltro = document.getElementById('filtro-produtos');
+    if (selFiltro) {
+      const total = dbProdutos.length;
+      const comEst = dbProdutos.filter(p => Number(p.estoque || 0) > 0).length;
+      const semEst = total - comEst;
+      const comFoto = dbProdutos.filter(p => p.fotoUrl).length;
+      const semFoto = total - comFoto;
+      const valorAtual = selFiltro.value;
+      const optsHtml = [
+        { v: 'todos',        label: `📋 Todos os produtos (${total})` },
+        { v: 'com-estoque',  label: `📦 Com estoque (${comEst})` },
+        { v: 'sem-estoque',  label: `🚫 Sem estoque (${semEst})` },
+        { v: 'com-foto',     label: `📷 Com foto (${comFoto})` },
+        { v: 'sem-foto',     label: `🖼️ Sem foto (${semFoto})` }
+      ].map(o => `<option value="${o.v}"${o.v === valorAtual ? ' selected' : ''}>${o.label}</option>`).join('');
+      selFiltro.innerHTML = optsHtml;
+    }
+    const filtroTipo = selFiltro ? selFiltro.value : 'todos';
+
     let lista = dbProdutos;
+
+    // Aplica filtro de tipo (estoque/foto)
+    if (filtroTipo === 'com-estoque')      lista = lista.filter(p => Number(p.estoque || 0) > 0);
+    else if (filtroTipo === 'sem-estoque') lista = lista.filter(p => Number(p.estoque || 0) === 0);
+    else if (filtroTipo === 'com-foto')    lista = lista.filter(p => !!p.fotoUrl);
+    else if (filtroTipo === 'sem-foto')    lista = lista.filter(p => !p.fotoUrl);
+
+    // Aplica busca por texto
     if (termo) {
-      lista = dbProdutos.filter(p => (
+      lista = lista.filter(p => (
         (p.codigo && String(p.codigo).toLowerCase().includes(termo)) ||
         (p.nome && p.nome.toLowerCase().includes(termo)) ||
         (p.categoria && p.categoria.toLowerCase().includes(termo)) ||
@@ -8219,7 +8256,8 @@ https://sistema.glinformatica.com.br
     const contador = document.getElementById('contador-produtos');
     if(contador) {
       const mostrando = Math.min(_limiteProdutos, lista.length);
-      contador.textContent = termo
+      const filtroAtivo = termo || (filtroTipo && filtroTipo !== 'todos');
+      contador.textContent = filtroAtivo
         ? `Mostrando ${mostrando} de ${lista.length} (total ${dbProdutos.length})`
         : `Mostrando ${mostrando} de ${dbProdutos.length} produto(s)`;
     }
@@ -8229,7 +8267,8 @@ https://sistema.glinformatica.com.br
       return;
     }
     if(lista.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto encontrado para "${termo}".</td></tr>`;
+      const msgFiltro = filtroTipo && filtroTipo !== 'todos' ? ' com esse filtro' : '';
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#889;padding:20px;">Nenhum produto encontrado${termo ? ` para "${termo}"` : ''}${msgFiltro}.</td></tr>`;
       return;
     }
     // Só os primeiros _limiteProdutos
