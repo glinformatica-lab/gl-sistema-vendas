@@ -550,12 +550,12 @@
       <span class="grupo-seta" id="seta-cadastros">▼</span>
     </button>
     <div class="submenu" id="submenu-cadastros" style="display:none;">
-      <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
-      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('servicos')">&#128295; Serviços</button>
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('clientes')">&#128100; Clientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('marcas')" style="display:none;">&#127991;&#65039; Marcas</button>
+      <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
+      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('servicos')">&#128295; Serviços</button>
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('transportadoras')" style="display:none;">&#128666; Transportadoras</button>
     </div>
 
@@ -565,9 +565,9 @@
       <span class="grupo-seta" id="seta-vendas">▼</span>
     </button>
     <div class="submenu" id="submenu-vendas" style="display:none;">
-      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
-      <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('aprovacoes-financeiras')" style="display:none;">&#128176; Aprovações Financeiras <span id="badge-aprovacoes-fin" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
+      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
     </div>
 
     <!-- Estoque (Módulo Iluminação) -->
@@ -576,11 +576,11 @@
       <span class="grupo-seta" id="seta-estoque">▼</span>
     </button>
     <div class="submenu feature-ambientes" id="submenu-estoque" style="display:none;">
-      <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('cotacoes')">&#128172; Cotações <span id="badge-cotacoes" style="display:none;background:#7c3aed;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('entrada-mercadorias')">&#128229; Entrada de Mercadorias</button>
       <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
-      <button class="menu-btn submenu-item" onclick="showPage('cotacoes')">&#128172; Cotações <span id="badge-cotacoes" style="display:none;background:#7c3aed;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('ordens-compra')">&#128203; Ordens de Compra <span id="badge-ordens-compra" style="display:none;background:#0891b2;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
+      <button class="menu-btn submenu-item" onclick="showPage('separacao')">&#128230; Separação <span id="badge-separacao" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
 
     <!-- Vendas Online (admin-only) -->
@@ -600,9 +600,9 @@
     </button>
     <div class="submenu estoque-hide" id="submenu-financeiro" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('caixa')">&#128181; Caixa Diário</button>
-      <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128202; Resumo Financeiro</button>
       <button class="menu-btn submenu-item admin-only" onclick="showPage('contas-pagar')">&#128184; Contas a Pagar</button>
       <button class="menu-btn submenu-item admin-only" onclick="showPage('contas-receber')">&#128176; Contas a Receber</button>
+      <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128202; Resumo Financeiro</button>
     </div>
 
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
@@ -613,10 +613,10 @@
       <span class="grupo-seta" id="seta-config">▼</span>
     </button>
     <div class="submenu admin-only" id="submenu-config" style="display:none;">
-      <button class="menu-btn submenu-item" onclick="showPage('configuracoes')">&#9881;&#65039; Geral</button>
-      <button class="menu-btn submenu-item" onclick="showPage('usuarios')">&#128101; Usuários</button>
       <button class="menu-btn submenu-item fiscal-only" id="menu-btn-fiscal" onclick="showPage('configuracoes-fiscais')" style="display:none;">&#129534; Config. Fiscais</button>
+      <button class="menu-btn submenu-item" onclick="showPage('configuracoes')">&#9881;&#65039; Geral</button>
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('migracao')" style="display:none;">&#128260; Migração de Sistema</button>
+      <button class="menu-btn submenu-item" onclick="showPage('usuarios')">&#128101; Usuários</button>
     </div>
 
     <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
@@ -770,13 +770,10 @@
       <div class="page-title">Clientes</div>
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoCliente()">&#43; Novo Cliente</button>
-        <button class="btn" style="background:#16a34a;" onclick="abrirImportarClientes()">&#128229; Importar Planilha</button>
-        <button class="btn" style="background:#eceef2;color:var(--azul);" onclick="baixarModeloClientes()" title="Baixar modelo XLSX vazio com os cabeçalhos certos">&#128196; Baixar Modelo</button>
         <input type="text" id="busca-clientes" placeholder="🔍 Buscar por nome, CPF/CNPJ, telefone ou cidade"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="renderClientes()">
         <span id="contador-clientes" style="color:#668;font-size:13px;"></span>
-        <input type="file" id="input-importar-clientes" accept=".xlsx,.xls,.csv" style="display:none;" onchange="processarArquivoClientes(this.files[0])">
       </div>
       <table>
         <thead>
@@ -1110,7 +1107,6 @@
       <div class="page-title">Produtos</div>
       <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <button class="btn" onclick="openNovoProdutoRapido('produto')">+ Novo Produto</button>
-        <button class="btn" style="background:#16a34a;" onclick="openImportarProdutos()">📥 Importar Planilha</button>
         <button class="btn feature-ambientes" style="background:#7c3aed;display:none;" onclick="abrirEtiquetas()">🏷️ Etiquetas</button>
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria, fornecedor, referência ou código de barras"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
