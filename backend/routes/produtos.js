@@ -686,4 +686,119 @@ router.post('/migracao-fornecedores', async (req, res) => {
   }
 });
 
+// ==========================================
+// MIGRAÇÃO DE CLIENTES (Iluminação)
+// ==========================================
+// Body: { itens: [{ nome, doc, telefone, cep, endereco, bairro, cidade, uf }] }
+// - Detecta duplicata por doc (CPF/CNPJ) primeiro, depois por nome
+// - Suporta até 5000 clientes por lote
+router.post('/migracao-clientes', async (req, res) => {
+  const { itens } = req.body || {};
+
+  const empChk = await db.query('SELECT usa_ambientes FROM empresas WHERE id=$1', [req.user.empresaId]);
+  if (!empChk.rows[0]?.usa_ambientes) {
+    return res.status(403).json({ error: 'Migração disponível apenas com Módulo Iluminação ativo.' });
+  }
+
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ error: 'Nenhum cliente recebido.' });
+  }
+  if (itens.length > 5000) {
+    return res.status(400).json({ error: 'Máximo de 5000 clientes por lote.' });
+  }
+
+  const client = await db.pool.connect();
+  let criados = 0, atualizados = 0, ignorados = 0;
+  const erros = [];
+
+  try {
+    await client.query('BEGIN');
+
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      const linha = i + 2;
+      try {
+        const nome = String(it.nome || '').trim();
+        if (!nome) {
+          erros.push({ linha, motivo: 'Nome em branco' });
+          ignorados++;
+          continue;
+        }
+
+        const doc = it.doc ? String(it.doc).trim() : null;
+        const telefone = it.telefone ? String(it.telefone).trim() : null;
+        const cep = it.cep ? String(it.cep).trim() : null;
+        const endereco = it.endereco ? String(it.endereco).trim() : null;
+        const bairro = it.bairro ? String(it.bairro).trim() : null;
+        const cidade = it.cidade ? String(it.cidade).trim() : null;
+        const uf = it.uf ? String(it.uf).trim().toUpperCase().slice(0, 2) : null;
+
+        // Busca duplicata: primeiro por doc (mais preciso), depois por nome
+        let existente = null;
+        if (doc) {
+          const rExist = await client.query(
+            `SELECT id FROM clientes WHERE empresa_id=$1 AND doc=$2 LIMIT 1`,
+            [req.user.empresaId, doc]
+          );
+          existente = rExist.rows[0];
+        }
+        if (!existente) {
+          const rExist = await client.query(
+            `SELECT id FROM clientes WHERE empresa_id=$1 AND LOWER(nome)=LOWER($2) LIMIT 1`,
+            [req.user.empresaId, nome]
+          );
+          existente = rExist.rows[0];
+        }
+
+        if (existente) {
+          // UPDATE só dos campos que vieram preenchidos (não sobrescreve com null)
+          const sets = ['nome=$1'];
+          const vals = [nome];
+          let idx = 2;
+          if (doc) { sets.push(`doc=$${idx++}`); vals.push(doc); }
+          if (telefone) { sets.push(`telefone=$${idx++}`); vals.push(telefone); }
+          if (cep) { sets.push(`cep=$${idx++}`); vals.push(cep); }
+          if (endereco) { sets.push(`endereco=$${idx++}`); vals.push(endereco); }
+          if (bairro) { sets.push(`bairro=$${idx++}`); vals.push(bairro); }
+          if (cidade) { sets.push(`cidade=$${idx++}`); vals.push(cidade); }
+          if (uf) { sets.push(`uf=$${idx++}`); vals.push(uf); }
+          vals.push(existente.id, req.user.empresaId);
+          await client.query(
+            `UPDATE clientes SET ${sets.join(', ')} WHERE id=$${idx++} AND empresa_id=$${idx++}`,
+            vals
+          );
+          atualizados++;
+        } else {
+          await client.query(
+            `INSERT INTO clientes (empresa_id, nome, doc, telefone, cep, endereco, bairro, cidade, uf)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [req.user.empresaId, nome, doc, telefone, cep, endereco, bairro, cidade, uf]
+          );
+          criados++;
+        }
+      } catch (e) {
+        console.error(`[migracao-clientes] Linha ${linha}:`, e.message);
+        erros.push({ linha, motivo: e.message || 'Erro desconhecido' });
+        ignorados++;
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      criados,
+      atualizados,
+      ignorados,
+      total: itens.length,
+      erros: erros.slice(0, 100)
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[produtos/migracao-clientes]', err);
+    res.status(500).json({ error: 'Erro geral: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
