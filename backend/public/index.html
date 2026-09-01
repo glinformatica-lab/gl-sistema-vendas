@@ -18174,20 +18174,27 @@ ${conteudo}
       return;
     }
     cont.innerHTML = _atServ.map((s, i) => `
-      <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:6px;align-items:center;">
-        <select onchange="atServicoChange(${i}, this)"
-                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
-          <option value="">Selecione serviço...</option>
-          ${_atServicos.filter(x => x.ativo).map(x => `
-            <option value="${x.id}" data-preco="${x.precoPadrao}" ${s.servicoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
-          `).join('')}
-        </select>
-        <input type="number" step="0.01" min="0" value="${s.preco}"
-               oninput="atServ_[${i}] = {...atServ_[${i}], preco: parseFloat(this.value)||0}; atRecalcular();"
-               placeholder="Preço"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
-        <button type="button" onclick="atRemoverServico(${i})"
-                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+      <div style="background:#fff;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;gap:6px;align-items:flex-start;">
+          <div style="flex:2;">
+            <label style="font-size:10px;color:#166534;font-weight:700;text-transform:uppercase;">Serviço prestado</label>
+            <select onchange="atServicoChange(${i}, this)"
+                    style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:#fff;margin-top:2px;">
+              <option value="">Selecione serviço...</option>
+              ${_atServicos.filter(x => x.ativo).map(x => `
+                <option value="${x.id}" ${s.servicoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Valor cobrado (R$)</label>
+            <input type="number" step="0.01" min="0" value="${s.preco}"
+                   oninput="atServ_[${i}] = {...atServ_[${i}], preco: parseFloat(this.value)||0}; atRecalcular();"
+                   style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:right;margin-top:2px;font-weight:700;">
+          </div>
+          <button type="button" onclick="atRemoverServico(${i})" title="Remover"
+                  style="margin-top:14px;padding:8px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;">✕</button>
+        </div>
       </div>
     `).join('');
     // Hack: expor _atServ como window.atServ_ pra os oninput
@@ -18229,28 +18236,50 @@ ${conteudo}
       cont.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Cliente comprou algum produto? Clique "+ Produto".</div>';
       return;
     }
-    cont.innerHTML = _atProdV.map((p, i) => `
-      <div style="display:grid;grid-template-columns:2fr 60px 80px 70px auto;gap:6px;margin-bottom:6px;align-items:center;">
-        <select onchange="atProdVChange(${i}, this)"
-                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
-          <option value="">Selecione produto...</option>
-          ${_atProdutos.slice(0, 500).map(x => `
-            <option value="${x.id}" data-preco="${x.precoVenda || x.preco || 0}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
-          `).join('')}
-        </select>
-        <input type="number" step="1" min="1" value="${p.qtd}" placeholder="Qtd"
-               oninput="atProdV_[${i}].qtd = parseFloat(this.value)||0; atRecalcular();"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:center;">
-        <input type="number" step="0.01" min="0" value="${p.precoUnit}" placeholder="Preço"
-               oninput="atProdV_[${i}].precoUnit = parseFloat(this.value)||0; atRecalcular();"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
-        <input type="number" step="0.01" min="0" max="100" value="${p.comissaoPct}" title="% comissão profissional"
-               oninput="atProdV_[${i}].comissaoPct = parseFloat(this.value)||0; atRecalcular();"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
-        <button type="button" onclick="atRemoverProdV(${i})"
-                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+    cont.innerHTML = _atProdV.map((p, i) => {
+      const subtotal = (Number(p.qtd) || 0) * (Number(p.precoUnit) || 0);
+      return `
+      <div style="background:#fff;border:1px solid #93c5fd;border-radius:6px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px;">
+          <div style="flex:1;">
+            <label style="font-size:10px;color:#1e40af;font-weight:700;text-transform:uppercase;">Produto vendido</label>
+            <select onchange="atProdVChange(${i}, this)"
+                    style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:#fff;margin-top:2px;">
+              <option value="">Selecione produto...</option>
+              ${_atProdutos.slice(0, 500).map(x => `
+                <option value="${x.id}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+              `).join('')}
+            </select>
+          </div>
+          <button type="button" onclick="atRemoverProdV(${i})" title="Remover"
+                  style="margin-top:14px;padding:8px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;">
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Quantidade</label>
+            <input type="number" step="1" min="1" value="${p.qtd}"
+                   oninput="atProdV_[${i}].qtd = parseFloat(this.value)||0; atRecalcular(); document.getElementById('at-pv-sub-${i}').textContent = atFmtBRL((parseFloat(this.value)||0) * atProdV_[${i}].precoUnit);"
+                   style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:center;margin-top:2px;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Preço unitário</label>
+            <input type="number" step="0.01" min="0" value="${p.precoUnit}"
+                   oninput="atProdV_[${i}].precoUnit = parseFloat(this.value)||0; atRecalcular(); document.getElementById('at-pv-sub-${i}').textContent = atFmtBRL(atProdV_[${i}].qtd * (parseFloat(this.value)||0));"
+                   style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:right;margin-top:2px;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">% Comissão prof</label>
+            <input type="number" step="0.01" min="0" max="100" value="${p.comissaoPct}" title="% que a profissional recebe deste produto"
+                   oninput="atProdV_[${i}].comissaoPct = parseFloat(this.value)||0; atRecalcular();"
+                   style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:right;margin-top:2px;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Subtotal</label>
+            <div id="at-pv-sub-${i}" style="width:100%;padding:8px;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;font-size:13px;text-align:right;font-weight:700;color:#166534;margin-top:2px;">${atFmtBRL(subtotal)}</div>
+          </div>
+        </div>
       </div>
-    `).join('');
+    `;}).join('');
     window.atProdV_ = _atProdV;
   }
 
@@ -18286,27 +18315,43 @@ ${conteudo}
       return;
     }
     cont.innerHTML = _atProdU.map((p, i) => `
-      <div style="display:grid;grid-template-columns:2fr 80px 80px 130px auto;gap:6px;margin-bottom:6px;align-items:center;">
-        <select onchange="atProdUChange(${i}, this)"
-                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
-          <option value="">Selecione produto...</option>
-          ${_atProdutos.slice(0, 500).map(x => `
-            <option value="${x.id}" data-custo="${x.precoCusto || 0}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
-          `).join('')}
-        </select>
-        <input type="number" step="0.01" min="0" value="${p.qtd}" placeholder="Qtd"
-               oninput="atProdU_[${i}].qtd = parseFloat(this.value)||0;"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:center;">
-        <input type="number" step="0.01" min="0" value="${p.custoUnit}" placeholder="Custo un"
-               oninput="atProdU_[${i}].custoUnit = parseFloat(this.value)||0;"
-               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
-        <label style="font-size:11px;color:#334155;display:flex;align-items:center;gap:4px;cursor:pointer;">
-          <input type="checkbox" ${p.baixarEstoque ? 'checked' : ''}
-                 onchange="atProdU_[${i}].baixarEstoque = this.checked;">
-          baixar estoque
-        </label>
-        <button type="button" onclick="atRemoverProdU(${i})"
-                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+      <div style="background:#fff;border:1px solid #fbbf24;border-radius:6px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px;">
+          <div style="flex:1;">
+            <label style="font-size:10px;color:#92400e;font-weight:700;text-transform:uppercase;">Produto usado no atendimento</label>
+            <select onchange="atProdUChange(${i}, this)"
+                    style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:#fff;margin-top:2px;">
+              <option value="">Selecione produto...</option>
+              ${_atProdutos.slice(0, 500).map(x => `
+                <option value="${x.id}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+              `).join('')}
+            </select>
+          </div>
+          <button type="button" onclick="atRemoverProdU(${i})" title="Remover"
+                  style="margin-top:14px;padding:8px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end;">
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Quantidade</label>
+            <input type="number" step="0.01" min="0" value="${p.qtd}"
+                   oninput="atProdU_[${i}].qtd = parseFloat(this.value)||0;"
+                   style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:center;margin-top:2px;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#64748b;font-weight:600;">Custo unitário</label>
+            <input type="number" step="0.01" min="0" value="${p.custoUnit}"
+                   oninput="atProdU_[${i}].custoUnit = parseFloat(this.value)||0;"
+                   style="width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:right;margin-top:2px;">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#92400e;display:flex;align-items:center;gap:5px;cursor:pointer;padding:7px 8px;background:#fef3c7;border-radius:5px;font-weight:600;">
+              <input type="checkbox" ${p.baixarEstoque ? 'checked' : ''}
+                     onchange="atProdU_[${i}].baixarEstoque = this.checked;"
+                     style="width:16px;height:16px;">
+              Baixar do estoque
+            </label>
+          </div>
+        </div>
       </div>
     `).join('');
     window.atProdU_ = _atProdU;
@@ -18342,18 +18387,26 @@ ${conteudo}
     cont.innerHTML = _atPag.map((p, i) => {
       const taxa = _atTaxas[p.formaPagamento] || 0;
       return `
-        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;">
-          <select onchange="atPag_[${i}].formaPagamento = this.value; atRecalcular(); atRenderPagamentos();"
-                  style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
-            ${Object.keys(AT_FORMAS_LABEL).map(f => `
-              <option value="${f}" ${p.formaPagamento === f ? 'selected' : ''}>${AT_FORMAS_LABEL[f]} ${_atTaxas[f] > 0 ? '('+_atTaxas[f]+'%)' : ''}</option>
-            `).join('')}
-          </select>
-          <input type="number" step="0.01" min="0" value="${p.valor}" placeholder="Valor"
-                 oninput="atPag_[${i}].valor = parseFloat(this.value)||0; atRecalcular();"
-                 style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
-          <button type="button" onclick="atRemoverPag(${i})"
-                  style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+        <div style="background:#fff;border:1px solid #d8b4fe;border-radius:6px;padding:10px;margin-bottom:8px;">
+          <div style="display:flex;gap:6px;align-items:flex-start;">
+            <div style="flex:2;">
+              <label style="font-size:10px;color:#6b21a8;font-weight:700;text-transform:uppercase;">Forma de pagamento</label>
+              <select onchange="atPag_[${i}].formaPagamento = this.value; atRecalcular(); atRenderPagamentos();"
+                      style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;background:#fff;margin-top:2px;">
+                ${Object.keys(AT_FORMAS_LABEL).map(f => `
+                  <option value="${f}" ${p.formaPagamento === f ? 'selected' : ''}>${AT_FORMAS_LABEL[f]} ${_atTaxas[f] > 0 ? '('+_atTaxas[f]+'% de taxa)' : ''}</option>
+                `).join('')}
+              </select>
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:10px;color:#64748b;font-weight:600;">Valor recebido (R$)</label>
+              <input type="number" step="0.01" min="0" value="${p.valor}"
+                     oninput="atPag_[${i}].valor = parseFloat(this.value)||0; atRecalcular();"
+                     style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;text-align:right;margin-top:2px;font-weight:700;">
+            </div>
+            <button type="button" onclick="atRemoverPag(${i})" title="Remover"
+                    style="margin-top:14px;padding:8px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;">✕</button>
+          </div>
         </div>
       `;
     }).join('');
