@@ -628,6 +628,8 @@
     <div class="submenu feature-salao" id="submenu-salao" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('sl-agenda')">&#128197; Agenda</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-atendimentos')">&#128188; Atendimentos</button>
+      <button class="menu-btn submenu-item" onclick="showPage('sl-vales')">&#128181; Vales</button>
+      <button class="menu-btn submenu-item" onclick="showPage('sl-fechamento')">&#128202; Fechamento Mensal</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-profissionais')">&#128101; Profissionais</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-servicos')">&#9986;&#65039; Serviços</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-taxas')">&#128179; Taxas de Maquininha</button>
@@ -2812,6 +2814,163 @@
             <button type="submit"
                     style="padding:10px 22px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">
               ✅ Salvar Atendimento
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Vales -->
+    <div id="page-sl-vales" style="display:none;">
+      <div class="page-title">💵 Vales para Profissionais</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Registre aqui adiantamentos que você paga durante o mês. Serão descontados no fechamento mensal.
+      </div>
+
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button class="btn" onclick="vlAbrirNovo()" style="background:#f59e0b;color:#fff;font-weight:700;">+ Registrar Vale</button>
+        <select id="vl-filtro-prof" onchange="vlCarregar()"
+                style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+          <option value="">Todas profissionais</option>
+        </select>
+        <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;">
+          <input type="checkbox" id="vl-so-abertos" onchange="vlCarregar()"> só abertos (não fechados)
+        </label>
+        <span id="vl-total" style="margin-left:auto;font-size:14px;font-weight:700;color:#f59e0b;"></span>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-top:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Data</th>
+              <th style="padding:10px;text-align:left;">Profissional</th>
+              <th style="padding:10px;text-align:right;">Valor</th>
+              <th style="padding:10px;text-align:left;">Observação</th>
+              <th style="padding:10px;text-align:center;">Status</th>
+              <th style="padding:10px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-vales">
+            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Vale -->
+    <div id="modal-sl-vale" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:500px;width:100%;padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 id="vl-modal-titulo" style="color:#f59e0b;margin:0;font-size:20px;">💵 Novo Vale</h2>
+          <button onclick="vlFecharModal()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+        <form id="form-sl-vale" onsubmit="event.preventDefault(); vlSalvar();">
+          <input type="hidden" id="vl-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Profissional *</label>
+              <select id="vl-prof" required
+                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Data *</label>
+              <input type="date" id="vl-data" required
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Valor (R$) *</label>
+              <input type="number" id="vl-valor" required min="0.01" step="0.01"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;text-align:right;">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Observação</label>
+              <input type="text" id="vl-obs" placeholder="Ex: adiantamento pra pagar conta"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+            <button type="button" onclick="vlFecharModal()" style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit" style="padding:10px 18px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Fechamento Mensal -->
+    <div id="page-sl-fechamento" style="display:none;">
+      <div class="page-title">📊 Fechamento Mensal</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Visualize e feche o mês de cada profissional. Depois de fechado, o valor pode ser marcado como pago.
+      </div>
+
+      <!-- Alerta se está fim/início de mês -->
+      <div id="fech-alerta" style="display:none;background:#fef3c7;border:1px solid #fbbf24;color:#92400e;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;">
+      </div>
+
+      <!-- Seletor de mês/ano -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button onclick="fechNavegar(-1)" style="padding:8px 14px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">‹ Mês anterior</button>
+        <div style="font-size:18px;font-weight:700;color:#334155;min-width:200px;text-align:center;">
+          <span id="fech-mes-label">—</span>
+        </div>
+        <button onclick="fechNavegar(1)" style="padding:8px 14px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">Próximo mês ›</button>
+        <button onclick="fechIrMesAtual()" style="padding:8px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Mês atual</button>
+      </div>
+
+      <!-- Cards por profissional -->
+      <div id="fech-container">
+        <div style="text-align:center;padding:40px;color:#94a3b8;">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Modal Detalhe Fechamento -->
+    <div id="modal-sl-fechamento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10005;justify-content:center;align-items:flex-start;padding:16px;overflow-y:auto;">
+      <div id="modal-fech-conteudo" style="background:#fff;border-radius:14px;max-width:800px;width:100%;padding:22px;">
+        <!-- Preenchido dinamicamente -->
+      </div>
+    </div>
+
+    <!-- Modal Marcar Pago -->
+    <div id="modal-sl-marcar-pago" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10006;justify-content:center;align-items:flex-start;padding:20px;">
+      <div style="background:#fff;border-radius:14px;max-width:500px;width:100%;padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 style="color:#10b981;margin:0;font-size:20px;">✅ Marcar como Pago</h2>
+          <button onclick="document.getElementById('modal-sl-marcar-pago').style.display='none';" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+        <form id="form-marcar-pago" onsubmit="event.preventDefault(); mpConfirmar();">
+          <input type="hidden" id="mp-fechamento-id">
+          <div id="mp-info" style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#166534;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Data do pagamento *</label>
+              <input type="date" id="mp-data" required
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Forma de pagamento</label>
+              <select id="mp-forma"
+                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+                <option value="pix">💰 PIX</option>
+                <option value="dinheiro">💵 Dinheiro</option>
+                <option value="transferencia">🏦 Transferência</option>
+                <option value="outros">📋 Outros</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Observação</label>
+              <input type="text" id="mp-obs"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+            <button type="button" onclick="document.getElementById('modal-sl-marcar-pago').style.display='none';"
+                    style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit"
+                    style="padding:10px 18px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">
+              ✅ Confirmar Pagamento
             </button>
           </div>
         </form>
@@ -7863,7 +8022,9 @@ https://sistema.glinformatica.com.br
     'sl-servicos': 'salao',
     'sl-taxas': 'salao',
     'sl-agenda': 'salao',
-    'sl-atendimentos': 'salao'
+    'sl-atendimentos': 'salao',
+    'sl-vales': 'salao',
+    'sl-fechamento': 'salao'
   };
 
   // Abre/fecha um grupo de submenu manualmente
@@ -8145,7 +8306,7 @@ https://sistema.glinformatica.com.br
       }
       carregarNotasSaida();
     }
-    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas' || pg === 'sl-agenda' || pg === 'sl-atendimentos') {
+    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas' || pg === 'sl-agenda' || pg === 'sl-atendimentos' || pg === 'sl-vales' || pg === 'sl-fechamento') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.moduloSalao) {
         alert('Este recurso está disponível apenas para empresas com Módulo Salão.');
@@ -8157,6 +8318,8 @@ https://sistema.glinformatica.com.br
       if (pg === 'sl-taxas')         slCarregarTaxas();
       if (pg === 'sl-agenda')        agEntrar();
       if (pg === 'sl-atendimentos')  atEntrar();
+      if (pg === 'sl-vales')         vlEntrar();
+      if (pg === 'sl-fechamento')    fechEntrar();
     }
     if(pg === 'dashboard') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -18364,6 +18527,517 @@ ${conteudo}
       await api('POST', `/api/atendimentos/${id}/cancelar`, { motivo });
       await atCarregar();
       alert('✅ Atendimento cancelado. Estoque estornado.');
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  // ============================================
+  // MÓDULO SALÃO — VALES
+  // ============================================
+
+  let _vlLista = [];
+  let _vlProfissionais = [];
+
+  async function vlEntrar() {
+    // Carrega profissionais pra filtro e modal
+    if (_vlProfissionais.length === 0) {
+      try { _vlProfissionais = await api('GET', '/api/profissionais'); } catch (e) { _vlProfissionais = []; }
+    }
+    const sel = document.getElementById('vl-filtro-prof');
+    if (sel) {
+      const val = sel.value;
+      sel.innerHTML = '<option value="">Todas profissionais</option>' +
+        _vlProfissionais.filter(p => p.ativo).map(p => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+      sel.value = val;
+    }
+    await vlCarregar();
+  }
+
+  async function vlCarregar() {
+    const tbody = document.getElementById('tbody-vales');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+
+    const prof = document.getElementById('vl-filtro-prof')?.value || '';
+    const soAbertos = document.getElementById('vl-so-abertos')?.checked ? 'true' : 'false';
+    const params = new URLSearchParams({ somenteAbertos: soAbertos });
+    if (prof) params.append('profissionalId', prof);
+
+    try {
+      _vlLista = await api('GET', '/api/vales?' + params);
+      vlRenderizar();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function vlRenderizar() {
+    const tbody = document.getElementById('tbody-vales');
+    if (!tbody) return;
+    const total = _vlLista.reduce((s, v) => s + Number(v.valor || 0), 0);
+    document.getElementById('vl-total').textContent = `Total: R$ ${total.toFixed(2).replace('.', ',')}`;
+
+    if (_vlLista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum vale registrado no filtro.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = _vlLista.map(v => {
+      const trancado = v.fechamentoId != null;
+      const dataFmt = v.data ? v.data.split('-').reverse().join('/') : '';
+      return `
+        <tr style="${trancado ? 'opacity:0.75;' : ''}">
+          <td style="padding:10px;">${dataFmt}</td>
+          <td style="padding:10px;"><b>${escapeHtml(v.profissionalNome)}</b></td>
+          <td style="padding:10px;text-align:right;font-weight:700;color:#f59e0b;">R$ ${Number(v.valor).toFixed(2).replace('.', ',')}</td>
+          <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(v.observacao || '—')}</td>
+          <td style="padding:10px;text-align:center;">
+            ${trancado
+              ? '<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">🔒 FECHADO</span>'
+              : '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">ABERTO</span>'
+            }
+          </td>
+          <td style="padding:10px;text-align:center;">
+            ${trancado ? '<span style="color:#94a3b8;font-size:11px;">travado</span>' : `
+              <button class="btn-link" onclick="vlEditar(${v.id})">Editar</button>
+              | <button class="btn-link danger" onclick="vlApagar(${v.id})">Apagar</button>
+            `}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function vlAbrirNovo() {
+    if (_vlProfissionais.length === 0) { alert('Cadastre profissionais antes.'); showPage('sl-profissionais'); return; }
+    document.getElementById('vl-modal-titulo').textContent = '💵 Novo Vale';
+    document.getElementById('vl-id').value = '';
+    document.getElementById('form-sl-vale').reset();
+    document.getElementById('vl-data').value = new Date().toISOString().slice(0,10);
+
+    const sel = document.getElementById('vl-prof');
+    sel.innerHTML = '<option value="">Selecione...</option>' +
+      _vlProfissionais.filter(p => p.ativo).map(p => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+
+    document.getElementById('modal-sl-vale').style.display = 'flex';
+    setTimeout(() => document.getElementById('vl-prof').focus(), 100);
+  }
+
+  function vlEditar(id) {
+    const v = _vlLista.find(x => x.id === id);
+    if (!v) return;
+    if (v.fechamentoId) { alert('Vale já foi incluído no fechamento. Não pode ser editado.'); return; }
+    document.getElementById('vl-modal-titulo').textContent = '💵 Editar Vale';
+    document.getElementById('vl-id').value = v.id;
+    const sel = document.getElementById('vl-prof');
+    sel.innerHTML = '<option value="">Selecione...</option>' +
+      _vlProfissionais.filter(p => p.ativo).map(p => `<option value="${p.id}" ${p.id === v.profissionalId ? 'selected' : ''}>${escapeHtml(p.nome)}</option>`).join('');
+    sel.disabled = true; // não deixa trocar profissional na edição
+    document.getElementById('vl-data').value = v.data;
+    document.getElementById('vl-valor').value = v.valor;
+    document.getElementById('vl-obs').value = v.observacao || '';
+    document.getElementById('modal-sl-vale').style.display = 'flex';
+  }
+
+  function vlFecharModal() {
+    document.getElementById('modal-sl-vale').style.display = 'none';
+    document.getElementById('vl-prof').disabled = false;
+  }
+
+  async function vlSalvar() {
+    const id = document.getElementById('vl-id').value;
+    const dados = {
+      profissionalId: parseInt(document.getElementById('vl-prof').value) || null,
+      data: document.getElementById('vl-data').value,
+      valor: parseFloat(document.getElementById('vl-valor').value) || 0,
+      observacao: document.getElementById('vl-obs').value.trim()
+    };
+    if (!dados.profissionalId) { alert('Selecione a profissional.'); return; }
+    if (dados.valor <= 0) { alert('Valor deve ser maior que zero.'); return; }
+    try {
+      if (id) {
+        await api('PUT', `/api/vales/${id}`, { data: dados.data, valor: dados.valor, observacao: dados.observacao });
+      } else {
+        await api('POST', '/api/vales', dados);
+      }
+      vlFecharModal();
+      await vlCarregar();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  async function vlApagar(id) {
+    const v = _vlLista.find(x => x.id === id);
+    if (!v) return;
+    if (!confirm(`Apagar vale de R$ ${Number(v.valor).toFixed(2)} de ${v.profissionalNome}?`)) return;
+    try {
+      await api('DELETE', `/api/vales/${id}`);
+      await vlCarregar();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  // ============================================
+  // MÓDULO SALÃO — FECHAMENTO MENSAL
+  // ============================================
+
+  let _fechMes = new Date().getMonth() + 1;
+  let _fechAno = new Date().getFullYear();
+  let _fechResumo = null;
+
+  const FECH_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  async function fechEntrar() {
+    // Começa no mês passado (mais útil pra fechar), a não ser que já esteja logo no início do mês
+    const hoje = new Date();
+    if (hoje.getDate() <= 5) {
+      // Início do mês → sugere fechar o mês anterior
+      const ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+      _fechMes = ant.getMonth() + 1;
+      _fechAno = ant.getFullYear();
+    } else {
+      _fechMes = hoje.getMonth() + 1;
+      _fechAno = hoje.getFullYear();
+    }
+    await fechCarregar();
+    fechChecarAlerta();
+  }
+
+  function fechChecarAlerta() {
+    const alerta = document.getElementById('fech-alerta');
+    if (!alerta) return;
+    const hoje = new Date();
+    if (hoje.getDate() <= 7 && hoje.getMonth() + 1 !== _fechMes) {
+      // Passou do dia 1º e ainda tá vendo mês atual (não anterior)
+      alerta.style.display = 'block';
+      alerta.innerHTML = `⚠️ <b>Já é dia ${hoje.getDate()} — hora de fechar o mês anterior!</b> Verifique se as profissionais tiveram fechamento em ${FECH_MESES[hoje.getMonth() === 0 ? 11 : hoje.getMonth() - 1]}.`;
+    } else {
+      alerta.style.display = 'none';
+    }
+  }
+
+  async function fechCarregar() {
+    const cont = document.getElementById('fech-container');
+    if (!cont) return;
+    cont.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Carregando...</div>';
+    document.getElementById('fech-mes-label').textContent = `${FECH_MESES[_fechMes - 1]} de ${_fechAno}`;
+
+    try {
+      _fechResumo = await api('GET', `/api/fechamentos/resumo/${_fechMes}/${_fechAno}`);
+      fechRenderizar();
+    } catch (err) {
+      cont.innerHTML = `<div style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function fechRenderizar() {
+    const cont = document.getElementById('fech-container');
+    if (!cont) return;
+    const lista = _fechResumo?.profissionais || [];
+    if (lista.length === 0) {
+      cont.innerHTML = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:40px;text-align:center;color:#94a3b8;">Nenhuma profissional teve movimento neste mês.</div>';
+      return;
+    }
+    cont.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">' +
+      lista.map(p => {
+        const fech = p.fechamento;
+        let statusBadge, botoes;
+        if (!fech) {
+          statusBadge = '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;">🟡 EM ABERTO</span>';
+          botoes = `
+            <button onclick="fechVerDetalhe(${p.profissionalId})" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Ver detalhes</button>
+            <button onclick="fechConfirmarFechar(${p.profissionalId}, '${escapeHtml(p.profissionalNome)}')" style="flex:1;padding:9px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">🔒 Fechar mês</button>
+          `;
+        } else if (fech.status === 'fechado') {
+          statusBadge = '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;">🔒 FECHADO</span>';
+          botoes = `
+            <button onclick="fechVerFechamento(${fech.id})" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Ver detalhes</button>
+            <button onclick="mpAbrir(${fech.id}, '${escapeHtml(p.profissionalNome)}', ${p.valorLiquido})" style="flex:1;padding:9px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">💰 Marcar Pago</button>
+          `;
+        } else {
+          statusBadge = '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;">✅ PAGO</span>';
+          botoes = `
+            <button onclick="fechVerFechamento(${fech.id})" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Ver comprovante</button>
+          `;
+        }
+
+        return `
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div style="font-size:15px;font-weight:700;color:#334155;">${escapeHtml(p.profissionalNome)}</div>
+              ${statusBadge}
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:10px;">${p.qtdAtendimentos} atendimento(s) no mês</div>
+            <div style="background:#f8fafc;border-radius:8px;padding:10px;font-size:12px;">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                <span>Serviços:</span><span style="font-weight:600;">R$ ${p.totalServicos.toFixed(2).replace('.', ',')}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;color:#166534;">
+                <span>+ Comissão produtos:</span><span style="font-weight:600;">R$ ${p.totalComissaoProdutos.toFixed(2).replace('.', ',')}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;color:#b91c1c;">
+                <span>− Taxa espaço (10%):</span><span style="font-weight:600;">R$ ${p.totalTaxaEspaco.toFixed(2).replace('.', ',')}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;color:#b91c1c;">
+                <span>− Vales:</span><span style="font-weight:600;">R$ ${p.totalVales.toFixed(2).replace('.', ',')}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid #e2e8f0;margin-top:4px;font-size:14px;font-weight:700;color:#7c3aed;">
+                <span>LÍQUIDO A PAGAR:</span><span>R$ ${p.valorLiquido.toFixed(2).replace('.', ',')}</span>
+              </div>
+              ${fech && fech.status === 'pago' ? `<div style="margin-top:6px;font-size:11px;color:#166534;">Pago em ${fech.pagoEm ? fech.pagoEm.split('-').reverse().join('/') : ''} via ${fech.formaPagamento || '—'}</div>` : ''}
+            </div>
+            <div style="display:flex;gap:6px;margin-top:10px;">${botoes}</div>
+          </div>
+        `;
+      }).join('') + '</div>';
+  }
+
+  function fechNavegar(dir) {
+    _fechMes += dir;
+    if (_fechMes < 1) { _fechMes = 12; _fechAno--; }
+    if (_fechMes > 12) { _fechMes = 1; _fechAno++; }
+    fechCarregar();
+  }
+
+  function fechIrMesAtual() {
+    const hoje = new Date();
+    _fechMes = hoje.getMonth() + 1;
+    _fechAno = hoje.getFullYear();
+    fechCarregar();
+  }
+
+  async function fechVerDetalhe(profId) {
+    try {
+      const dados = await api('GET', `/api/fechamentos/calcular/${profId}/${_fechMes}/${_fechAno}`);
+      fechMostrarDetalhe(dados, false);
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  async function fechVerFechamento(fechId) {
+    try {
+      const dados = await api('GET', `/api/fechamentos/${fechId}`);
+      fechMostrarDetalheFechado(dados);
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  function fechMostrarDetalhe(dados, jaFechado) {
+    const modal = document.getElementById('modal-sl-fechamento');
+    const cont = document.getElementById('modal-fech-conteudo');
+    const p = dados.profissional;
+    const html = fechRenderContent(p, dados, false);
+    cont.innerHTML = html;
+    modal.style.display = 'flex';
+  }
+
+  function fechMostrarDetalheFechado(dados) {
+    const modal = document.getElementById('modal-sl-fechamento');
+    const cont = document.getElementById('modal-fech-conteudo');
+    const f = dados.fechamento;
+    // Adapta pra shape do calcular
+    const adaptado = {
+      qtdAtendimentos: f.qtdAtendimentos,
+      totalServicos: Number(f.totalServicos),
+      totalComissaoProdutos: Number(f.totalComissaoProdutos),
+      totalTaxaEspaco: Number(f.totalTaxaEspaco),
+      totalVales: Number(f.totalVales),
+      valorLiquido: Number(f.valorLiquido),
+      atendimentos: dados.atendimentos,
+      vales: dados.vales
+    };
+    const p = { id: f.profissionalId, nome: f.profissionalNome, pix: f.profissionalPix };
+    cont.innerHTML = fechRenderContent(p, adaptado, true, f);
+    modal.style.display = 'flex';
+  }
+
+  function fechRenderContent(p, calc, jaFechado, fech) {
+    const nomeMes = FECH_MESES[_fechMes - 1];
+    const atsHtml = (calc.atendimentos || []).map(a => {
+      const servs = (a.servicos || []).map(s => s.nome).join(', ');
+      const prodsSum = (a.produtosVendidos || []).reduce((s, x) => s + Number(x.subtotal || 0), 0);
+      return `
+        <tr>
+          <td style="padding:6px;font-size:11px;">${a.data.split('-').reverse().join('/')}<br><span style="color:#94a3b8;">${a.hora}</span></td>
+          <td style="padding:6px;font-size:11px;"><b>${escapeHtml(a.clienteNome)}</b><br><span style="color:#64748b;">${escapeHtml(servs)}</span></td>
+          <td style="padding:6px;font-size:11px;text-align:right;">R$ ${a.subtotalServicos.toFixed(2).replace('.', ',')}</td>
+          <td style="padding:6px;font-size:11px;text-align:right;color:#166534;">R$ ${a.valorComissaoProfissional.toFixed(2).replace('.', ',')}</td>
+          <td style="padding:6px;font-size:11px;text-align:right;color:#b91c1c;">−R$ ${a.valorEspacoSalao.toFixed(2).replace('.', ',')}</td>
+          <td style="padding:6px;font-size:11px;text-align:right;font-weight:700;color:#7c3aed;">R$ ${a.valorLiquidoProfissional.toFixed(2).replace('.', ',')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const valesHtml = (calc.vales || []).map(v => `
+      <tr>
+        <td style="padding:6px;font-size:11px;">${v.data.split('-').reverse().join('/')}</td>
+        <td style="padding:6px;font-size:11px;">${escapeHtml(v.observacao || '—')}</td>
+        <td style="padding:6px;font-size:11px;text-align:right;color:#b91c1c;font-weight:700;">−R$ ${v.valor.toFixed(2).replace('.', ',')}</td>
+      </tr>
+    `).join('');
+
+    let statusHtml = '';
+    if (fech) {
+      const sta = fech.status;
+      const cor = sta === 'pago' ? '#dcfce7' : '#dbeafe';
+      const fg = sta === 'pago' ? '#166534' : '#1e40af';
+      const label = sta === 'pago' ? '✅ PAGO' : '🔒 FECHADO — AGUARDANDO PAGAMENTO';
+      statusHtml = `<div style="background:${cor};color:${fg};padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;margin-bottom:12px;">${label}</div>`;
+    }
+
+    let acoes = '';
+    if (!jaFechado) {
+      acoes = `
+        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
+                style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
+      `;
+    } else if (fech && fech.status === 'fechado') {
+      acoes = `
+        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="fechReabrir(${fech.id})" style="padding:9px 14px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;border-radius:6px;cursor:pointer;font-weight:600;">↩️ Reabrir</button>
+        <button onclick="mpAbrir(${fech.id}, '${escapeHtml(p.nome)}', ${calc.valorLiquido})"
+                style="padding:9px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;">💰 Marcar Pago</button>
+        <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
+                style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
+      `;
+    } else {
+      acoes = `
+        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
+                style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
+      `;
+    }
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <h2 style="color:#7c3aed;margin:0;font-size:22px;">📊 Fechamento — ${nomeMes} ${_fechAno}</h2>
+          <div style="font-size:14px;color:#334155;margin-top:4px;">${escapeHtml(p.nome)}${p.pix ? ` · PIX: ${escapeHtml(p.pix)}` : ''}</div>
+        </div>
+        <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
+                style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+      </div>
+
+      ${statusHtml}
+
+      <div style="background:#7c3aed;color:#fff;border-radius:10px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:12px;opacity:0.85;">TOTAL A PAGAR</div>
+        <div style="font-size:32px;font-weight:700;margin-top:4px;">R$ ${calc.valorLiquido.toFixed(2).replace('.', ',')}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;">
+        <div style="background:#f0fdf4;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">Serviços</div>
+          <div style="font-weight:700;color:#166534;font-size:15px;">R$ ${calc.totalServicos.toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#dbeafe;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">+ Comissão produtos</div>
+          <div style="font-weight:700;color:#1e40af;font-size:15px;">R$ ${calc.totalComissaoProdutos.toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">− Taxa espaço</div>
+          <div style="font-weight:700;color:#b91c1c;font-size:15px;">R$ ${calc.totalTaxaEspaco.toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#fef3c7;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">− Vales</div>
+          <div style="font-weight:700;color:#92400e;font-size:15px;">R$ ${calc.totalVales.toFixed(2).replace('.', ',')}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;color:#334155;font-weight:700;margin-bottom:6px;">📋 ATENDIMENTOS (${calc.qtdAtendimentos})</div>
+        <div style="max-height:250px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:#f8fafc;position:sticky;top:0;">
+              <tr>
+                <th style="padding:6px;font-size:10px;text-align:left;">Data</th>
+                <th style="padding:6px;font-size:10px;text-align:left;">Cliente / Serviços</th>
+                <th style="padding:6px;font-size:10px;text-align:right;">Serv.</th>
+                <th style="padding:6px;font-size:10px;text-align:right;">Comis.</th>
+                <th style="padding:6px;font-size:10px;text-align:right;">Espaço</th>
+                <th style="padding:6px;font-size:10px;text-align:right;">Líquido</th>
+              </tr>
+            </thead>
+            <tbody>${atsHtml || '<tr><td colspan="6" style="text-align:center;padding:14px;color:#94a3b8;">Sem atendimentos.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;color:#334155;font-weight:700;margin-bottom:6px;">💵 VALES (${(calc.vales || []).length})</div>
+        <div style="max-height:150px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:6px;font-size:10px;text-align:left;">Data</th>
+                <th style="padding:6px;font-size:10px;text-align:left;">Observação</th>
+                <th style="padding:6px;font-size:10px;text-align:right;">Valor</th>
+              </tr>
+            </thead>
+            <tbody>${valesHtml || '<tr><td colspan="3" style="text-align:center;padding:14px;color:#94a3b8;">Sem vales no mês.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">${acoes}</div>
+    `;
+  }
+
+  async function fechConfirmarFechar(profId, nome) {
+    if (!confirm(`Fechar o mês de ${FECH_MESES[_fechMes - 1]}/${_fechAno} de ${nome}?\n\nDepois de fechado, os vales do mês ficam TRAVADOS (não podem ser editados/apagados). Você ainda poderá REABRIR o fechamento se precisar.`)) return;
+    try {
+      await api('POST', '/api/fechamentos/gerar', {
+        profissionalId: profId,
+        mes: _fechMes,
+        ano: _fechAno
+      });
+      await fechCarregar();
+      alert(`✅ Mês fechado! Próximo passo: marcar como PAGO quando pagar ${nome}.`);
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  async function fechReabrir(fechId) {
+    if (!confirm('Reabrir este fechamento?\n\nOs vales do mês voltam a ficar editáveis. Você precisará fechar novamente depois.')) return;
+    try {
+      await api('DELETE', `/api/fechamentos/${fechId}`);
+      document.getElementById('modal-sl-fechamento').style.display = 'none';
+      await fechCarregar();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  // Modal marcar pago
+  function mpAbrir(fechId, nome, valor) {
+    document.getElementById('mp-fechamento-id').value = fechId;
+    document.getElementById('mp-info').innerHTML =
+      `Marcar pagamento de <b>${escapeHtml(nome)}</b> — <b style="color:#166534;">R$ ${Number(valor).toFixed(2).replace('.', ',')}</b>`;
+    document.getElementById('mp-data').value = new Date().toISOString().slice(0,10);
+    document.getElementById('mp-forma').value = 'pix';
+    document.getElementById('mp-obs').value = '';
+    document.getElementById('modal-sl-fechamento').style.display = 'none';
+    document.getElementById('modal-sl-marcar-pago').style.display = 'flex';
+  }
+
+  async function mpConfirmar() {
+    const fechId = document.getElementById('mp-fechamento-id').value;
+    const dados = {
+      dataPagamento: document.getElementById('mp-data').value,
+      formaPagamento: document.getElementById('mp-forma').value,
+      observacoes: document.getElementById('mp-obs').value.trim()
+    };
+    try {
+      await api('POST', `/api/fechamentos/${fechId}/marcar-pago`, dados);
+      document.getElementById('modal-sl-marcar-pago').style.display = 'none';
+      await fechCarregar();
+      alert('✅ Pagamento registrado!');
     } catch (err) {
       alert('Erro: ' + err.message);
     }
