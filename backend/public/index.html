@@ -858,19 +858,19 @@
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;background:#f6f8fc;padding:12px 16px;border-radius:10px;">
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Mês
-          <input type="month" id="filtro-ent-mes" onchange="renderEntradasFornecedores()"
+          <input type="month" id="filtro-ent-mes" onchange="_limiteEntradasForn = 50; renderEntradasFornecedores();"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Fornecedor
-          <select id="filtro-ent-fornecedor" onchange="renderEntradasFornecedores()"
+          <select id="filtro-ent-fornecedor" onchange="_limiteEntradasForn = 50; renderEntradasFornecedores();"
                   style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;min-width:200px;">
             <option value="">Todos</option>
           </select>
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
           Buscar (produto, código, NF, documento)
-          <input type="text" id="filtro-ent-busca" oninput="renderEntradasFornecedores()" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
+          <input type="text" id="filtro-ent-busca" oninput="_limiteEntradasForn = 50; renderEntradasFornecedores();" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <button class="btn" type="button" onclick="limparFiltrosEntradas()"
@@ -8861,6 +8861,8 @@ https://sistema.glinformatica.com.br
     }).catch(err => alert('Erro ao quitar: ' + err.message));
   }
   // Render da tabela de Entradas Registradas (aba Fornecedores)
+  let _limiteEntradasForn = 50;
+
   function renderEntradasFornecedores() {
     // Sempre atualiza também a página Estoque (se aberta ou não, é barato)
     setTimeout(() => {
@@ -8922,22 +8924,25 @@ https://sistema.glinformatica.com.br
     const c = document.getElementById('contador-entradas');
     if(c) {
       const totalFiltrado = lista.reduce((s, e) => s + Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0, 0);
+      const mostrando = Math.min(_limiteEntradasForn, lista.length);
       c.textContent = (filtroMes || filtroFornecedor || filtroBusca)
-        ? `${lista.length} de ${dbEntradas.length} · Total: ${formatarBRL(totalFiltrado)}`
-        : `${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbEntradas.length}) · Total: ${formatarBRL(totalFiltrado)}`
+        : `Mostrando ${mostrando} de ${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
     }
     if(lista.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma entrada encontrada com os filtros aplicados.</td></tr>';
       return;
     }
-    tbody.innerHTML = lista.map(e => {
+    // Fatia pra pagina
+    const listaVisivel = lista.slice(0, _limiteEntradasForn);
+    let htmlEnt = listaVisivel.map(e => {
       const isNf = e.tipo === 'com-nf';
       const total = isNf ? e.totalNf : e.totalGeral;
       const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
       const badge = isNf
         ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
         : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
-      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
+      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
       // Info de rastreamento pra ADMIN
       const isAdmin = window._papelAtual === 'admin';
       const infoUsuarioIcone = isAdmin && e.criadoPorNome
@@ -8961,9 +8966,27 @@ https://sistema.glinformatica.com.br
         </tr>
       `;
     }).join('');
+    // Botão "Mostrar mais"
+    if (lista.length > _limiteEntradasForn) {
+      const restantes = lista.length - _limiteEntradasForn;
+      const proxLote = Math.min(50, restantes);
+      htmlEnt += `
+        <tr>
+          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteEntradasForn += 50; renderEntradasFornecedores();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteEntradasForn = ${lista.length}; renderEntradasFornecedores();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = htmlEnt;
     agendarSalvar();
   }
   function limparFiltrosEntradas() {
+    _limiteEntradasForn = 50;
     const m = document.getElementById('filtro-ent-mes');     if(m) m.value = '';
     const f = document.getElementById('filtro-ent-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('filtro-ent-busca');   if(b) b.value = '';
@@ -9007,6 +9030,9 @@ https://sistema.glinformatica.com.br
     if (mF) mF.value = m?.value || '';
     if (fF) fF.value = f?.value || '';
     if (bF) bF.value = b?.value || '';
+    // Reset limites ao mudar filtros
+    _limiteEntradasEstoque = 50;
+    _limiteEntradasForn = 50;
     atualizarResumoEntradasEstoque();
     renderEntradaMercadoriasEstoque();
   }
@@ -9021,11 +9047,15 @@ https://sistema.glinformatica.com.br
   }
 
   function limparFiltrosEntradasEstoque() {
+    _limiteEntradasEstoque = 50;
+    _limiteEntradasForn = 50;
     const m = document.getElementById('em-filtro-mes');     if(m) m.value = '';
     const f = document.getElementById('em-filtro-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('em-filtro-busca');   if(b) b.value = '';
     sincronizarFiltrosEntradas();
   }
+
+  let _limiteEntradasEstoque = 50;
 
   function renderEntradaMercadoriasEstoque() {
     const tbody = document.getElementById('tbody-entradas-estoque');
@@ -9069,9 +9099,10 @@ https://sistema.glinformatica.com.br
     const totalFiltrado = lista.reduce((s, e) => s + (Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0), 0);
     const c = document.getElementById('em-contador');
     if (c) {
+      const mostrando = Math.min(_limiteEntradasEstoque, lista.length);
       c.textContent = (filtroMes || filtroFornecedor || filtroBusca)
-        ? `${lista.length} de ${dbEntradas.length} · Total: ${formatarBRL(totalFiltrado)}`
-        : `${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
+        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbEntradas.length}) · Total: ${formatarBRL(totalFiltrado)}`
+        : `Mostrando ${mostrando} de ${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
     }
 
     if (lista.length === 0) {
@@ -9079,14 +9110,15 @@ https://sistema.glinformatica.com.br
       return;
     }
 
-    tbody.innerHTML = lista.map(e => {
+    const listaVisivel = lista.slice(0, _limiteEntradasEstoque);
+    let htmlEst = listaVisivel.map(e => {
       const isNf = e.tipo === 'com-nf';
       const total = isNf ? e.totalNf : e.totalGeral;
       const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
       const badge = isNf
         ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
         : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
-      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
+      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
       const isAdmin = window._papelAtual === 'admin';
       const linhaUsuarioCriou = isAdmin && e.criadoPorNome
         ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
@@ -9098,7 +9130,7 @@ https://sistema.glinformatica.com.br
           <td>${badge}</td>
           <td>${escapeHtml(documento)}</td>
           <td><strong>${formatarBRL(total)}</strong></td>
-          <td>${escapeHtml(pagamentoLabel)}</td>
+          <td>${pagamentoLabel}</td>
           <td>
             <button class="btn-link" onclick="editarEntrada(${e.id})">✏️ Editar</button>
             | <button class="btn-link" onclick="imprimirEntrada(${e.id})">🖨️ Imprimir</button>
@@ -9107,6 +9139,23 @@ https://sistema.glinformatica.com.br
         </tr>
       `;
     }).join('');
+    // Botão "Mostrar mais"
+    if (lista.length > _limiteEntradasEstoque) {
+      const restantes = lista.length - _limiteEntradasEstoque;
+      const proxLote = Math.min(50, restantes);
+      htmlEst += `
+        <tr>
+          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+            <button type="button" onclick="_limiteEntradasEstoque += 50; renderEntradaMercadoriasEstoque();"
+                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
+              📄 Mostrar mais ${proxLote} (${restantes} restantes)
+            </button>
+            ${restantes > 50 ? `<button type="button" onclick="_limiteEntradasEstoque = ${lista.length}; renderEntradaMercadoriasEstoque();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = htmlEst;
   }
 
   function atualizarResumoEntradasEstoque() {
