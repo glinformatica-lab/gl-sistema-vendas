@@ -390,6 +390,19 @@
         </p>
       </div>
 
+      <div style="background:#ede9fe;border:1px solid #a78bfa;border-radius:8px;padding:14px;margin:12px 0;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="checkbox" id="me-modulo-salao" style="width:20px;height:20px;cursor:pointer;">
+          <label for="me-modulo-salao" style="margin:0;font-weight:600;color:#5b21b6;cursor:pointer;font-size:14px;">
+            💇 Ativar Módulo Salão
+          </label>
+        </div>
+        <p style="margin:6px 0 0 32px;font-size:12px;color:#557;line-height:1.4;">
+          Libera recursos exclusivos pra salões de beleza: cadastro de profissionais parceiras (comissões e % de espaço), catálogo de serviços, taxas de maquininha, agenda visual e atendimentos com divisão automática de valores.<br>
+          <strong style="color:#5b21b6;">Ideal pra salões que trabalham com cabeleireiras parceiras.</strong>
+        </p>
+      </div>
+
       <label>Observações</label>
       <textarea id="me-observacao" rows="3"></textarea>
 
@@ -709,7 +722,7 @@
                   <tr style="border-top:1px solid #f1f5f9;">
                     <td style="padding:6px 8px;"><strong>${escapeHtml(e.nome)}</strong> <span style="color:#94a3b8;font-size:10px;">#${e.id}</span></td>
                     <td style="padding:6px 8px;text-align:center;"><span style="background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700;">${escapeHtml(e.plano || '—')}</span></td>
-                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : '—'}</td>
+                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : ''}${e.moduloSalao ? ' 💇' : ''}${!e.usaAmbientes && !e.moduloSalao ? '—' : ''}</td>
                     <td style="padding:6px 8px;text-align:right;font-weight:600;">${e.totalProdutos}</td>
                     <td style="padding:6px 8px;text-align:right;color:#0891b2;">${e.totalFotos}</td>
                     <td style="padding:6px 8px;text-align:right;">${e.totalClientes}</td>
@@ -966,6 +979,8 @@
     }
     // Ambientes
     document.getElementById('me-usa-ambientes').checked = !!(e.usaAmbientes);
+    // Salão
+    document.getElementById('me-modulo-salao').checked = !!(e.moduloSalao);
     document.getElementById('me-erro').style.display = 'none';
     document.getElementById('modal-editar').classList.add('show');
   }
@@ -1012,7 +1027,8 @@
         valorMensalidade: parseFloat(document.getElementById('me-mensalidade').value) || 0,
         observacao: document.getElementById('me-observacao').value.trim(),
         moduloFiscalAtivo: document.getElementById('me-modulo-fiscal').checked,
-        usaAmbientes: document.getElementById('me-usa-ambientes').checked
+        usaAmbientes: document.getElementById('me-usa-ambientes').checked,
+        moduloSalao: document.getElementById('me-modulo-salao').checked
       });
       closeEditar();
       await Promise.all([carregarDashboard(), carregarEmpresas()]);
