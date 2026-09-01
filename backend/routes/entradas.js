@@ -45,10 +45,16 @@ router.get('/paginado', async (req, res) => {
     const vals = [req.user.empresaId];
     let idx = 2;
 
-    // Filtro mês (formato YYYY-MM)
+    // Filtro mês (YYYY-MM) → usa RANGE em data (usa índice se existir)
     if (mes && /^\d{4}-\d{2}$/.test(mes)) {
-      where.push(`to_char(data, 'YYYY-MM') = $${idx++}`);
-      vals.push(mes);
+      const [ano, m] = mes.split('-');
+      const dataIni = `${ano}-${m}-01`;
+      // Primeiro dia do mês seguinte
+      let anoFim = parseInt(ano), mesFim = parseInt(m) + 1;
+      if (mesFim > 12) { mesFim = 1; anoFim++; }
+      const dataFim = `${anoFim}-${String(mesFim).padStart(2, '0')}-01`;
+      where.push(`data >= $${idx++} AND data < $${idx++}`);
+      vals.push(dataIni, dataFim);
     }
 
     // Filtro fornecedor (nome exato)
@@ -57,15 +63,14 @@ router.get('/paginado', async (req, res) => {
       vals.push(fornecedor.trim());
     }
 
-    // Busca: numero, doc, fornecedor (ILIKE)
-    // Busca em itens (JSONB) exige textualização - CAST + ILIKE
+    // Busca: apenas em campos indexáveis (número, doc, fornecedor)
+    // NÃO buscamos em JSONB itens porque força seq scan em 6000+ registros
     if (busca && busca.trim()) {
       const b = busca.trim();
       where.push(`(
         numero ILIKE $${idx} OR
         doc ILIKE $${idx} OR
-        fornecedor ILIKE $${idx} OR
-        itens::text ILIKE $${idx}
+        fornecedor ILIKE $${idx}
       )`);
       vals.push(`%${b}%`);
       idx++;
@@ -73,7 +78,7 @@ router.get('/paginado', async (req, res) => {
 
     const whereSql = where.join(' AND ');
 
-    // Count + soma agregada
+    // Count sem JOIN (mais rápido)
     const rCount = await db.query(
       `SELECT COUNT(*)::int AS total,
               COALESCE(SUM(COALESCE(total_nf, total_geral, 0)), 0)::numeric AS soma_total
@@ -83,10 +88,12 @@ router.get('/paginado', async (req, res) => {
     const total = rCount.rows[0].total;
     const somaTotal = Number(rCount.rows[0].soma_total) || 0;
 
-    // Lista paginada
+    // Lista paginada: SELECT COLUNAS ESPECÍFICAS (sem itens JSONB pesado)
     const offset = (pagina - 1) * porPagina;
     const rLista = await db.query(
-      `SELECT e.*, uc.nome AS criado_por_nome
+      `SELECT e.id, e.data, e.tipo, e.numero, e.serie, e.doc, e.fornecedor,
+              e.total_nf, e.total_geral, e.pagamento, e.criado_por,
+              uc.nome AS criado_por_nome
        FROM entradas e
        LEFT JOIN usuarios uc ON uc.id = e.criado_por
        WHERE ${whereSql.replace(/empresa_id/g, 'e.empresa_id')}
@@ -98,10 +105,8 @@ router.get('/paginado', async (req, res) => {
     res.json({
       entradas: rLista.rows.map(e => ({
         ...camelizar(e),
-        itens: e.itens || [],
-        totalGeral: toNum(e.total_geral), totalProdutos: toNum(e.total_produtos),
-        frete: toNum(e.frete), seguro: toNum(e.seguro), outras: toNum(e.outras),
-        desconto: toNum(e.desconto), totalNf: toNum(e.total_nf)
+        totalGeral: toNum(e.total_geral),
+        totalNf: toNum(e.total_nf)
       })),
       total,
       somaTotal,
@@ -135,12 +140,22 @@ router.get('/fornecedores-distintos', async (req, res) => {
 router.get('/resumo-mes', async (req, res) => {
   try {
     const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(mes)) {
+      return res.status(400).json({ error: 'Mês inválido.' });
+    }
+    // Usa RANGE em data (usa índice)
+    const [ano, m] = mes.split('-');
+    const dataIni = `${ano}-${m}-01`;
+    let anoFim = parseInt(ano), mesFim = parseInt(m) + 1;
+    if (mesFim > 12) { mesFim = 1; anoFim++; }
+    const dataFim = `${anoFim}-${String(mesFim).padStart(2, '0')}-01`;
+
     const r = await db.query(
       `SELECT COUNT(*)::int AS total,
               COALESCE(SUM(COALESCE(total_nf, total_geral, 0)), 0)::numeric AS soma_total
        FROM entradas
-       WHERE empresa_id=$1 AND to_char(data, 'YYYY-MM')=$2`,
-      [req.user.empresaId, mes]
+       WHERE empresa_id=$1 AND data >= $2 AND data < $3`,
+      [req.user.empresaId, dataIni, dataFim]
     );
     res.json({
       mes,
