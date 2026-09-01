@@ -32,6 +32,127 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /paginado — Lista paginada com filtros (versão otimizada)
+router.get('/paginado', async (req, res) => {
+  try {
+    const { mes, fornecedor, busca } = req.query;
+    let pagina = parseInt(req.query.pagina) || 1;
+    let porPagina = parseInt(req.query.porPagina) || 50;
+    if (pagina < 1) pagina = 1;
+    if (porPagina < 1 || porPagina > 500) porPagina = 50;
+
+    const where = ['empresa_id = $1'];
+    const vals = [req.user.empresaId];
+    let idx = 2;
+
+    // Filtro mês (formato YYYY-MM)
+    if (mes && /^\d{4}-\d{2}$/.test(mes)) {
+      where.push(`to_char(data, 'YYYY-MM') = $${idx++}`);
+      vals.push(mes);
+    }
+
+    // Filtro fornecedor (nome exato)
+    if (fornecedor && fornecedor.trim()) {
+      where.push(`fornecedor = $${idx++}`);
+      vals.push(fornecedor.trim());
+    }
+
+    // Busca: numero, doc, fornecedor (ILIKE)
+    // Busca em itens (JSONB) exige textualização - CAST + ILIKE
+    if (busca && busca.trim()) {
+      const b = busca.trim();
+      where.push(`(
+        numero ILIKE $${idx} OR
+        doc ILIKE $${idx} OR
+        fornecedor ILIKE $${idx} OR
+        itens::text ILIKE $${idx}
+      )`);
+      vals.push(`%${b}%`);
+      idx++;
+    }
+
+    const whereSql = where.join(' AND ');
+
+    // Count + soma agregada
+    const rCount = await db.query(
+      `SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(COALESCE(total_nf, total_geral, 0)), 0)::numeric AS soma_total
+       FROM entradas WHERE ${whereSql}`,
+      vals
+    );
+    const total = rCount.rows[0].total;
+    const somaTotal = Number(rCount.rows[0].soma_total) || 0;
+
+    // Lista paginada
+    const offset = (pagina - 1) * porPagina;
+    const rLista = await db.query(
+      `SELECT e.*, uc.nome AS criado_por_nome
+       FROM entradas e
+       LEFT JOIN usuarios uc ON uc.id = e.criado_por
+       WHERE ${whereSql.replace(/empresa_id/g, 'e.empresa_id')}
+       ORDER BY e.data DESC, e.id DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...vals, porPagina, offset]
+    );
+
+    res.json({
+      entradas: rLista.rows.map(e => ({
+        ...camelizar(e),
+        itens: e.itens || [],
+        totalGeral: toNum(e.total_geral), totalProdutos: toNum(e.total_produtos),
+        frete: toNum(e.frete), seguro: toNum(e.seguro), outras: toNum(e.outras),
+        desconto: toNum(e.desconto), totalNf: toNum(e.total_nf)
+      })),
+      total,
+      somaTotal,
+      pagina,
+      porPagina,
+      totalPaginas: Math.ceil(total / porPagina)
+    });
+  } catch (err) {
+    console.error('[entradas/paginado]', err);
+    res.status(500).json({ error: 'Erro ao listar entradas: ' + err.message });
+  }
+});
+
+// GET /fornecedores-distintos — Lista de fornecedores únicos (pro select)
+router.get('/fornecedores-distintos', async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT DISTINCT fornecedor FROM entradas
+       WHERE empresa_id=$1 AND fornecedor IS NOT NULL AND fornecedor <> ''
+       ORDER BY fornecedor`,
+      [req.user.empresaId]
+    );
+    res.json(r.rows.map(row => row.fornecedor));
+  } catch (err) {
+    console.error('[entradas/fornecedores]', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
+// GET /resumo-mes — Contadores rápidos pro dashboard/cards
+router.get('/resumo-mes', async (req, res) => {
+  try {
+    const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+    const r = await db.query(
+      `SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(COALESCE(total_nf, total_geral, 0)), 0)::numeric AS soma_total
+       FROM entradas
+       WHERE empresa_id=$1 AND to_char(data, 'YYYY-MM')=$2`,
+      [req.user.empresaId, mes]
+    );
+    res.json({
+      mes,
+      total: r.rows[0].total,
+      somaTotal: Number(r.rows[0].soma_total) || 0
+    });
+  } catch (err) {
+    console.error('[entradas/resumo]', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
 router.post('/', async (req, res) => {
   const e = req.body || {};
   if (!e.fornecedor) return res.status(400).json({ error: 'Fornecedor é obrigatório.' });

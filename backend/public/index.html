@@ -858,19 +858,19 @@
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;background:#f6f8fc;padding:12px 16px;border-radius:10px;">
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Mês
-          <input type="month" id="filtro-ent-mes" onchange="_limiteEntradasForn = 50; renderEntradasFornecedores();"
+          <input type="month" id="filtro-ent-mes" onchange="_entPaginaForn = 1; carregarEntradasFornPaginado();"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;">
           Fornecedor
-          <select id="filtro-ent-fornecedor" onchange="_limiteEntradasForn = 50; renderEntradasFornecedores();"
+          <select id="filtro-ent-fornecedor" onchange="_entPaginaForn = 1; carregarEntradasFornPaginado();"
                   style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;min-width:200px;">
             <option value="">Todos</option>
           </select>
         </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
           Buscar (produto, código, NF, documento)
-          <input type="text" id="filtro-ent-busca" oninput="_limiteEntradasForn = 50; renderEntradasFornecedores();" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
+          <input type="text" id="filtro-ent-busca" oninput="nsAgendarBuscaForn();" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
                  style="margin-top:4px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:6px;font-size:13px;">
         </label>
         <button class="btn" type="button" onclick="limparFiltrosEntradas()"
@@ -6937,24 +6937,17 @@ https://sistema.glinformatica.com.br
   // ====== Carregamento inicial via API: popula todos os arrays a partir do servidor ======
   async function recarregarTudoDaApi() {
     try {
-      const [forn, prods, clis, vds, ents, cp, cr, servs] = await Promise.all([
+      const [forn, prods, clis, vds, cp, cr, servs] = await Promise.all([
         api('GET', '/api/fornecedores'),
         api('GET', '/api/produtos'),
         api('GET', '/api/clientes'),
         api('GET', '/api/vendas'),
-        api('GET', '/api/entradas'),
         api('GET', '/api/contas-pagar'),
         api('GET', '/api/contas-receber'),
         api('GET', '/api/servicos').catch(() => [])
       ]);
       // Normaliza datas (Postgres devolve como timestamp ISO; convertemos para YYYY-MM-DD)
       vds.forEach(v => { v.data = normalizarDataIso(v.data); });
-      ents.forEach(e => {
-        e.data = normalizarDataIso(e.data);
-        e.dataEmissao = normalizarDataIso(e.dataEmissao);
-        e.dataEntrada = normalizarDataIso(e.dataEntrada);
-        e.vencimento = normalizarDataIso(e.vencimento);
-      });
       cp.forEach(c => {
         c.vencimento = normalizarDataIso(c.vencimento);
         c.dataPagamento = normalizarDataIso(c.dataPagamento);
@@ -6968,9 +6961,7 @@ https://sistema.glinformatica.com.br
       dbProdutos.length = 0; dbProdutos.push(...prods);
       dbClientes.length = 0; dbClientes.push(...clis);
       dbVendas.length = 0; dbVendas.push(...vds);
-      dbEntradas.length = 0; dbEntradas.push(...ents);
-      // Invalida cache do select de fornecedores (será repopulado no próximo render)
-      if (typeof _fornSelectPopulado !== 'undefined') _fornSelectPopulado = false;
+      // dbEntradas NÃO é mais carregado aqui - só sob demanda (server-side paginado)
       dbContasPagar.length = 0; dbContasPagar.push(...cp);
       dbContasReceber.length = 0; dbContasReceber.push(...cr);
       // Movimentações são carregadas sob demanda (ao abrir histórico de produto)
@@ -6979,7 +6970,7 @@ https://sistema.glinformatica.com.br
       _servicosCache = servs || [];
       console.log('[API] Dados carregados:', {
         produtos: dbProdutos.length, clientes: dbClientes.length, vendas: dbVendas.length,
-        entradas: dbEntradas.length, cp: dbContasPagar.length, cr: dbContasReceber.length
+        cp: dbContasPagar.length, cr: dbContasReceber.length
       });
     } catch (err) {
       console.error('[API] Falha ao carregar:', err);
@@ -6995,13 +6986,25 @@ https://sistema.glinformatica.com.br
     // Renderiza todas as listagens (com try pra cada, pra falha de uma não quebrar as outras)
     const renders = [
       'renderProdutos', 'renderClientes', 'renderVendas', 'renderFornecedores',
-      'renderEntradasFornecedores', 'renderContasPagar', 'renderContasReceber',
+      'renderContasPagar', 'renderContasReceber',
       'renderCardsVendas', 'renderResumoFinanceiro', 'renderListaClientes',
       'renderListaFornecedores', 'renderListaProdutos'
     ];
     for (const fn of renders) {
       try { if (typeof window[fn] === 'function') window[fn](); } catch(e) { console.warn(fn, e.message); }
     }
+    // Só recarrega entradas se página de Fornecedores/Entradas estiver aberta
+    try {
+      const pageForn = document.getElementById('page-fornecedores');
+      const pageEnt = document.getElementById('page-entrada-mercadorias');
+      if (pageForn && pageForn.style.display !== 'none' && typeof carregarEntradasFornPaginado === 'function') {
+        await carregarEntradasFornPaginado();
+      }
+      if (pageEnt && pageEnt.style.display !== 'none' && typeof carregarEntradasEstPaginado === 'function') {
+        await carregarEntradasEstPaginado();
+        await atualizarResumoEntradasEstoque();
+      }
+    } catch(e) { console.warn('render entradas', e.message); }
     // Telas extras (orçamentos, serviços, caixa) - chama se função existe
     try { if (typeof carregarOrcamentos === 'function') await carregarOrcamentos(); } catch(e) {}
     try { if (typeof carregarServicos === 'function') await carregarServicos(); } catch(e) {}
@@ -8868,135 +8871,141 @@ https://sistema.glinformatica.com.br
     }).catch(err => alert('Erro ao quitar: ' + err.message));
   }
   // Render da tabela de Entradas Registradas (aba Fornecedores)
-  let _limiteEntradasForn = 50;
-  let _fornSelectPopulado = false; // cache: só popula uma vez
+  // ====== ENTRADAS FORNECEDORES (server-side paginado) ======
+  let _entPaginaForn = 1;
+  let _entTotalForn = 0;
+  let _entTotalPaginasForn = 0;
+  let _entFornSelectPopulado = false;
+  let _entBuscaTimerForn = null;
 
   function renderEntradasFornecedores() {
     const tbody = document.getElementById('tbody-entradas-fornecedores');
     if(!tbody) return;
-    // OTIMIZAÇÃO: só renderiza se a página de Fornecedores está visível
-    // (evita processar 6000+ entradas quando você está em outra tela)
+    // Só carrega se página está visível
     const paginaForn = document.getElementById('page-fornecedores');
     if (!paginaForn || paginaForn.style.display === 'none') return;
-    // Popula o select UMA VEZ (evita reprocessar 6000+ entradas a cada render)
-    const selFornecedor = document.getElementById('filtro-ent-fornecedor');
-    if (selFornecedor && !_fornSelectPopulado) {
-      const valorAtual = selFornecedor.value;
-      const fornecedoresUnicos = [...new Set(dbEntradas.map(e => e.fornecedor).filter(Boolean))].sort();
-      selFornecedor.innerHTML = '<option value="">Todos</option>' +
-        fornecedoresUnicos.map(f => `<option value="${f.replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${f}</option>`).join('');
-      _fornSelectPopulado = true;
+    // Popula select de fornecedores UMA VEZ via endpoint dedicado
+    if (!_entFornSelectPopulado) {
+      _entFornSelectPopulado = true; // seta antes pra evitar chamadas concorrentes
+      api('GET', '/api/entradas/fornecedores-distintos').then(list => {
+        const sel = document.getElementById('filtro-ent-fornecedor');
+        if (!sel) return;
+        const valorAtual = sel.value;
+        sel.innerHTML = '<option value="">Todos</option>' +
+          (list || []).map(f => `<option value="${String(f).replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${escapeHtml(f)}</option>`).join('');
+      }).catch(() => { _entFornSelectPopulado = false; }); // libera pra tentar de novo se falhar
     }
-    if(dbEntradas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma entrada registrada.</td></tr>';
-      const c = document.getElementById('contador-entradas');
-      if(c) c.textContent = '';
-      agendarSalvar();
-      return;
-    }
-    // Aplica filtros
-    const filtroMes = document.getElementById('filtro-ent-mes')?.value || ''; // formato YYYY-MM
-    const filtroFornecedor = document.getElementById('filtro-ent-fornecedor')?.value || '';
-    const filtroBusca = (document.getElementById('filtro-ent-busca')?.value || '').trim().toLowerCase();
-    let lista = [...dbEntradas];
-    if (filtroMes) {
-      lista = lista.filter(e => (e.data || '').slice(0, 7) === filtroMes);
-    }
-    if (filtroFornecedor) {
-      lista = lista.filter(e => e.fornecedor === filtroFornecedor);
-    }
-    if (filtroBusca) {
-      // Constrói índice de código→nome a partir de dbProdutos para permitir busca por código
-      const codigoParaNome = new Map();
-      const nomeParaCodigo = new Map();
-      (dbProdutos || []).forEach(p => {
-        if (p.codigo) codigoParaNome.set(String(p.codigo).toLowerCase(), p.nome);
-        if (p.nome) nomeParaCodigo.set(p.nome, String(p.codigo || ''));
-      });
-      lista = lista.filter(e => {
-        const docNum = `${e.numero || ''}${e.serie ? '/' + e.serie : ''} ${e.doc || ''}`.toLowerCase();
-        // Para cada item da entrada, monta string com nome + código (consultado em dbProdutos)
-        const itensTxt = (e.itens || []).map(i => {
-          const nomeProduto = i.produto || i.nome || '';
-          const codigoProduto = nomeParaCodigo.get(nomeProduto) || i.codigo || '';
-          return `${nomeProduto} ${codigoProduto}`;
-        }).join(' ').toLowerCase();
-        return docNum.includes(filtroBusca) ||
-               itensTxt.includes(filtroBusca) ||
-               (e.fornecedor && e.fornecedor.toLowerCase().includes(filtroBusca));
-      });
-    }
-    lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-    const c = document.getElementById('contador-entradas');
-    if(c) {
-      const totalFiltrado = lista.reduce((s, e) => s + Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0, 0);
-      const mostrando = Math.min(_limiteEntradasForn, lista.length);
-      c.textContent = (filtroMes || filtroFornecedor || filtroBusca)
-        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbEntradas.length}) · Total: ${formatarBRL(totalFiltrado)}`
-        : `Mostrando ${mostrando} de ${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
-    }
-    if(lista.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma entrada encontrada com os filtros aplicados.</td></tr>';
-      return;
-    }
-    // Fatia pra pagina
-    const listaVisivel = lista.slice(0, _limiteEntradasForn);
-    let htmlEnt = listaVisivel.map(e => {
-      const isNf = e.tipo === 'com-nf';
-      const total = isNf ? e.totalNf : e.totalGeral;
-      const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
-      const badge = isNf
-        ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
-        : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
-      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
-      // Info de rastreamento pra ADMIN
-      const isAdmin = window._papelAtual === 'admin';
-      const infoUsuarioIcone = isAdmin && e.criadoPorNome
-        ? ` <span title="👤 Criada por: ${escapeAttr(e.criadoPorNome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
-        : '';
-      const linhaUsuarioCriou = isAdmin && e.criadoPorNome
-        ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
-        : '';
-      return `
-        <tr>
-          <td>${formatarDataBR(e.data)}</td>
-          <td>${e.fornecedor}${infoUsuarioIcone}${linhaUsuarioCriou}</td>
-          <td>${badge}</td>
-          <td>${documento}</td>
-          <td>${formatarBRL(total)}</td>
-          <td>${pagamentoLabel}</td>
-          <td>
-            <button class="btn-link" onclick="editarEntrada(${e.id})">Editar</button> |
-            <button class="btn-link" onclick="imprimirEntrada(${e.id})">Imprimir</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-    // Botão "Mostrar mais"
-    if (lista.length > _limiteEntradasForn) {
-      const restantes = lista.length - _limiteEntradasForn;
-      const proxLote = Math.min(50, restantes);
-      htmlEnt += `
-        <tr>
-          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
-            <button type="button" onclick="_limiteEntradasForn += 50; renderEntradasFornecedores();"
-                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
-              📄 Mostrar mais ${proxLote} (${restantes} restantes)
-            </button>
-            ${restantes > 50 ? `<button type="button" onclick="_limiteEntradasForn = ${lista.length}; renderEntradasFornecedores();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
-          </td>
-        </tr>
-      `;
-    }
-    tbody.innerHTML = htmlEnt;
-    agendarSalvar();
+    // Faz busca paginada
+    _entPaginaForn = _entPaginaForn || 1;
+    carregarEntradasFornPaginado();
   }
+
+  function nsAgendarBuscaForn() {
+    clearTimeout(_entBuscaTimerForn);
+    _entBuscaTimerForn = setTimeout(() => {
+      _entPaginaForn = 1;
+      carregarEntradasFornPaginado();
+    }, 400);
+  }
+
+  async function carregarEntradasFornPaginado() {
+    const tbody = document.getElementById('tbody-entradas-fornecedores');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</td></tr>';
+
+    const params = new URLSearchParams();
+    const mes = document.getElementById('filtro-ent-mes')?.value || '';
+    const forn = document.getElementById('filtro-ent-fornecedor')?.value || '';
+    const busca = document.getElementById('filtro-ent-busca')?.value?.trim() || '';
+    if (mes) params.set('mes', mes);
+    if (forn) params.set('fornecedor', forn);
+    if (busca) params.set('busca', busca);
+    params.set('pagina', _entPaginaForn);
+    params.set('porPagina', 50);
+
+    try {
+      const r = await api('GET', '/api/entradas/paginado?' + params.toString());
+      _entTotalForn = r.total || 0;
+      _entTotalPaginasForn = r.totalPaginas || 0;
+
+      const c = document.getElementById('contador-entradas');
+      if (c) {
+        const mostrando = Math.min(50, r.entradas.length);
+        const filtroAtivo = mes || forn || busca;
+        c.textContent = filtroAtivo
+          ? `Mostrando ${mostrando} de ${r.total} · Total: ${formatarBRL(r.somaTotal)}`
+          : `Mostrando ${mostrando} de ${r.total} entrada(s) · Total: ${formatarBRL(r.somaTotal)}`;
+      }
+
+      if (!r.entradas || r.entradas.length === 0) {
+        const msg = (mes || forn || busca) ? 'Nenhuma entrada encontrada com os filtros aplicados.' : 'Nenhuma entrada registrada.';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">${msg}</td></tr>`;
+        return;
+      }
+
+      let html = r.entradas.map(e => {
+        const isNf = e.tipo === 'com-nf';
+        const total = isNf ? e.totalNf : e.totalGeral;
+        const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
+        const badge = isNf
+          ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
+          : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
+        const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
+        const isAdmin = window._papelAtual === 'admin';
+        const infoUsuarioIcone = isAdmin && e.criadoPorNome
+          ? ` <span title="👤 Criada por: ${escapeAttr(e.criadoPorNome)}" style="cursor:help;font-size:12px;color:#0891b2;text-decoration:none;display:inline-block;margin-left:4px;">👤</span>`
+          : '';
+        const linhaUsuarioCriou = isAdmin && e.criadoPorNome
+          ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
+          : '';
+        return `
+          <tr>
+            <td>${formatarDataBR(e.data)}</td>
+            <td>${escapeHtml(e.fornecedor || '')}${infoUsuarioIcone}${linhaUsuarioCriou}</td>
+            <td>${badge}</td>
+            <td>${escapeHtml(documento)}</td>
+            <td>${formatarBRL(total)}</td>
+            <td>${pagamentoLabel}</td>
+            <td>
+              <button class="btn-link" onclick="editarEntrada(${e.id})">Editar</button> |
+              <button class="btn-link" onclick="imprimirEntrada(${e.id})">Imprimir</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Paginação
+      if (_entTotalPaginasForn > 1) {
+        const podePrev = _entPaginaForn > 1;
+        const podeNext = _entPaginaForn < _entTotalPaginasForn;
+        html += `
+          <tr>
+            <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+              <button onclick="_entPaginaForn--; carregarEntradasFornPaginado()" ${podePrev ? '' : 'disabled'}
+                      style="padding:8px 14px;background:${podePrev ? '#3960f9' : '#e2e8f0'};color:${podePrev ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podePrev ? 'pointer' : 'not-allowed'};margin-right:8px;">
+                ← Anterior
+              </button>
+              <span style="margin:0 12px;font-size:13px;color:#64748b;">Página <strong>${_entPaginaForn}</strong> de <strong>${_entTotalPaginasForn}</strong></span>
+              <button onclick="_entPaginaForn++; carregarEntradasFornPaginado()" ${podeNext ? '' : 'disabled'}
+                      style="padding:8px 14px;background:${podeNext ? '#3960f9' : '#e2e8f0'};color:${podeNext ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podeNext ? 'pointer' : 'not-allowed'};margin-left:8px;">
+                Próxima →
+              </button>
+            </td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
   function limparFiltrosEntradas() {
-    _limiteEntradasForn = 50;
+    _entPaginaForn = 1;
     const m = document.getElementById('filtro-ent-mes');     if(m) m.value = '';
     const f = document.getElementById('filtro-ent-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('filtro-ent-busca');   if(b) b.value = '';
-    renderEntradasFornecedores();
+    carregarEntradasFornPaginado();
     // Se a página estoque estiver aberta, sincroniza
     if (document.getElementById('page-entrada-mercadorias')?.style.display !== 'none') {
       copiarFiltrosParaEstoque();
@@ -9009,13 +9018,14 @@ https://sistema.glinformatica.com.br
   // Aqui só sincroniza filtros e reflete a mesma tabela.
 
   function carregarEntradaMercadorias() {
-    // Popula select de fornecedores (mesma lista)
+    // Popula select de fornecedores via API (uma vez)
     const sel = document.getElementById('em-filtro-fornecedor');
-    if (sel) {
-      const valorAtual = sel.value;
-      const fornecedoresUnicos = [...new Set(dbEntradas.map(e => e.fornecedor).filter(Boolean))].sort();
-      sel.innerHTML = '<option value="">Todos</option>' +
-        fornecedoresUnicos.map(f => `<option value="${f.replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${f}</option>`).join('');
+    if (sel && sel.options.length <= 1) {
+      api('GET', '/api/entradas/fornecedores-distintos').then(list => {
+        const valorAtual = sel.value;
+        sel.innerHTML = '<option value="">Todos</option>' +
+          (list || []).map(f => `<option value="${String(f).replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${escapeHtml(f)}</option>`).join('');
+      }).catch(() => {});
     }
     // Copia filtros do outro contexto se ainda não estiverem definidos aqui
     if (!document.getElementById('em-filtro-mes').value && document.getElementById('filtro-ent-mes')?.value) {
@@ -9036,11 +9046,11 @@ https://sistema.glinformatica.com.br
     if (mF) mF.value = m?.value || '';
     if (fF) fF.value = f?.value || '';
     if (bF) bF.value = b?.value || '';
-    // Reset limites ao mudar filtros
-    _limiteEntradasEstoque = 50;
-    _limiteEntradasForn = 50;
-    atualizarResumoEntradasEstoque();
-    renderEntradaMercadoriasEstoque();
+    // Reset paginação ao mudar filtros
+    _entPaginaEst = 1;
+    _entPaginaForn = 1;
+    if (typeof atualizarResumoEntradasEstoque === 'function') atualizarResumoEntradasEstoque();
+    carregarEntradasEstPaginado();
   }
 
   function copiarFiltrosParaEstoque() {
@@ -9053,136 +9063,135 @@ https://sistema.glinformatica.com.br
   }
 
   function limparFiltrosEntradasEstoque() {
-    _limiteEntradasEstoque = 50;
-    _limiteEntradasForn = 50;
+    _entPaginaEst = 1;
+    _entPaginaForn = 1;
     const m = document.getElementById('em-filtro-mes');     if(m) m.value = '';
     const f = document.getElementById('em-filtro-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('em-filtro-busca');   if(b) b.value = '';
     sincronizarFiltrosEntradas();
   }
 
-  let _limiteEntradasEstoque = 50;
+  // ====== ENTRADAS ESTOQUE (server-side paginado) ======
+  let _entPaginaEst = 1;
+  let _entBuscaTimerEst = null;
 
   function renderEntradaMercadoriasEstoque() {
     const tbody = document.getElementById('tbody-entradas-estoque');
     if (!tbody) return;
-    // OTIMIZAÇÃO: só renderiza se a página de Entradas está visível
     const paginaEst = document.getElementById('page-entrada-mercadorias');
     if (!paginaEst || paginaEst.style.display === 'none') return;
-
-    if (!dbEntradas || dbEntradas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">📭 Nenhuma entrada registrada. Clique em "Nova Entrada" pra começar.</td></tr>';
-      const c = document.getElementById('em-contador');
-      if (c) c.textContent = '';
-      return;
-    }
-
-    // Aplica os mesmos filtros
-    const filtroMes = document.getElementById('em-filtro-mes')?.value || '';
-    const filtroFornecedor = document.getElementById('em-filtro-fornecedor')?.value || '';
-    const filtroBusca = (document.getElementById('em-filtro-busca')?.value || '').trim().toLowerCase();
-
-    let lista = [...dbEntradas];
-    if (filtroMes) lista = lista.filter(e => (e.data || '').slice(0, 7) === filtroMes);
-    if (filtroFornecedor) lista = lista.filter(e => e.fornecedor === filtroFornecedor);
-    if (filtroBusca) {
-      const nomeParaCodigo = new Map();
-      (dbProdutos || []).forEach(p => {
-        if (p.nome) nomeParaCodigo.set(p.nome, String(p.codigo || ''));
-      });
-      lista = lista.filter(e => {
-        const docNum = `${e.numero || ''}${e.serie ? '/' + e.serie : ''} ${e.doc || ''}`.toLowerCase();
-        const itensTxt = (e.itens || []).map(i => {
-          const nomeProduto = i.produto || i.nome || '';
-          const codigoProduto = nomeParaCodigo.get(nomeProduto) || i.codigo || '';
-          return `${nomeProduto} ${codigoProduto}`;
-        }).join(' ').toLowerCase();
-        return docNum.includes(filtroBusca) ||
-               itensTxt.includes(filtroBusca) ||
-               (e.fornecedor && e.fornecedor.toLowerCase().includes(filtroBusca));
-      });
-    }
-    lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-
-    // Contador
-    const totalFiltrado = lista.reduce((s, e) => s + (Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0), 0);
-    const c = document.getElementById('em-contador');
-    if (c) {
-      const mostrando = Math.min(_limiteEntradasEstoque, lista.length);
-      c.textContent = (filtroMes || filtroFornecedor || filtroBusca)
-        ? `Mostrando ${mostrando} de ${lista.length} (total ${dbEntradas.length}) · Total: ${formatarBRL(totalFiltrado)}`
-        : `Mostrando ${mostrando} de ${dbEntradas.length} entrada(s) · Total: ${formatarBRL(totalFiltrado)}`;
-    }
-
-    if (lista.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">Nenhuma entrada encontrada com esses filtros.</td></tr>';
-      return;
-    }
-
-    const listaVisivel = lista.slice(0, _limiteEntradasEstoque);
-    let htmlEst = listaVisivel.map(e => {
-      const isNf = e.tipo === 'com-nf';
-      const total = isNf ? e.totalNf : e.totalGeral;
-      const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
-      const badge = isNf
-        ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
-        : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
-      const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
-      const isAdmin = window._papelAtual === 'admin';
-      const linhaUsuarioCriou = isAdmin && e.criadoPorNome
-        ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
-        : '';
-      return `
-        <tr>
-          <td>${formatarDataBR(e.data)}</td>
-          <td>${escapeHtml(e.fornecedor || '—')}${linhaUsuarioCriou}</td>
-          <td>${badge}</td>
-          <td>${escapeHtml(documento)}</td>
-          <td><strong>${formatarBRL(total)}</strong></td>
-          <td>${pagamentoLabel}</td>
-          <td>
-            <button class="btn-link" onclick="editarEntrada(${e.id})">✏️ Editar</button>
-            | <button class="btn-link" onclick="imprimirEntrada(${e.id})">🖨️ Imprimir</button>
-            ${isAdmin ? ` | <button class="btn-link danger" onclick="excluirEntrada(${e.id})">🗑️ Excluir</button>` : ''}
-          </td>
-        </tr>
-      `;
-    }).join('');
-    // Botão "Mostrar mais"
-    if (lista.length > _limiteEntradasEstoque) {
-      const restantes = lista.length - _limiteEntradasEstoque;
-      const proxLote = Math.min(50, restantes);
-      htmlEst += `
-        <tr>
-          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
-            <button type="button" onclick="_limiteEntradasEstoque += 50; renderEntradaMercadoriasEstoque();"
-                    style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
-              📄 Mostrar mais ${proxLote} (${restantes} restantes)
-            </button>
-            ${restantes > 50 ? `<button type="button" onclick="_limiteEntradasEstoque = ${lista.length}; renderEntradaMercadoriasEstoque();" style="margin-left:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">Mostrar todos</button>` : ''}
-          </td>
-        </tr>
-      `;
-    }
-    tbody.innerHTML = htmlEst;
+    carregarEntradasEstPaginado();
   }
 
-  function atualizarResumoEntradasEstoque() {
-    if (!dbEntradas) return;
-    const mesAtual = new Date().toISOString().slice(0, 7);
-    const doMes = dbEntradas.filter(e => (e.data || '').slice(0, 7) === mesAtual);
-    const cntMes = doMes.length;
-    const valMes = doMes.reduce((s, e) => s + (Number(e.tipo === 'com-nf' ? e.totalNf : e.totalGeral) || 0), 0);
-    // Produtos distintos no mês
-    const produtosSet = new Set();
-    doMes.forEach(e => (e.itens || []).forEach(i => produtosSet.add(i.produto || i.nome || '')));
+  function nsAgendarBuscaEst() {
+    clearTimeout(_entBuscaTimerEst);
+    _entBuscaTimerEst = setTimeout(() => {
+      _entPaginaEst = 1;
+      carregarEntradasEstPaginado();
+    }, 400);
+  }
 
-    const el1 = document.getElementById('em-cnt-mes');
-    const el2 = document.getElementById('em-val-mes');
-    const el3 = document.getElementById('em-cnt-produtos');
-    if (el1) el1.textContent = cntMes;
-    if (el2) el2.textContent = formatarBRL(valMes);
-    if (el3) el3.textContent = produtosSet.size;
+  async function carregarEntradasEstPaginado() {
+    const tbody = document.getElementById('tbody-entradas-estoque');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</td></tr>';
+
+    const params = new URLSearchParams();
+    const mes = document.getElementById('em-filtro-mes')?.value || '';
+    const forn = document.getElementById('em-filtro-fornecedor')?.value || '';
+    const busca = document.getElementById('em-filtro-busca')?.value?.trim() || '';
+    if (mes) params.set('mes', mes);
+    if (forn) params.set('fornecedor', forn);
+    if (busca) params.set('busca', busca);
+    params.set('pagina', _entPaginaEst);
+    params.set('porPagina', 50);
+
+    try {
+      const r = await api('GET', '/api/entradas/paginado?' + params.toString());
+      const c = document.getElementById('em-contador');
+      if (c) {
+        const mostrando = Math.min(50, r.entradas.length);
+        const filtroAtivo = mes || forn || busca;
+        c.textContent = filtroAtivo
+          ? `Mostrando ${mostrando} de ${r.total} · Total: ${formatarBRL(r.somaTotal)}`
+          : `Mostrando ${mostrando} de ${r.total} entrada(s) · Total: ${formatarBRL(r.somaTotal)}`;
+      }
+
+      if (!r.entradas || r.entradas.length === 0) {
+        const msg = (mes || forn || busca)
+          ? 'Nenhuma entrada encontrada com esses filtros.'
+          : '📭 Nenhuma entrada registrada. Clique em "Nova Entrada" pra começar.';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">${msg}</td></tr>`;
+        return;
+      }
+
+      let html = r.entradas.map(e => {
+        const isNf = e.tipo === 'com-nf';
+        const total = isNf ? e.totalNf : e.totalGeral;
+        const documento = isNf ? `${e.numero || ''}${e.serie ? '/' + e.serie : ''}` : (e.doc || '-');
+        const badge = isNf
+          ? '<span style="background:#cfd8f7;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">COM NF</span>'
+          : '<span style="background:#f7e3c1;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;">SEM NF</span>';
+        const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento || '<span style="color:#94a3b8;">—</span>';
+        const isAdmin = window._papelAtual === 'admin';
+        const linhaUsuarioCriou = isAdmin && e.criadoPorNome
+          ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
+          : '';
+        return `
+          <tr>
+            <td>${formatarDataBR(e.data)}</td>
+            <td>${escapeHtml(e.fornecedor || '—')}${linhaUsuarioCriou}</td>
+            <td>${badge}</td>
+            <td>${escapeHtml(documento)}</td>
+            <td><strong>${formatarBRL(total)}</strong></td>
+            <td>${pagamentoLabel}</td>
+            <td>
+              <button class="btn-link" onclick="editarEntrada(${e.id})">✏️ Editar</button>
+              | <button class="btn-link" onclick="imprimirEntrada(${e.id})">🖨️ Imprimir</button>
+              ${isAdmin ? ` | <button class="btn-link danger" onclick="excluirEntrada(${e.id})">🗑️ Excluir</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if (r.totalPaginas > 1) {
+        const podePrev = _entPaginaEst > 1;
+        const podeNext = _entPaginaEst < r.totalPaginas;
+        html += `
+          <tr>
+            <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+              <button onclick="_entPaginaEst--; carregarEntradasEstPaginado()" ${podePrev ? '' : 'disabled'}
+                      style="padding:8px 14px;background:${podePrev ? '#3960f9' : '#e2e8f0'};color:${podePrev ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podePrev ? 'pointer' : 'not-allowed'};margin-right:8px;">
+                ← Anterior
+              </button>
+              <span style="margin:0 12px;font-size:13px;color:#64748b;">Página <strong>${_entPaginaEst}</strong> de <strong>${r.totalPaginas}</strong></span>
+              <button onclick="_entPaginaEst++; carregarEntradasEstPaginado()" ${podeNext ? '' : 'disabled'}
+                      style="padding:8px 14px;background:${podeNext ? '#3960f9' : '#e2e8f0'};color:${podeNext ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podeNext ? 'pointer' : 'not-allowed'};margin-left:8px;">
+                Próxima →
+              </button>
+            </td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  async function atualizarResumoEntradasEstoque() {
+    try {
+      const mesAtual = new Date().toISOString().slice(0, 7);
+      const r = await api('GET', '/api/entradas/resumo-mes?mes=' + mesAtual);
+      const el1 = document.getElementById('em-cnt-mes');
+      const el2 = document.getElementById('em-val-mes');
+      const el3 = document.getElementById('em-cnt-produtos');
+      if (el1) el1.textContent = r.total || 0;
+      if (el2) el2.textContent = formatarBRL(r.somaTotal || 0);
+      if (el3) el3.textContent = '—'; // produtos distintos exigiria consulta separada, deixamos placeholder
+    } catch (e) {
+      // Silencioso, é só resumo
+    }
   }
 
   // Mostra/esconde o campo de data prevista conforme a forma de pagamento
