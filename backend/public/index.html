@@ -607,6 +607,15 @@
 
     <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
 
+    <!-- Fiscal (feature-ambientes) -->
+    <button class="menu-btn menu-grupo feature-ambientes" onclick="toggleGrupoMenu('fiscal')" data-grupo="fiscal" type="button" style="display:none;">
+      <span>&#129534; Fiscal</span>
+      <span class="grupo-seta" id="seta-fiscal">▼</span>
+    </button>
+    <div class="submenu feature-ambientes" id="submenu-fiscal" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('notas-saida')">&#128196; Notas Fiscais de Saída</button>
+    </div>
+
     <!-- Configurações (admin-only) -->
     <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('config')" data-grupo="config" type="button">
       <span>&#9881;&#65039; Configurações</span>
@@ -1416,6 +1425,7 @@
             <th>Itens</th>
             <th>Total</th>
             <th>Pagamento</th>
+            <th>NF</th>
             <th>Ações</th>
           </tr>
         </thead>
@@ -2075,6 +2085,102 @@
           <button type="button" class="btn" style="background:#eceef2;color:var(--azul);" onclick="carregarConfigEmpresa()">Descartar Alterações</button>
         </div>
       </form>
+    </div>
+
+    <!-- Notas Fiscais de Saída (Módulo Iluminação) -->
+    <div id="page-notas-saida" style="display:none;">
+      <div class="page-title">🧾 Notas Fiscais de Saída</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Visualização das notas fiscais migradas do sistema anterior. Somente leitura.
+      </div>
+
+      <!-- Filtros -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;">
+        <div>
+          <label style="font-size:11px;color:#334155;font-weight:600;">De</label>
+          <input type="date" id="ns-filtro-de" onchange="_nsPagina = 1; carregarNotasSaida()"
+                 style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#334155;font-weight:600;">Até</label>
+          <input type="date" id="ns-filtro-ate" onchange="_nsPagina = 1; carregarNotasSaida()"
+                 style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#334155;font-weight:600;">Tipo</label>
+          <select id="ns-filtro-tipo" onchange="_nsPagina = 1; carregarNotasSaida()"
+                  style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+            <option value="">Todos</option>
+            <option value="venda">Venda</option>
+            <option value="devolucao">Devolução</option>
+            <option value="cupom">Cupom</option>
+            <option value="transferencia">Transferência</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#334155;font-weight:600;">Situação</label>
+          <select id="ns-filtro-status" onchange="_nsPagina = 1; carregarNotasSaida()"
+                  style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+            <option value="">Todas</option>
+            <option value="autorizada">Autorizada</option>
+            <option value="cancelada">Cancelada</option>
+            <option value="denegada">Denegada</option>
+            <option value="sem_nfe">Sem NF-e</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px;color:#334155;font-weight:600;">Buscar (número, cliente ou chave)</label>
+          <input type="text" id="ns-filtro-busca" placeholder="Ex: 12345, João Silva, 3524..." oninput="nsAgendarBusca()"
+                 style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        </div>
+        <div>
+          <button type="button" onclick="nsLimparFiltros()" style="width:100%;padding:8px;background:#eceef2;color:#3960f9;border:1px solid #d2d6df;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+            🗑️ Limpar
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumo -->
+      <div id="ns-resumo" style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#1e3a8a;display:none;"></div>
+
+      <!-- Tabela -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Data</th>
+              <th style="padding:10px;text-align:left;">Número</th>
+              <th style="padding:10px;text-align:center;">Série</th>
+              <th style="padding:10px;text-align:center;">Tipo</th>
+              <th style="padding:10px;text-align:left;">Cliente</th>
+              <th style="padding:10px;text-align:center;">CFOP</th>
+              <th style="padding:10px;text-align:center;">Situação</th>
+              <th style="padding:10px;text-align:right;">Total</th>
+              <th style="padding:10px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-notas-saida">
+            <tr><td colspan="9" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação -->
+      <div id="ns-paginacao" style="display:none;margin-top:14px;text-align:center;color:#64748b;font-size:13px;"></div>
+    </div>
+
+    <!-- Modal: Detalhe da Nota Fiscal -->
+    <div id="modal-nota-saida" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;">
+        <div style="padding:18px 24px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1;">
+          <div>
+            <h2 style="color:#0891b2;margin:0;font-size:20px;">🧾 <span id="ns-det-titulo">Nota Fiscal</span></h2>
+            <div id="ns-det-subtitulo" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
+          </div>
+          <button onclick="fecharModalNotaSaida()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div id="ns-det-corpo" style="padding:18px 24px;"></div>
+      </div>
     </div>
 
     <!-- Migração de Sistema (Módulo Iluminação, só admin) -->
@@ -7310,6 +7416,15 @@ https://sistema.glinformatica.com.br
       }
       carregarOrdensCompra();
     }
+    if(pg === 'notas-saida') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.usaAmbientes) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Iluminação.');
+        showPage('dashboard');
+        return;
+      }
+      carregarNotasSaida();
+    }
     if(pg === 'cotacoes') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.usaAmbientes) {
@@ -9104,6 +9219,14 @@ https://sistema.glinformatica.com.br
     return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Formata quantidade removendo zeros à direita (2.000 → "2", 2.5 → "2,5")
+  function formatarQtd(q) {
+    const num = Number(q) || 0;
+    if (num % 1 === 0) return num.toFixed(0);
+    // Remove zeros à direita: 2.500 → 2.5
+    return num.toString().replace(/\.?0+$/, '').replace('.', ',');
+  }
+
   // Submit do formulário
   document.getElementById('form-entrada-sem-nf').addEventListener('submit', async function(e){
     e.preventDefault();
@@ -10102,7 +10225,7 @@ https://sistema.glinformatica.com.br
         clientesUnicos.map(c => `<option value="${c.replace(/"/g,'&quot;')}"${c===valorAtual?' selected':''}>${c}</option>`).join('');
     }
     if(dbVendas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma venda registrada.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma venda registrada.</td></tr>';
       const c = document.getElementById('contador-vendas');
       if(c) c.textContent = '';
       agendarSalvar();
@@ -10146,15 +10269,31 @@ https://sistema.glinformatica.com.br
         : `Mostrando ${mostrando} de ${dbVendas.length} venda(s) · Total: ${formatarBRL(totalFiltrado)}`;
     }
     if(lista.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma venda encontrada com os filtros aplicados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma venda encontrada com os filtros aplicados.</td></tr>';
       return;
     }
     const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' };
     const listaVisivel = lista.slice(0, _limiteVendas);
     let htmlVendas = listaVisivel.map(v => {
-      const pag = pagamentoLabel[v.pagamento] || v.pagamento;
-      const pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
+      // Fix: pagamento nulo mostra "—" em vez de "null"
+      let pagTxt;
+      if (!v.pagamento) {
+        pagTxt = '<span style="color:#94a3b8;">—</span>';
+      } else {
+        const pag = pagamentoLabel[v.pagamento] || v.pagamento;
+        pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
+      }
       const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
+
+      // Notas fiscais vinculadas (uma venda pode ter várias)
+      let nfTxt = '<span style="color:#94a3b8;">—</span>';
+      if (v.notasFiscais && v.notasFiscais.length > 0) {
+        nfTxt = v.notasFiscais.map(nf => {
+          const cor = nf.status_nfe === 'cancelada' ? '#991b1b' : '#0891b2';
+          const label = `${nf.numero}${nf.serie ? '/' + nf.serie : ''}`;
+          return `<a href="#" onclick="event.preventDefault(); abrirDetalheNotaSaida(${nf.id})" style="color:${cor};text-decoration:none;font-weight:600;" title="Clique para ver detalhes da NF">${label}</a>`;
+        }).join(', ');
+      }
       const cancelada = v.status === 'cancelada';
       const emSeparacao = v.status === 'em_separacao';
       // Linha riscada + cinza pra venda cancelada
@@ -10199,6 +10338,7 @@ https://sistema.glinformatica.com.br
           <td>${itensTxt}</td>
           <td>${formatarBRL(v.total)}</td>
           <td>${pagTxt}</td>
+          <td>${nfTxt}</td>
           <td>${acoes}</td>
         </tr>
       `;
@@ -10208,7 +10348,7 @@ https://sistema.glinformatica.com.br
       const proxLote = Math.min(50, restantes);
       htmlVendas += `
         <tr>
-          <td colspan="6" style="text-align:center;padding:14px;background:#f8fafc;">
+          <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
             <button type="button" onclick="_limiteVendas += 50; renderVendas();"
                     style="background:#3960f9;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">
               📄 Mostrar mais ${proxLote} (${restantes} restantes)
@@ -11372,7 +11512,7 @@ https://sistema.glinformatica.com.br
     const linhasItens = v.itens.map(it => `
       <div class="item">
         <div class="item-nome">${escapeHtml(it.produto)}</div>
-        <div class="item-detalhe">${it.qtd} x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
+        <div class="item-detalhe">${formatarQtd(it.qtd)} x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
       </div>
     `).join('');
     const parcelasHtml = (v.parcelas && v.parcelas.length > 1)
@@ -11434,7 +11574,7 @@ https://sistema.glinformatica.com.br
     const linhasItens = v.itens.map(it => `
       <div class="item">
         <div class="item-nome">${escapeHtml(it.produto)}</div>
-        <div class="item-detalhe">${it.qtd}x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
+        <div class="item-detalhe">${formatarQtd(it.qtd)}x ${formatarBRL(it.preco)} = <strong>${formatarBRL(it.qtd * it.preco)}</strong></div>
       </div>
     `).join('');
     const parcelasHtml = (v.parcelas && v.parcelas.length > 1)
@@ -11489,7 +11629,7 @@ https://sistema.glinformatica.com.br
     const linhasItens = v.itens.map(it => `
       <tr>
         <td>${it.produto}</td>
-        <td style="text-align:right;">${it.qtd}</td>
+        <td style="text-align:right;">${formatarQtd(it.qtd)}</td>
         <td style="text-align:right;">${formatarBRL(it.preco)}</td>
         <td style="text-align:right;">${formatarBRL(it.qtd * it.preco)}</td>
       </tr>
@@ -11928,7 +12068,7 @@ https://sistema.glinformatica.com.br
         <td>${it.codigo || '-'}</td>
         <td>${it.produto}</td>
         ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || 'UN'}</td>` : ''}
-        <td style="text-align:right;">${it.qtd}</td>
+        <td style="text-align:right;">${formatarQtd(it.qtd)}</td>
         <td style="text-align:right;">${formatarBRL(it.custo)}</td>
         <td style="text-align:right;">${formatarBRL(it.qtd * it.custo)}</td>
       </tr>
@@ -16158,6 +16298,270 @@ ${conteudo}
   let _ordensCompraCache = [];
   let _ocFiltro = 'rascunho';
   let _nocItensPendentes = [];
+
+  // ====== NOTAS FISCAIS DE SAÍDA ======
+  let _nsPagina = 1;
+  let _nsPorPagina = 50;
+  let _nsCache = [];
+  let _nsBuscaTimer = null;
+
+  function nsAgendarBusca() {
+    clearTimeout(_nsBuscaTimer);
+    _nsBuscaTimer = setTimeout(() => {
+      _nsPagina = 1;
+      carregarNotasSaida();
+    }, 400);
+  }
+
+  function nsLimparFiltros() {
+    document.getElementById('ns-filtro-de').value = '';
+    document.getElementById('ns-filtro-ate').value = '';
+    document.getElementById('ns-filtro-tipo').value = '';
+    document.getElementById('ns-filtro-status').value = '';
+    document.getElementById('ns-filtro-busca').value = '';
+    _nsPagina = 1;
+    carregarNotasSaida();
+  }
+
+  async function carregarNotasSaida() {
+    const tbody = document.getElementById('tbody-notas-saida');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+
+    const params = new URLSearchParams();
+    const de = document.getElementById('ns-filtro-de').value;
+    const ate = document.getElementById('ns-filtro-ate').value;
+    const tipo = document.getElementById('ns-filtro-tipo').value;
+    const status = document.getElementById('ns-filtro-status').value;
+    const busca = document.getElementById('ns-filtro-busca').value.trim();
+    if (de) params.set('de', de);
+    if (ate) params.set('ate', ate);
+    if (tipo) params.set('tipo', tipo);
+    if (status) params.set('status', status);
+    if (busca) params.set('busca', busca);
+    params.set('pagina', _nsPagina);
+    params.set('porPagina', _nsPorPagina);
+
+    try {
+      const r = await api('GET', '/api/notas-saida?' + params.toString());
+      _nsCache = r.notas || [];
+      renderNotasSaida(r);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function renderNotasSaida(r) {
+    const tbody = document.getElementById('tbody-notas-saida');
+    const resumo = document.getElementById('ns-resumo');
+    const paginacao = document.getElementById('ns-paginacao');
+
+    // Resumo
+    if (r.total > 0) {
+      resumo.style.display = '';
+      resumo.innerHTML = `📊 <strong>${r.total.toLocaleString('pt-BR')}</strong> nota(s) · Soma total: <strong>${formatarBRL(r.somaTotal || 0)}</strong>`;
+    } else {
+      resumo.style.display = 'none';
+    }
+
+    if (!r.notas || r.notas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8;">📭 Nenhuma nota fiscal encontrada.</td></tr>';
+      paginacao.style.display = 'none';
+      return;
+    }
+
+    // Badges de tipo
+    const tipoBadge = (t) => {
+      const cores = {
+        venda:         { bg:'#dbeafe', fg:'#1e40af', label:'Venda' },
+        devolucao:     { bg:'#fef2f2', fg:'#991b1b', label:'Devolução' },
+        cupom:         { bg:'#f0fdf4', fg:'#166534', label:'Cupom' },
+        transferencia: { bg:'#f3e8ff', fg:'#6b21a8', label:'Transferência' }
+      };
+      const c = cores[t] || { bg:'#f1f5f9', fg:'#475569', label: t || '—' };
+      return `<span style="background:${c.bg};color:${c.fg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${c.label}</span>`;
+    };
+
+    // Badges de situação
+    const statusBadge = (s) => {
+      if (!s) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
+      const cores = {
+        autorizada: { bg:'#dcfce7', fg:'#166534', label:'✅ Autorizada' },
+        cancelada:  { bg:'#fef2f2', fg:'#991b1b', label:'❌ Cancelada' },
+        denegada:   { bg:'#fef3c7', fg:'#92400e', label:'⚠️ Denegada' }
+      };
+      const c = cores[s] || { bg:'#f1f5f9', fg:'#475569', label: s };
+      return `<span style="background:${c.bg};color:${c.fg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${c.label}</span>`;
+    };
+
+    tbody.innerHTML = r.notas.map(n => {
+      const dt = n.data ? new Date(String(n.data).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      const bgLinha = n.status_nfe === 'cancelada' ? 'background:#fef2f2;' : '';
+      return `
+        <tr style="border-top:1px solid #f1f5f9;cursor:pointer;${bgLinha}"
+            onclick="abrirDetalheNotaSaida(${n.id})"
+            onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='${n.status_nfe === 'cancelada' ? '#fef2f2' : ''}'">
+          <td style="padding:10px;font-size:12px;color:#64748b;">${dt}</td>
+          <td style="padding:10px;"><strong>${escapeHtml(n.numero || '—')}</strong></td>
+          <td style="padding:10px;text-align:center;color:#64748b;">${escapeHtml(n.serie || '—')}</td>
+          <td style="padding:10px;text-align:center;">${tipoBadge(n.tipo)}</td>
+          <td style="padding:10px;">${escapeHtml(n.cliente || '—')}</td>
+          <td style="padding:10px;text-align:center;font-size:12px;color:#64748b;">${escapeHtml(n.cfop || '—')}</td>
+          <td style="padding:10px;text-align:center;">${statusBadge(n.status_nfe)}</td>
+          <td style="padding:10px;text-align:right;font-weight:700;color:#0891b2;">${formatarBRL(n.total)}</td>
+          <td style="padding:10px;text-align:center;">
+            <button onclick="event.stopPropagation(); abrirDetalheNotaSaida(${n.id})" style="background:#eff6ff;color:var(--azul);border:1px solid #93c5fd;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">👁️ Ver</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Paginação
+    if (r.totalPaginas > 1) {
+      paginacao.style.display = '';
+      const podePrev = _nsPagina > 1;
+      const podeNext = _nsPagina < r.totalPaginas;
+      paginacao.innerHTML = `
+        <button onclick="_nsPagina--; carregarNotasSaida()" ${podePrev ? '' : 'disabled'}
+                style="padding:8px 14px;background:${podePrev ? '#3960f9' : '#e2e8f0'};color:${podePrev ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podePrev ? 'pointer' : 'not-allowed'};margin-right:8px;">
+          ← Anterior
+        </button>
+        <span style="margin:0 12px;">Página <strong>${_nsPagina}</strong> de <strong>${r.totalPaginas}</strong></span>
+        <button onclick="_nsPagina++; carregarNotasSaida()" ${podeNext ? '' : 'disabled'}
+                style="padding:8px 14px;background:${podeNext ? '#3960f9' : '#e2e8f0'};color:${podeNext ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podeNext ? 'pointer' : 'not-allowed'};margin-left:8px;">
+          Próxima →
+        </button>
+      `;
+    } else {
+      paginacao.style.display = 'none';
+    }
+  }
+
+  async function abrirDetalheNotaSaida(id) {
+    document.getElementById('modal-nota-saida').style.display = 'flex';
+    document.getElementById('ns-det-titulo').textContent = 'Carregando...';
+    document.getElementById('ns-det-subtitulo').textContent = '';
+    document.getElementById('ns-det-corpo').innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</div>';
+
+    try {
+      const r = await api('GET', `/api/notas-saida/${id}`);
+      const n = r.nota;
+      const v = r.venda;
+
+      document.getElementById('ns-det-titulo').textContent = `NF ${n.numero}${n.serie ? ' · Série ' + n.serie : ''}`;
+      const dt = n.data ? new Date(String(n.data).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      document.getElementById('ns-det-subtitulo').textContent = `${dt} · ${n.cliente || 'Sem cliente'}`;
+
+      // Chave formatada em blocos de 4 dígitos
+      let chaveHtml = '';
+      if (n.chave) {
+        const blocos = String(n.chave).replace(/\D/g, '').match(/.{1,4}/g) || [];
+        chaveHtml = `
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-top:6px;">
+            <div style="font-family:monospace;font-size:13px;letter-spacing:1px;color:#334155;word-break:break-all;">${blocos.join(' ')}</div>
+            <button onclick="navigator.clipboard.writeText('${escapeAttr(n.chave)}').then(()=>alert('Chave copiada!'))"
+                    style="margin-top:6px;padding:5px 10px;background:#0891b2;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">
+              📋 Copiar chave
+            </button>
+          </div>
+        `;
+      }
+
+      const statusLabel = {
+        autorizada: '✅ Autorizada',
+        cancelada:  '❌ Cancelada',
+        denegada:   '⚠️ Denegada'
+      };
+      const tipoLabel = {
+        venda: 'Venda',
+        devolucao: 'Devolução',
+        cupom: 'Cupom',
+        transferencia: 'Transferência'
+      };
+
+      let corpoHtml = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+          <div><strong>Número:</strong> ${escapeHtml(n.numero || '—')}</div>
+          <div><strong>Série:</strong> ${escapeHtml(n.serie || '—')}</div>
+          <div><strong>Data:</strong> ${dt}</div>
+          <div><strong>Tipo:</strong> ${tipoLabel[n.tipo] || n.tipo || '—'}</div>
+          <div><strong>Cliente:</strong> ${escapeHtml(n.cliente || '—')}</div>
+          <div><strong>CFOP:</strong> ${escapeHtml(n.cfop || '—')}</div>
+          <div><strong>Situação:</strong> ${n.status_nfe ? (statusLabel[n.status_nfe] || n.status_nfe) : '<em style="color:#94a3b8;">Sem NF-e (histórica)</em>'}</div>
+          <div><strong>Código legado:</strong> <span style="font-family:monospace;">${escapeHtml(n.codigo_legado || '—')}</span></div>
+        </div>
+
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;">
+          <div style="background:#f0f9ff;padding:10px;border-radius:6px;text-align:center;">
+            <div style="font-size:11px;color:#0369a1;">Total Produtos</div>
+            <div style="font-weight:700;color:#0c4a6e;font-size:16px;">${formatarBRL(n.total_produtos)}</div>
+          </div>
+          <div style="background:#fef3c7;padding:10px;border-radius:6px;text-align:center;">
+            <div style="font-size:11px;color:#92400e;">ICMS</div>
+            <div style="font-weight:700;color:#78350f;font-size:16px;">${formatarBRL(n.icms)}</div>
+          </div>
+          <div style="background:#dcfce7;padding:10px;border-radius:6px;text-align:center;">
+            <div style="font-size:11px;color:#166534;">Total NF</div>
+            <div style="font-weight:700;color:#14532d;font-size:16px;">${formatarBRL(n.total)}</div>
+          </div>
+        </div>
+
+        ${n.chave ? `<div style="margin-top:14px;"><strong style="font-size:13px;">🔑 Chave de acesso:</strong>${chaveHtml}</div>` : ''}
+
+        ${n.obs ? `<div style="margin-top:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;color:#475569;"><strong>Observações:</strong><br>${escapeHtml(n.obs)}</div>` : ''}
+      `;
+
+      // Itens da venda vinculada
+      if (v) {
+        const itensHtml = (v.itens || []).map(it => {
+          const qtdFormatada = Number(it.qtd || 0);
+          const qtdTxt = qtdFormatada % 1 === 0 ? qtdFormatada.toFixed(0) : qtdFormatada.toString().replace(/\.?0+$/, '');
+          const preco = Number(it.preco || it.precoUnit || 0);
+          const subtotal = qtdFormatada * preco;
+          return `
+            <tr style="border-top:1px solid #f1f5f9;">
+              <td style="padding:6px 10px;">${escapeHtml(it.descricao || it.nome || '—')}</td>
+              <td style="padding:6px 10px;text-align:center;">${qtdTxt}</td>
+              <td style="padding:6px 10px;text-align:right;">${formatarBRL(preco)}</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:600;">${formatarBRL(subtotal)}</td>
+            </tr>
+          `;
+        }).join('');
+
+        corpoHtml += `
+          <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <strong style="color:#0891b2;font-size:14px;">🛒 Venda vinculada #${v.id}</strong>
+              <span style="font-size:12px;color:#64748b;">${v.data ? new Date(String(v.data).slice(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</span>
+            </div>
+            ${itensHtml ? `
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead style="background:#f8fafc;">
+                  <tr>
+                    <th style="padding:6px 10px;text-align:left;">Item</th>
+                    <th style="padding:6px 10px;text-align:center;">Qtd</th>
+                    <th style="padding:6px 10px;text-align:right;">Preço</th>
+                    <th style="padding:6px 10px;text-align:right;">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>${itensHtml}</tbody>
+              </table>
+            ` : '<div style="color:#94a3b8;font-size:12px;">Sem itens registrados.</div>'}
+          </div>
+        `;
+      } else if (n.venda_id) {
+        corpoHtml += `<div style="margin-top:14px;padding:10px;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;font-size:12px;color:#92400e;">⚠️ Venda #${n.venda_id} vinculada não encontrada (pode ter sido apagada).</div>`;
+      }
+
+      document.getElementById('ns-det-corpo').innerHTML = corpoHtml;
+    } catch (err) {
+      document.getElementById('ns-det-corpo').innerHTML = `<div style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function fecharModalNotaSaida() {
+    document.getElementById('modal-nota-saida').style.display = 'none';
+  }
 
   async function carregarOrdensCompra() {
     try {

@@ -34,7 +34,19 @@ router.get('/', async (req, res) => {
       `SELECT v.*,
               uc.nome AS criado_por_nome,
               ucan.nome AS cancelada_por_nome,
-              t.nome AS transportadora_nome
+              t.nome AS transportadora_nome,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'id', ns.id,
+                    'numero', ns.numero,
+                    'serie', ns.serie,
+                    'tipo', ns.tipo,
+                    'chave', ns.chave,
+                    'status_nfe', ns.status_nfe
+                  ) ORDER BY ns.data DESC, ns.id DESC)
+                 FROM notas_saida ns WHERE ns.venda_id = v.id),
+                '[]'::json
+              ) AS notas_fiscais
        FROM vendas v
        LEFT JOIN usuarios uc ON uc.id = v.criado_por
        LEFT JOIN usuarios ucan ON ucan.id = v.cancelada_por
@@ -45,7 +57,8 @@ router.get('/', async (req, res) => {
     res.json(r.rows.map(v => ({
       ...camelizar(v),
       subtotal: toNum(v.subtotal), desconto: toNum(v.desconto), total: toNum(v.total),
-      itens: v.itens || [], parcelas: v.parcelas || []
+      itens: v.itens || [], parcelas: v.parcelas || [],
+      notasFiscais: v.notas_fiscais || []
     })));
   } catch (err) {
     console.error('[vendas/list]', err);

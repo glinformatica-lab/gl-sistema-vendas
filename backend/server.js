@@ -17,6 +17,7 @@ app.use('/api/catalogo', require('./routes/catalogo'));
 // Rotas protegidas (token de empresa)
 app.use('/api/produtos',        autenticar, verificarAcesso, require('./routes/produtos'));
 app.use('/api/creditos',        autenticar, verificarAcesso, require('./routes/creditos'));
+app.use('/api/notas-saida',     autenticar, verificarAcesso, require('./routes/notas-saida'));
 app.use('/api/servicos',        autenticar, verificarAcesso, require('./routes/servicos'));
 app.use('/api/orcamentos',      autenticar, verificarAcesso, require('./routes/orcamentos'));
 app.use('/api/ambientes',       autenticar, verificarAcesso, require('./routes/ambientes'));
