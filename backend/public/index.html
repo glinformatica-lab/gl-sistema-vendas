@@ -627,6 +627,7 @@
     </button>
     <div class="submenu feature-salao" id="submenu-salao" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('sl-agenda')">&#128197; Agenda</button>
+      <button class="menu-btn submenu-item" onclick="showPage('sl-atendimentos')">&#128188; Atendimentos</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-profissionais')">&#128101; Profissionais</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-servicos')">&#9986;&#65039; Serviços</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-taxas')">&#128179; Taxas de Maquininha</button>
@@ -716,7 +717,7 @@
               <div>Ver Agenda</div>
               <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Ver / marcar horários</div>
             </button>
-            <button onclick="showPage('sl-atendimentos')" style="padding:18px;background:#dcfce7;color:#166534;border:2px solid #86efac;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
+            <button onclick="showPage('sl-atendimentos'); setTimeout(()=>atAbrirNovo(),300);" style="padding:18px;background:#dcfce7;color:#166534;border:2px solid #86efac;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
               <div style="font-size:22px;margin-bottom:4px;">💼</div>
               <div>Novo Atendimento</div>
               <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Registrar venda de serviço</div>
@@ -2582,6 +2583,236 @@
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
             <button type="button" onclick="agFecharModal()" style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
             <button type="submit" style="padding:10px 18px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Atendimentos -->
+    <div id="page-sl-atendimentos" style="display:none;">
+      <div class="page-title">💼 Atendimentos</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Registro de atendimentos realizados. Cada atendimento pode ter serviços, produtos vendidos e produtos usados (com baixa em estoque).
+      </div>
+
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button class="btn" onclick="atAbrirNovo()" style="background:#10b981;color:#fff;font-weight:700;">+ Novo Atendimento</button>
+        <input type="date" id="at-filtro-de" onchange="atCarregar()"
+               style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" title="Data inicial">
+        <input type="date" id="at-filtro-ate" onchange="atCarregar()"
+               style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;" title="Data final">
+        <select id="at-filtro-prof" onchange="atCarregar()"
+                style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+          <option value="">Todas profissionais</option>
+        </select>
+        <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;">
+          <input type="checkbox" id="at-inc-cancelados" onchange="atCarregar()"> incluir cancelados
+        </label>
+        <span id="at-contador" style="color:#64748b;font-size:12px;margin-left:auto;"></span>
+      </div>
+
+      <!-- Resumo rápido -->
+      <div id="at-resumo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;">Qtd atendimentos</div>
+          <div id="at-r-qtd" style="font-size:22px;font-weight:700;color:#334155;margin-top:4px;">0</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;">Faturamento bruto</div>
+          <div id="at-r-bruto" style="font-size:22px;font-weight:700;color:#0891b2;margin-top:4px;">R$ 0,00</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;">Líquido do salão</div>
+          <div id="at-r-salao" style="font-size:22px;font-weight:700;color:#10b981;margin-top:4px;">R$ 0,00</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600;">A pagar profissionais</div>
+          <div id="at-r-profs" style="font-size:22px;font-weight:700;color:#f59e0b;margin-top:4px;">R$ 0,00</div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-top:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Data / Hora</th>
+              <th style="padding:10px;text-align:left;">Cliente</th>
+              <th style="padding:10px;text-align:left;">Profissional</th>
+              <th style="padding:10px;text-align:left;">Itens</th>
+              <th style="padding:10px;text-align:right;">Total</th>
+              <th style="padding:10px;text-align:right;">Prof. recebe</th>
+              <th style="padding:10px;text-align:center;">Pagto</th>
+              <th style="padding:10px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-atendimentos">
+            <tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Atendimento (grande) -->
+    <div id="modal-sl-atendimento" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:10005;justify-content:center;align-items:flex-start;padding:16px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:900px;width:100%;padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 style="color:#7c3aed;margin:0;font-size:20px;">💼 Novo Atendimento</h2>
+          <button onclick="atFecharModal()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+
+        <!-- Vincular a agendamento -->
+        <div id="at-vincular-agenda-bloco" style="background:#ede9fe;border:1px solid #a78bfa;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="font-size:12px;color:#5b21b6;font-weight:600;">
+              📅 Você quer vincular este atendimento a um agendamento de hoje?
+            </div>
+            <button type="button" onclick="atMostrarAgendamentosHoje()"
+                    style="padding:6px 12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              Ver agendamentos de hoje
+            </button>
+          </div>
+          <div id="at-agendamentos-lista" style="display:none;margin-top:10px;background:#fff;border-radius:6px;padding:6px;max-height:150px;overflow-y:auto;"></div>
+          <div id="at-agendamento-vinculado" style="display:none;margin-top:8px;font-size:12px;color:#166534;background:#dcfce7;padding:6px 10px;border-radius:6px;"></div>
+          <input type="hidden" id="at-agendamento-id">
+        </div>
+
+        <form id="form-sl-atendimento" onsubmit="event.preventDefault(); atSalvar();">
+          <!-- Profissional + data/hora -->
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div>
+              <label style="font-size:11px;color:#334155;font-weight:600;">Profissional *</label>
+              <select id="at-profissional" required onchange="atRecalcular()"
+                      style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#334155;font-weight:600;">Data</label>
+              <input type="date" id="at-data"
+                     style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#334155;font-weight:600;">Hora</label>
+              <input type="time" id="at-hora"
+                     style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+
+          <!-- Cliente -->
+          <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+            <div style="font-size:11px;color:#7c3aed;font-weight:700;margin-bottom:6px;">CLIENTE</div>
+            <div style="display:flex;gap:12px;margin-bottom:6px;">
+              <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;cursor:pointer;">
+                <input type="radio" name="at-tipo-cli" value="cadastrado" checked onchange="atTrocarTipoCliente()"> Cadastrado
+              </label>
+              <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;cursor:pointer;">
+                <input type="radio" name="at-tipo-cli" value="avulso" onchange="atTrocarTipoCliente()"> Avulso
+              </label>
+            </div>
+            <div id="at-bloco-cadastrado">
+              <div style="position:relative;">
+                <input type="text" id="at-cliente-busca" placeholder="Buscar cliente..."
+                       oninput="atBuscarClientes()" autocomplete="off"
+                       style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                <div id="at-cliente-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;z-index:10;"></div>
+              </div>
+              <input type="hidden" id="at-cliente-id">
+              <div id="at-cliente-sel" style="display:none;margin-top:5px;padding:5px 8px;background:#dcfce7;border-radius:5px;font-size:12px;color:#166534;"></div>
+            </div>
+            <div id="at-bloco-avulso" style="display:none;">
+              <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;">
+                <input type="text" id="at-cli-nome" placeholder="Nome"
+                       style="padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                <input type="text" id="at-cli-tel" placeholder="Telefone"
+                       style="padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- SERVIÇOS -->
+          <div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;color:#166534;font-weight:700;">✂️ SERVIÇOS PRESTADOS</div>
+              <button type="button" onclick="atAddServico()"
+                      style="padding:4px 10px;background:#10b981;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">+ Serviço</button>
+            </div>
+            <div id="at-servicos-lista"></div>
+          </div>
+
+          <!-- PRODUTOS VENDIDOS -->
+          <div style="background:#dbeafe;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;color:#1e40af;font-weight:700;">🛒 PRODUTOS VENDIDOS (cliente compra)</div>
+              <button type="button" onclick="atAddProdutoVendido()"
+                      style="padding:4px 10px;background:#3b82f6;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">+ Produto</button>
+            </div>
+            <div id="at-produtos-vendidos-lista"></div>
+          </div>
+
+          <!-- PRODUTOS USADOS -->
+          <div style="background:#fef3c7;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;color:#92400e;font-weight:700;">🧴 PRODUTOS USADOS (tinta, oxigenada, etc)</div>
+              <button type="button" onclick="atAddProdutoUsado()"
+                      style="padding:4px 10px;background:#f59e0b;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">+ Produto usado</button>
+            </div>
+            <div id="at-produtos-usados-lista"></div>
+          </div>
+
+          <!-- Desconto -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <label style="font-size:11px;color:#334155;font-weight:600;">Desconto (R$)</label>
+              <input type="number" id="at-desconto" min="0" step="0.01" value="0" oninput="atRecalcular()"
+                     style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#334155;font-weight:600;">Observações</label>
+              <input type="text" id="at-obs"
+                     style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+
+          <!-- PAGAMENTOS -->
+          <div style="background:#f3e8ff;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;color:#6b21a8;font-weight:700;">💳 FORMAS DE PAGAMENTO</div>
+              <button type="button" onclick="atAddPagamento()"
+                      style="padding:4px 10px;background:#a855f7;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">+ Forma</button>
+            </div>
+            <div id="at-pagamentos-lista"></div>
+            <div id="at-pagto-status" style="margin-top:6px;font-size:11px;font-weight:600;text-align:right;"></div>
+          </div>
+
+          <!-- RESUMO -->
+          <div style="background:#1e293b;color:#fff;border-radius:8px;padding:14px;margin-bottom:14px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;margin-bottom:8px;">💰 RESUMO</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:13px;">
+              <div>Subtotal serviços:</div><div id="at-r-serv" style="text-align:right;">R$ 0,00</div>
+              <div>Subtotal produtos:</div><div id="at-r-prod" style="text-align:right;">R$ 0,00</div>
+              <div>Desconto:</div><div id="at-r-desc" style="text-align:right;color:#fca5a5;">— R$ 0,00</div>
+              <div style="border-top:1px solid #475569;padding-top:4px;font-weight:700;">Total bruto:</div>
+              <div id="at-r-tot" style="text-align:right;border-top:1px solid #475569;padding-top:4px;font-weight:700;">R$ 0,00</div>
+              <div style="color:#fbbf24;">Taxa maquininha:</div>
+              <div id="at-r-tax" style="text-align:right;color:#fbbf24;">— R$ 0,00</div>
+              <div style="color:#86efac;font-weight:700;">Total líquido recebido:</div>
+              <div id="at-r-liq" style="text-align:right;color:#86efac;font-weight:700;">R$ 0,00</div>
+            </div>
+            <div style="border-top:1px solid #475569;margin-top:10px;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:13px;">
+              <div style="color:#c4b5fd;">👤 Profissional recebe:</div>
+              <div id="at-r-prof" style="text-align:right;color:#c4b5fd;font-weight:700;">R$ 0,00</div>
+              <div style="color:#93c5fd;">🏢 Salão fica com:</div>
+              <div id="at-r-sal" style="text-align:right;color:#93c5fd;font-weight:700;">R$ 0,00</div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button type="button" onclick="atFecharModal()"
+                    style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit"
+                    style="padding:10px 22px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">
+              ✅ Salvar Atendimento
+            </button>
           </div>
         </form>
       </div>
@@ -7631,7 +7862,8 @@ https://sistema.glinformatica.com.br
     'sl-profissionais': 'salao',
     'sl-servicos': 'salao',
     'sl-taxas': 'salao',
-    'sl-agenda': 'salao'
+    'sl-agenda': 'salao',
+    'sl-atendimentos': 'salao'
   };
 
   // Abre/fecha um grupo de submenu manualmente
@@ -7913,7 +8145,7 @@ https://sistema.glinformatica.com.br
       }
       carregarNotasSaida();
     }
-    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas' || pg === 'sl-agenda') {
+    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas' || pg === 'sl-agenda' || pg === 'sl-atendimentos') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.moduloSalao) {
         alert('Este recurso está disponível apenas para empresas com Módulo Salão.');
@@ -7924,6 +8156,7 @@ https://sistema.glinformatica.com.br
       if (pg === 'sl-servicos')      slCarregarServicos();
       if (pg === 'sl-taxas')         slCarregarTaxas();
       if (pg === 'sl-agenda')        agEntrar();
+      if (pg === 'sl-atendimentos')  atEntrar();
     }
     if(pg === 'dashboard') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -17454,6 +17687,688 @@ ${conteudo}
     }
   }
 
+  // ============================================
+  // MÓDULO SALÃO — ATENDIMENTOS
+  // ============================================
+
+  let _atLista = [];
+  let _atProfissionais = [];
+  let _atServicos = [];
+  let _atProdutos = [];
+  let _atClienteBuscaTimer = null;
+
+  // Estado interno do modal
+  let _atServ = [];       // [{servicoId, nome, preco}]
+  let _atProdV = [];      // [{produtoId, nome, qtd, precoUnit, comissaoPct}]
+  let _atProdU = [];      // [{produtoId, nome, qtd, custoUnit, baixarEstoque}]
+  let _atPag = [];        // [{formaPagamento, valor}]
+  let _atTaxas = {};      // {dinheiro: 0, pix: 0, ...}
+  let _atComissaoPadrao = 0;   // % da profissional selecionada
+
+  const AT_FORMAS_LABEL = {
+    dinheiro: '💵 Dinheiro',
+    pix: '📱 PIX',
+    debito: '💳 Débito',
+    credito: '💳 Crédito',
+    boleto: '📄 Boleto',
+    outros: '📋 Outros'
+  };
+
+  function atFmtBRL(v) {
+    return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ',');
+  }
+
+  // ---------- CARREGAMENTO ----------
+
+  async function atEntrar() {
+    // Prime datas: últimos 30 dias
+    const hoje = new Date();
+    const iniMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const de = document.getElementById('at-filtro-de');
+    const ate = document.getElementById('at-filtro-ate');
+    if (de && !de.value) de.value = iniMes.toISOString().slice(0,10);
+    if (ate && !ate.value) ate.value = hoje.toISOString().slice(0,10);
+
+    // Carrega apoio (profissionais, serviços, produtos, taxas)
+    try {
+      const [profs, servs, taxas] = await Promise.all([
+        api('GET', '/api/profissionais'),
+        api('GET', '/api/servicos-salao'),
+        api('GET', '/api/taxas-maquininha')
+      ]);
+      _atProfissionais = profs;
+      _atServicos = servs;
+      _atTaxas = {};
+      taxas.forEach(t => { _atTaxas[t.formaPagamento] = Number(t.taxaPercentual) || 0; });
+    } catch (err) {
+      console.error('[atendimentos] erro carregando apoio', err);
+    }
+    _atProdutos = dbProdutos || [];
+
+    // Popula filtro profissional
+    const selFP = document.getElementById('at-filtro-prof');
+    if (selFP) {
+      const val = selFP.value;
+      selFP.innerHTML = '<option value="">Todas profissionais</option>' +
+        _atProfissionais.filter(p => p.ativo).map(p => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+      selFP.value = val;
+    }
+
+    await atCarregar();
+  }
+
+  async function atCarregar() {
+    const tbody = document.getElementById('tbody-atendimentos');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+
+    const de = document.getElementById('at-filtro-de')?.value || '';
+    const ate = document.getElementById('at-filtro-ate')?.value || '';
+    const prof = document.getElementById('at-filtro-prof')?.value || '';
+    const incCanc = document.getElementById('at-inc-cancelados')?.checked ? 'true' : 'false';
+
+    const params = new URLSearchParams({ incluirCancelados: incCanc });
+    if (de) params.append('de', de);
+    if (ate) params.append('ate', ate);
+    if (prof) params.append('profissionalId', prof);
+
+    try {
+      _atLista = await api('GET', '/api/atendimentos?' + params);
+      atRenderizar();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function atRenderizar() {
+    const tbody = document.getElementById('tbody-atendimentos');
+    const cont = document.getElementById('at-contador');
+    if (!tbody) return;
+
+    // Resumo
+    const naoCanc = _atLista.filter(a => !a.cancelado);
+    const bruto = naoCanc.reduce((s, a) => s + Number(a.totalBruto || 0), 0);
+    const salao = naoCanc.reduce((s, a) => s + Number(a.valorLiquidoSalao || 0), 0);
+    const profs = naoCanc.reduce((s, a) => s + Number(a.valorLiquidoProfissional || 0), 0);
+    document.getElementById('at-r-qtd').textContent = naoCanc.length;
+    document.getElementById('at-r-bruto').textContent = atFmtBRL(bruto);
+    document.getElementById('at-r-salao').textContent = atFmtBRL(salao);
+    document.getElementById('at-r-profs').textContent = atFmtBRL(profs);
+    if (cont) cont.textContent = `${_atLista.length} atendimento(s)`;
+
+    if (_atLista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum atendimento no período.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = _atLista.map(a => {
+      const dataFmt = a.data ? a.data.split('-').reverse().join('/') : '';
+      const hora = a.hora || '';
+      const nItens = (a.servicos || []).length + (a.produtosVendidos || []).length;
+      const primeirosItens = [
+        ...(a.servicos || []).map(s => '✂️ ' + s.nome),
+        ...(a.produtosVendidos || []).map(p => '🛒 ' + p.nome)
+      ].slice(0, 2).join(' · ');
+      const restante = nItens > 2 ? ` + ${nItens - 2}` : '';
+      const formasPag = (a.pagamentos || []).map(p => AT_FORMAS_LABEL[p.formaPagamento] || p.formaPagamento).join(' + ');
+      const opacidade = a.cancelado ? 'opacity:0.5;text-decoration:line-through;' : '';
+      const badgeCanc = a.cancelado ? ' <span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">CANCELADO</span>' : '';
+
+      return `
+        <tr style="${opacidade}">
+          <td style="padding:10px;"><b>${dataFmt}</b><br><span style="color:#64748b;font-size:11px;">${hora}</span></td>
+          <td style="padding:10px;"><b>${escapeHtml(a.clienteNome)}</b>${a.clienteTelefone ? '<br><span style="color:#64748b;font-size:11px;">' + escapeHtml(a.clienteTelefone) + '</span>' : ''}</td>
+          <td style="padding:10px;">${escapeHtml(a.profissionalNome || '')}${badgeCanc}</td>
+          <td style="padding:10px;font-size:12px;color:#475569;">${escapeHtml(primeirosItens)}${restante}</td>
+          <td style="padding:10px;text-align:right;font-weight:700;">${atFmtBRL(a.totalBruto)}</td>
+          <td style="padding:10px;text-align:right;color:#7c3aed;">${atFmtBRL(a.valorLiquidoProfissional)}</td>
+          <td style="padding:10px;text-align:center;font-size:11px;">${escapeHtml(formasPag)}</td>
+          <td style="padding:10px;text-align:center;">
+            <button class="btn-link" onclick="atVerDetalhe(${a.id})">Ver</button>
+            ${!a.cancelado ? ` | <button class="btn-link danger" onclick="atCancelar(${a.id})">Cancelar</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ---------- MODAL ----------
+
+  function atAbrirNovo() {
+    if (_atProfissionais.length === 0) { alert('Cadastre ao menos uma profissional antes.'); showPage('sl-profissionais'); return; }
+    if (_atServicos.length === 0 && (dbProdutos || []).length === 0) { alert('Cadastre serviços ou produtos antes.'); return; }
+
+    // Reset
+    _atServ = [];
+    _atProdV = [];
+    _atProdU = [];
+    _atPag = [{ formaPagamento: 'dinheiro', valor: 0 }];
+    document.getElementById('form-sl-atendimento').reset();
+    document.getElementById('at-desconto').value = 0;
+    document.getElementById('at-agendamento-id').value = '';
+    document.getElementById('at-agendamento-vinculado').style.display = 'none';
+    document.getElementById('at-agendamentos-lista').style.display = 'none';
+
+    // Data/hora atuais
+    const agora = new Date();
+    document.getElementById('at-data').value = agora.toISOString().slice(0,10);
+    document.getElementById('at-hora').value = String(agora.getHours()).padStart(2,'0') + ':' + String(agora.getMinutes()).padStart(2,'0');
+
+    // Popula select profissionais
+    const selP = document.getElementById('at-profissional');
+    selP.innerHTML = '<option value="">Selecione...</option>' +
+      _atProfissionais.filter(p => p.ativo).map(p =>
+        `<option value="${p.id}" data-comissao="${p.percentualComissaoProduto || 0}" data-espaco="${p.percentualEspaco || 0}">${escapeHtml(p.nome)}</option>`
+      ).join('');
+
+    // Cliente cadastrado por padrão
+    document.querySelector('input[name="at-tipo-cli"][value="cadastrado"]').checked = true;
+    atTrocarTipoCliente();
+    document.getElementById('at-cliente-id').value = '';
+    document.getElementById('at-cliente-busca').value = '';
+    document.getElementById('at-cliente-sel').style.display = 'none';
+
+    atRenderServicos();
+    atRenderProdVendidos();
+    atRenderProdUsados();
+    atRenderPagamentos();
+    atRecalcular();
+
+    document.getElementById('modal-sl-atendimento').style.display = 'flex';
+  }
+
+  function atFecharModal() {
+    document.getElementById('modal-sl-atendimento').style.display = 'none';
+    document.getElementById('at-cliente-sug').style.display = 'none';
+  }
+
+  async function atMostrarAgendamentosHoje() {
+    const div = document.getElementById('at-agendamentos-lista');
+    div.style.display = 'block';
+    div.innerHTML = '<div style="padding:10px;color:#64748b;font-size:12px;">Buscando...</div>';
+    try {
+      const lista = await api('GET', '/api/agendamentos/hoje');
+      const agendados = lista.filter(a => a.status === 'agendado');
+      if (agendados.length === 0) {
+        div.innerHTML = '<div style="padding:10px;color:#64748b;font-size:12px;">Nenhum agendamento pendente hoje.</div>';
+        return;
+      }
+      div.innerHTML = agendados.map(a => `
+        <div onclick="atVincularAgendamento(${a.id})" style="padding:8px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:12px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background=''">
+          <b>${a.horaInicio ? a.horaInicio : ''}</b> — ${escapeHtml(a.clienteNome)} <span style="color:#64748b;">(${escapeHtml(a.profissionalNome || '')})</span>
+        </div>
+      `).join('');
+    } catch (err) {
+      div.innerHTML = '<div style="padding:10px;color:#dc2626;font-size:12px;">Erro: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function atVincularAgendamento(id) {
+    try {
+      const a = await api('GET', `/api/agendamentos/${id}`);
+      document.getElementById('at-agendamento-id').value = a.id;
+      document.getElementById('at-agendamentos-lista').style.display = 'none';
+      const vinc = document.getElementById('at-agendamento-vinculado');
+      vinc.style.display = 'block';
+      vinc.innerHTML = `✓ Vinculado ao agendamento das <b>${a.horaInicio}</b> — ${escapeHtml(a.clienteNome)}`;
+
+      // Preenche automaticamente profissional + cliente + serviço
+      document.getElementById('at-profissional').value = a.profissionalId;
+      atOnProfissionalChange();
+
+      if (a.clienteId) {
+        document.querySelector('input[name="at-tipo-cli"][value="cadastrado"]').checked = true;
+        atTrocarTipoCliente();
+        document.getElementById('at-cliente-id').value = a.clienteId;
+        document.getElementById('at-cliente-busca').value = a.clienteNome;
+        const sel = document.getElementById('at-cliente-sel');
+        sel.style.display = 'block';
+        sel.textContent = `✓ ${a.clienteNome}` + (a.clienteTelefone ? ` — ${a.clienteTelefone}` : '');
+      } else {
+        document.querySelector('input[name="at-tipo-cli"][value="avulso"]').checked = true;
+        atTrocarTipoCliente();
+        document.getElementById('at-cli-nome').value = a.clienteNome;
+        document.getElementById('at-cli-tel').value = a.clienteTelefone || '';
+      }
+
+      if (a.servicoId) {
+        const serv = _atServicos.find(s => s.id === a.servicoId);
+        if (serv) {
+          _atServ.push({ servicoId: serv.id, nome: serv.nome, preco: Number(serv.precoPadrao) || 0 });
+          atRenderServicos();
+          atRecalcular();
+        }
+      }
+    } catch (err) {
+      alert('Erro ao vincular: ' + err.message);
+    }
+  }
+
+  function atOnProfissionalChange() {
+    const sel = document.getElementById('at-profissional');
+    const opt = sel.options[sel.selectedIndex];
+    _atComissaoPadrao = Number(opt?.dataset?.comissao) || 0;
+    atRecalcular();
+  }
+
+  function atTrocarTipoCliente() {
+    const tipo = document.querySelector('input[name="at-tipo-cli"]:checked')?.value;
+    document.getElementById('at-bloco-cadastrado').style.display = tipo === 'cadastrado' ? 'block' : 'none';
+    document.getElementById('at-bloco-avulso').style.display = tipo === 'avulso' ? 'block' : 'none';
+  }
+
+  function atBuscarClientes() {
+    clearTimeout(_atClienteBuscaTimer);
+    _atClienteBuscaTimer = setTimeout(() => {
+      const termo = document.getElementById('at-cliente-busca').value.trim();
+      const sug = document.getElementById('at-cliente-sug');
+      if (termo.length < 2) { sug.style.display = 'none'; return; }
+      const filtrados = (dbClientes || [])
+        .filter(c => (c.nome || '').toLowerCase().includes(termo.toLowerCase()))
+        .slice(0, 10);
+      if (filtrados.length === 0) {
+        sug.innerHTML = '<div style="padding:8px 12px;color:#94a3b8;font-size:12px;">Nenhum cliente.</div>';
+      } else {
+        sug.innerHTML = filtrados.map(c => `
+          <div onclick="atSelecionarCliente(${c.id})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+            <b>${escapeHtml(c.nome)}</b>${c.telefone ? ` <span style="color:#64748b;">${escapeHtml(c.telefone)}</span>` : ''}
+          </div>
+        `).join('');
+      }
+      sug.style.display = 'block';
+    }, 200);
+  }
+
+  function atSelecionarCliente(id) {
+    const c = (dbClientes || []).find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('at-cliente-id').value = c.id;
+    document.getElementById('at-cliente-busca').value = c.nome;
+    document.getElementById('at-cliente-sug').style.display = 'none';
+    const sel = document.getElementById('at-cliente-sel');
+    sel.style.display = 'block';
+    sel.textContent = `✓ ${c.nome}` + (c.telefone ? ` — ${c.telefone}` : '');
+  }
+
+  // ---------- SERVIÇOS ----------
+
+  function atAddServico() {
+    _atServ.push({ servicoId: null, nome: '', preco: 0 });
+    atRenderServicos();
+  }
+
+  function atRemoverServico(idx) {
+    _atServ.splice(idx, 1);
+    atRenderServicos();
+    atRecalcular();
+  }
+
+  function atRenderServicos() {
+    const cont = document.getElementById('at-servicos-lista');
+    if (!cont) return;
+    if (_atServ.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Clique em "+ Serviço" pra adicionar.</div>';
+      return;
+    }
+    cont.innerHTML = _atServ.map((s, i) => `
+      <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:6px;align-items:center;">
+        <select onchange="atServicoChange(${i}, this)"
+                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
+          <option value="">Selecione serviço...</option>
+          ${_atServicos.filter(x => x.ativo).map(x => `
+            <option value="${x.id}" data-preco="${x.precoPadrao}" ${s.servicoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+          `).join('')}
+        </select>
+        <input type="number" step="0.01" min="0" value="${s.preco}"
+               oninput="atServ_[${i}] = {...atServ_[${i}], preco: parseFloat(this.value)||0}; atRecalcular();"
+               placeholder="Preço"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
+        <button type="button" onclick="atRemoverServico(${i})"
+                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+      </div>
+    `).join('');
+    // Hack: expor _atServ como window.atServ_ pra os oninput
+    window.atServ_ = _atServ;
+  }
+
+  function atServicoChange(idx, sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const id = parseInt(sel.value) || null;
+    const serv = _atServicos.find(s => s.id === id);
+    if (serv) {
+      _atServ[idx].servicoId = serv.id;
+      _atServ[idx].nome = serv.nome;
+      _atServ[idx].preco = Number(serv.precoPadrao) || 0;
+    } else {
+      _atServ[idx].servicoId = null;
+    }
+    atRenderServicos();
+    atRecalcular();
+  }
+
+  // ---------- PRODUTOS VENDIDOS ----------
+
+  function atAddProdutoVendido() {
+    _atProdV.push({ produtoId: null, nome: '', qtd: 1, precoUnit: 0, comissaoPct: _atComissaoPadrao });
+    atRenderProdVendidos();
+  }
+
+  function atRemoverProdV(idx) {
+    _atProdV.splice(idx, 1);
+    atRenderProdVendidos();
+    atRecalcular();
+  }
+
+  function atRenderProdVendidos() {
+    const cont = document.getElementById('at-produtos-vendidos-lista');
+    if (!cont) return;
+    if (_atProdV.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Cliente comprou algum produto? Clique "+ Produto".</div>';
+      return;
+    }
+    cont.innerHTML = _atProdV.map((p, i) => `
+      <div style="display:grid;grid-template-columns:2fr 60px 80px 70px auto;gap:6px;margin-bottom:6px;align-items:center;">
+        <select onchange="atProdVChange(${i}, this)"
+                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
+          <option value="">Selecione produto...</option>
+          ${_atProdutos.slice(0, 500).map(x => `
+            <option value="${x.id}" data-preco="${x.precoVenda || x.preco || 0}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+          `).join('')}
+        </select>
+        <input type="number" step="1" min="1" value="${p.qtd}" placeholder="Qtd"
+               oninput="atProdV_[${i}].qtd = parseFloat(this.value)||0; atRecalcular();"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:center;">
+        <input type="number" step="0.01" min="0" value="${p.precoUnit}" placeholder="Preço"
+               oninput="atProdV_[${i}].precoUnit = parseFloat(this.value)||0; atRecalcular();"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
+        <input type="number" step="0.01" min="0" max="100" value="${p.comissaoPct}" title="% comissão profissional"
+               oninput="atProdV_[${i}].comissaoPct = parseFloat(this.value)||0; atRecalcular();"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
+        <button type="button" onclick="atRemoverProdV(${i})"
+                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+      </div>
+    `).join('');
+    window.atProdV_ = _atProdV;
+  }
+
+  function atProdVChange(idx, sel) {
+    const id = parseInt(sel.value) || null;
+    const prod = _atProdutos.find(p => p.id === id);
+    if (prod) {
+      _atProdV[idx].produtoId = prod.id;
+      _atProdV[idx].nome = prod.nome;
+      _atProdV[idx].precoUnit = Number(prod.precoVenda || prod.preco || 0);
+    }
+    atRenderProdVendidos();
+    atRecalcular();
+  }
+
+  // ---------- PRODUTOS USADOS ----------
+
+  function atAddProdutoUsado() {
+    _atProdU.push({ produtoId: null, nome: '', qtd: 1, custoUnit: 0, baixarEstoque: true });
+    atRenderProdUsados();
+  }
+
+  function atRemoverProdU(idx) {
+    _atProdU.splice(idx, 1);
+    atRenderProdUsados();
+  }
+
+  function atRenderProdUsados() {
+    const cont = document.getElementById('at-produtos-usados-lista');
+    if (!cont) return;
+    if (_atProdU.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Produtos consumidos no atendimento (tinta, etc). "+ Produto usado".</div>';
+      return;
+    }
+    cont.innerHTML = _atProdU.map((p, i) => `
+      <div style="display:grid;grid-template-columns:2fr 80px 80px 130px auto;gap:6px;margin-bottom:6px;align-items:center;">
+        <select onchange="atProdUChange(${i}, this)"
+                style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
+          <option value="">Selecione produto...</option>
+          ${_atProdutos.slice(0, 500).map(x => `
+            <option value="${x.id}" data-custo="${x.precoCusto || 0}" ${p.produtoId === x.id ? 'selected' : ''}>${escapeHtml(x.nome)}</option>
+          `).join('')}
+        </select>
+        <input type="number" step="0.01" min="0" value="${p.qtd}" placeholder="Qtd"
+               oninput="atProdU_[${i}].qtd = parseFloat(this.value)||0;"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:center;">
+        <input type="number" step="0.01" min="0" value="${p.custoUnit}" placeholder="Custo un"
+               oninput="atProdU_[${i}].custoUnit = parseFloat(this.value)||0;"
+               style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
+        <label style="font-size:11px;color:#334155;display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" ${p.baixarEstoque ? 'checked' : ''}
+                 onchange="atProdU_[${i}].baixarEstoque = this.checked;">
+          baixar estoque
+        </label>
+        <button type="button" onclick="atRemoverProdU(${i})"
+                style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+      </div>
+    `).join('');
+    window.atProdU_ = _atProdU;
+  }
+
+  function atProdUChange(idx, sel) {
+    const id = parseInt(sel.value) || null;
+    const prod = _atProdutos.find(p => p.id === id);
+    if (prod) {
+      _atProdU[idx].produtoId = prod.id;
+      _atProdU[idx].nome = prod.nome;
+      _atProdU[idx].custoUnit = Number(prod.precoCusto || 0);
+    }
+    atRenderProdUsados();
+  }
+
+  // ---------- PAGAMENTOS ----------
+
+  function atAddPagamento() {
+    _atPag.push({ formaPagamento: 'dinheiro', valor: 0 });
+    atRenderPagamentos();
+  }
+
+  function atRemoverPag(idx) {
+    _atPag.splice(idx, 1);
+    atRenderPagamentos();
+    atRecalcular();
+  }
+
+  function atRenderPagamentos() {
+    const cont = document.getElementById('at-pagamentos-lista');
+    if (!cont) return;
+    cont.innerHTML = _atPag.map((p, i) => {
+      const taxa = _atTaxas[p.formaPagamento] || 0;
+      return `
+        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;">
+          <select onchange="atPag_[${i}].formaPagamento = this.value; atRecalcular(); atRenderPagamentos();"
+                  style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;background:#fff;">
+            ${Object.keys(AT_FORMAS_LABEL).map(f => `
+              <option value="${f}" ${p.formaPagamento === f ? 'selected' : ''}>${AT_FORMAS_LABEL[f]} ${_atTaxas[f] > 0 ? '('+_atTaxas[f]+'%)' : ''}</option>
+            `).join('')}
+          </select>
+          <input type="number" step="0.01" min="0" value="${p.valor}" placeholder="Valor"
+                 oninput="atPag_[${i}].valor = parseFloat(this.value)||0; atRecalcular();"
+                 style="padding:7px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;text-align:right;">
+          <button type="button" onclick="atRemoverPag(${i})"
+                  style="padding:6px 10px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;font-size:12px;">✕</button>
+        </div>
+      `;
+    }).join('');
+    window.atPag_ = _atPag;
+  }
+
+  // ---------- RECALCULAR ----------
+
+  function atRecalcular() {
+    // Sub serviços
+    const subServ = _atServ.reduce((s, x) => s + (Number(x.preco) || 0), 0);
+    // Sub produtos
+    const subProd = _atProdV.reduce((s, x) => s + (Number(x.qtd) * Number(x.precoUnit)), 0);
+    const desc = Number(document.getElementById('at-desconto').value) || 0;
+    const totBruto = subServ + subProd - desc;
+
+    // Taxas maquininha (soma de todas)
+    const totTax = _atPag.reduce((s, p) => {
+      const taxa = _atTaxas[p.formaPagamento] || 0;
+      return s + (Number(p.valor) || 0) * taxa / 100;
+    }, 0);
+    const totLiq = totBruto - totTax;
+
+    // Divisão salão / profissional
+    const selP = document.getElementById('at-profissional');
+    const opt = selP.options[selP.selectedIndex];
+    const pctEspaco = Number(opt?.dataset?.espaco) || 0;
+    const valorEspaco = subServ * pctEspaco / 100;
+    const valorComissaoProf = _atProdV.reduce((s, p) => {
+      return s + (Number(p.qtd) * Number(p.precoUnit)) * (Number(p.comissaoPct) || 0) / 100;
+    }, 0);
+    const valorProf = subServ - valorEspaco + valorComissaoProf;
+    const valorSal = valorEspaco + subProd - valorComissaoProf - totTax - desc;
+
+    // Atualiza tela
+    document.getElementById('at-r-serv').textContent = atFmtBRL(subServ);
+    document.getElementById('at-r-prod').textContent = atFmtBRL(subProd);
+    document.getElementById('at-r-desc').textContent = '— ' + atFmtBRL(desc);
+    document.getElementById('at-r-tot').textContent = atFmtBRL(totBruto);
+    document.getElementById('at-r-tax').textContent = '— ' + atFmtBRL(totTax);
+    document.getElementById('at-r-liq').textContent = atFmtBRL(totLiq);
+    document.getElementById('at-r-prof').textContent = atFmtBRL(valorProf);
+    document.getElementById('at-r-sal').textContent = atFmtBRL(valorSal);
+
+    // Status pagamento
+    const somaPag = _atPag.reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const diff = totBruto - somaPag;
+    const status = document.getElementById('at-pagto-status');
+    if (Math.abs(diff) < 0.01) {
+      status.style.color = '#166534';
+      status.innerHTML = '✅ Pagamentos batem com o total';
+    } else if (diff > 0) {
+      status.style.color = '#b91c1c';
+      status.innerHTML = `Falta receber: ${atFmtBRL(diff)}`;
+    } else {
+      status.style.color = '#b91c1c';
+      status.innerHTML = `Recebido a mais: ${atFmtBRL(-diff)}`;
+    }
+  }
+
+  // Handler mudança profissional
+  document.addEventListener('DOMContentLoaded', () => {
+    const sp = document.getElementById('at-profissional');
+    if (sp) sp.addEventListener('change', atOnProfissionalChange);
+  });
+
+  // ---------- SALVAR ----------
+
+  async function atSalvar() {
+    const profId = document.getElementById('at-profissional').value;
+    if (!profId) { alert('Selecione a profissional.'); return; }
+
+    // Cliente
+    const tipoCli = document.querySelector('input[name="at-tipo-cli"]:checked')?.value;
+    let clienteId = null, clienteNome = '', clienteTelefone = '';
+    if (tipoCli === 'cadastrado') {
+      clienteId = parseInt(document.getElementById('at-cliente-id').value) || null;
+      if (!clienteId) { alert('Selecione um cliente cadastrado ou marque "avulso".'); return; }
+      const c = (dbClientes || []).find(x => x.id === clienteId);
+      if (c) { clienteNome = c.nome; clienteTelefone = c.telefone || ''; }
+    } else {
+      clienteNome = document.getElementById('at-cli-nome').value.trim();
+      clienteTelefone = document.getElementById('at-cli-tel').value.trim();
+      if (!clienteNome) { alert('Informe o nome do cliente.'); return; }
+    }
+
+    // Filtra itens vazios
+    const servicos = _atServ.filter(s => s.servicoId || s.nome);
+    const produtosVendidos = _atProdV.filter(p => p.produtoId || p.nome);
+    const produtosUsados = _atProdU.filter(p => p.produtoId || p.nome);
+    if (servicos.length === 0 && produtosVendidos.length === 0) {
+      alert('Adicione pelo menos um serviço ou produto vendido.');
+      return;
+    }
+
+    // Pagamentos: valida soma
+    const totBruto = servicos.reduce((s, x) => s + Number(x.preco), 0)
+                   + produtosVendidos.reduce((s, x) => s + Number(x.qtd) * Number(x.precoUnit), 0)
+                   - (Number(document.getElementById('at-desconto').value) || 0);
+    const somaPag = _atPag.reduce((s, p) => s + Number(p.valor), 0);
+    if (Math.abs(totBruto - somaPag) > 0.01) {
+      alert(`Os pagamentos precisam bater com o total (${atFmtBRL(totBruto)}). Diferença: ${atFmtBRL(Math.abs(totBruto - somaPag))}`);
+      return;
+    }
+    const pagamentos = _atPag.filter(p => Number(p.valor) > 0);
+    if (pagamentos.length === 0) { alert('Informe pelo menos uma forma de pagamento.'); return; }
+
+    const dados = {
+      agendamentoId: parseInt(document.getElementById('at-agendamento-id').value) || null,
+      profissionalId: parseInt(profId),
+      clienteId,
+      clienteNome,
+      clienteTelefone,
+      data: document.getElementById('at-data').value,
+      hora: document.getElementById('at-hora').value,
+      servicos,
+      produtosVendidos,
+      produtosUsados,
+      desconto: parseFloat(document.getElementById('at-desconto').value) || 0,
+      pagamentos,
+      observacoes: document.getElementById('at-obs').value.trim()
+    };
+
+    try {
+      await api('POST', '/api/atendimentos', dados);
+      atFecharModal();
+      await atCarregar();
+      alert('✅ Atendimento salvo com sucesso!');
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  // ---------- DETALHE / CANCELAR ----------
+
+  async function atVerDetalhe(id) {
+    const a = _atLista.find(x => x.id === id);
+    if (!a) return;
+    const servs = (a.servicos || []).map(s => `• ${s.nome} — ${atFmtBRL(s.preco)}`).join('\n');
+    const prodsV = (a.produtosVendidos || []).map(p => `• ${p.nome} × ${p.qtd} — ${atFmtBRL(p.subtotal)}${p.comissaoPct ? ` (comissão ${p.comissaoPct}%)` : ''}`).join('\n');
+    const prodsU = (a.produtosUsados || []).map(p => `• ${p.nome} × ${p.qtd}${p.baixarEstoque ? ' (baixou estoque)' : ''}`).join('\n');
+    const pags = (a.pagamentos || []).map(p => `• ${AT_FORMAS_LABEL[p.formaPagamento] || p.formaPagamento}: ${atFmtBRL(p.valor)}${p.taxaPct ? ` (taxa ${p.taxaPct}% = -${atFmtBRL(p.taxaValor)})` : ''}`).join('\n');
+
+    alert(
+      `ATENDIMENTO #${a.id}\n` +
+      `─────────────────────\n` +
+      `Data: ${a.data ? a.data.split('-').reverse().join('/') : ''} ${a.hora || ''}\n` +
+      `Cliente: ${a.clienteNome}\n` +
+      `Profissional: ${a.profissionalNome}\n` +
+      (a.cancelado ? `\n⚠️ CANCELADO — ${a.canceladoMotivo || 'sem motivo informado'}\n` : '') +
+      (servs ? `\nSERVIÇOS:\n${servs}\n` : '') +
+      (prodsV ? `\nPRODUTOS VENDIDOS:\n${prodsV}\n` : '') +
+      (prodsU ? `\nPRODUTOS USADOS:\n${prodsU}\n` : '') +
+      `\nPAGAMENTOS:\n${pags}\n` +
+      `─────────────────────\n` +
+      `Total bruto: ${atFmtBRL(a.totalBruto)}\n` +
+      `Taxa maquininha: ${atFmtBRL(a.totalTaxasMaquininha)}\n` +
+      `Total líquido: ${atFmtBRL(a.totalLiquido)}\n\n` +
+      `Profissional recebe: ${atFmtBRL(a.valorLiquidoProfissional)}\n` +
+      `Salão fica com: ${atFmtBRL(a.valorLiquidoSalao)}` +
+      (a.observacoes ? `\n\nObs: ${a.observacoes}` : '')
+    );
+  }
+
+  async function atCancelar(id) {
+    const a = _atLista.find(x => x.id === id);
+    if (!a) return;
+    const motivo = prompt(`Cancelar atendimento de ${a.clienteNome}?\n\nO estoque será ESTORNADO automaticamente.\n\nMotivo (opcional):`);
+    if (motivo === null) return; // usuário clicou cancelar
+    try {
+      await api('POST', `/api/atendimentos/${id}/cancelar`, { motivo });
+      await atCarregar();
+      alert('✅ Atendimento cancelado. Estoque estornado.');
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
   // ---------- DASHBOARD SALÃO ----------
 
   function carregarDashboardSalao() {
@@ -17526,11 +18441,22 @@ ${conteudo}
       }
     })();
 
-    // Faturamento ainda não implementado (Fase 3 - Atendimentos)
-    document.getElementById('ds-fat-hoje').textContent = 'R$ 0,00';
-    document.getElementById('ds-fat-hoje-detalhe').textContent = 'em breve';
-    document.getElementById('ds-fat-mes').textContent = 'R$ 0,00';
-    document.getElementById('ds-fat-mes-detalhe').textContent = 'em breve';
+    // Faturamento (atendimentos)
+    (async () => {
+      try {
+        const f = await api('GET', '/api/atendimentos/faturamento');
+        document.getElementById('ds-fat-hoje').textContent = 'R$ ' + (Number(f.brutoHoje) || 0).toFixed(2).replace('.', ',');
+        document.getElementById('ds-fat-hoje-detalhe').textContent =
+          f.qtdHoje === 0 ? 'ainda sem vendas' :
+          f.qtdHoje === 1 ? '1 atendimento' : `${f.qtdHoje} atendimentos`;
+        document.getElementById('ds-fat-mes').textContent = 'R$ ' + (Number(f.brutoMes) || 0).toFixed(2).replace('.', ',');
+        document.getElementById('ds-fat-mes-detalhe').textContent =
+          f.qtdMes === 0 ? 'ainda sem vendas' : `${f.qtdMes} atendimentos no mês`;
+      } catch (err) {
+        document.getElementById('ds-fat-hoje').textContent = 'R$ 0,00';
+        document.getElementById('ds-fat-mes').textContent = 'R$ 0,00';
+      }
+    })();
   }
 
   async function slCarregarProfissionais() {

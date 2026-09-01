@@ -42,6 +42,7 @@ app.use('/api/profissionais',     autenticar, verificarAcesso, require('./routes
 app.use('/api/servicos-salao',    autenticar, verificarAcesso, require('./routes/servicos-salao'));
 app.use('/api/taxas-maquininha',  autenticar, verificarAcesso, require('./routes/taxas-maquininha'));
 app.use('/api/agendamentos',      autenticar, verificarAcesso, require('./routes/agendamentos'));
+app.use('/api/atendimentos',      autenticar, verificarAcesso, require('./routes/atendimentos'));
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
 app.use('/api/master/uso-sistema', autenticarMaster, require('./routes/uso-sistema'));
