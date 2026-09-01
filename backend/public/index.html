@@ -6969,6 +6969,8 @@ https://sistema.glinformatica.com.br
       dbClientes.length = 0; dbClientes.push(...clis);
       dbVendas.length = 0; dbVendas.push(...vds);
       dbEntradas.length = 0; dbEntradas.push(...ents);
+      // Invalida cache do select de fornecedores (será repopulado no próximo render)
+      if (typeof _fornSelectPopulado !== 'undefined') _fornSelectPopulado = false;
       dbContasPagar.length = 0; dbContasPagar.push(...cp);
       dbContasReceber.length = 0; dbContasReceber.push(...cr);
       // Movimentações são carregadas sob demanda (ao abrir histórico de produto)
@@ -7350,6 +7352,11 @@ https://sistema.glinformatica.com.br
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
     if(pg === 'orcamentos') carregarOrcamentos();
+    if(pg === 'fornecedores') {
+      // Renderiza a lista de fornecedores (rápido) + entradas (agora só roda quando visível)
+      if (typeof renderFornecedores === 'function') renderFornecedores();
+      if (typeof renderEntradasFornecedores === 'function') renderEntradasFornecedores();
+    }
     if(pg === 'lista-compras') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.usaAmbientes) {
@@ -8862,24 +8869,23 @@ https://sistema.glinformatica.com.br
   }
   // Render da tabela de Entradas Registradas (aba Fornecedores)
   let _limiteEntradasForn = 50;
+  let _fornSelectPopulado = false; // cache: só popula uma vez
 
   function renderEntradasFornecedores() {
-    // Sempre atualiza também a página Estoque (se aberta ou não, é barato)
-    setTimeout(() => {
-      if (typeof renderEntradaMercadoriasEstoque === 'function') {
-        renderEntradaMercadoriasEstoque();
-        if (typeof atualizarResumoEntradasEstoque === 'function') atualizarResumoEntradasEstoque();
-      }
-    }, 0);
     const tbody = document.getElementById('tbody-entradas-fornecedores');
     if(!tbody) return;
-    // Atualiza opções do select de fornecedor (mantém o valor atual)
+    // OTIMIZAÇÃO: só renderiza se a página de Fornecedores está visível
+    // (evita processar 6000+ entradas quando você está em outra tela)
+    const paginaForn = document.getElementById('page-fornecedores');
+    if (!paginaForn || paginaForn.style.display === 'none') return;
+    // Popula o select UMA VEZ (evita reprocessar 6000+ entradas a cada render)
     const selFornecedor = document.getElementById('filtro-ent-fornecedor');
-    if (selFornecedor) {
+    if (selFornecedor && !_fornSelectPopulado) {
       const valorAtual = selFornecedor.value;
       const fornecedoresUnicos = [...new Set(dbEntradas.map(e => e.fornecedor).filter(Boolean))].sort();
       selFornecedor.innerHTML = '<option value="">Todos</option>' +
         fornecedoresUnicos.map(f => `<option value="${f.replace(/"/g,'&quot;')}"${f===valorAtual?' selected':''}>${f}</option>`).join('');
+      _fornSelectPopulado = true;
     }
     if(dbEntradas.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">Nenhuma entrada registrada.</td></tr>';
@@ -9060,6 +9066,9 @@ https://sistema.glinformatica.com.br
   function renderEntradaMercadoriasEstoque() {
     const tbody = document.getElementById('tbody-entradas-estoque');
     if (!tbody) return;
+    // OTIMIZAÇÃO: só renderiza se a página de Entradas está visível
+    const paginaEst = document.getElementById('page-entrada-mercadorias');
+    if (!paginaEst || paginaEst.style.display === 'none') return;
 
     if (!dbEntradas || dbEntradas.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">📭 Nenhuma entrada registrada. Clique em "Nova Entrada" pra começar.</td></tr>';
