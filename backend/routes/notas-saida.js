@@ -131,11 +131,22 @@ router.get('/:id', async (req, res) => {
     }
     const nota = rNota.rows[0];
 
-    // Busca dados da venda vinculada (se houver)
+    // Busca ITENS DA NOTA (tabela nova notas_saida_itens)
+    const rItens = await db.query(
+      `SELECT ordem, codigo, descricao, quantidade, valor_unitario,
+              desconto_item, total, unidade, cfop, ncm
+         FROM notas_saida_itens
+        WHERE nota_id = $1
+        ORDER BY ordem NULLS LAST, id`,
+      [id]
+    );
+    const itens = rItens.rows;
+
+    // Busca info mínima da venda vinculada (só pra mostrar link)
     let venda = null;
     if (nota.venda_id) {
       const rVenda = await db.query(
-        `SELECT id, data, cliente, total, itens, pagamento, parcelas, obs
+        `SELECT id, data, cliente, total
          FROM vendas WHERE id=$1 AND empresa_id=$2`,
         [nota.venda_id, req.user.empresaId]
       );
@@ -144,7 +155,7 @@ router.get('/:id', async (req, res) => {
       }
     }
 
-    res.json({ nota, venda });
+    res.json({ nota, itens, venda });
   } catch (err) {
     console.error('[notas-saida] GET /:id', err);
     res.status(500).json({ error: 'Erro: ' + err.message });

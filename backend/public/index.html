@@ -10350,7 +10350,27 @@ https://sistema.glinformatica.com.br
         const pag = pagamentoLabel[v.pagamento] || v.pagamento;
         pagTxt = v.parcelas && v.parcelas.length > 1 ? `${pag} (${v.parcelas.length}x)` : pag;
       }
-      const itensTxt = (v.itens && v.itens.length) ? `${v.itens.length} iten(s)` : '-';
+      // Coluna Itens: mostra até 3 produtos com código (chaves corretas: produto + codigo)
+      let itensTxt = '<span style="color:#94a3b8;">—</span>';
+      if (v.itens && v.itens.length > 0) {
+        const primeiros = v.itens.slice(0, 3).map(i => {
+          const cod = i.codigo ? `<span style="font-family:monospace;color:#64748b;font-size:11px;">${escapeHtml(String(i.codigo))}</span> ` : '';
+          const nome = escapeHtml(i.produto || i.nome || i.descricao || '—');
+          const qtd = formatarQtd(i.qtd || i.quantidade || 0);
+          return `<div style="line-height:1.35;">${cod}${nome} <span style="color:#64748b;">×${qtd}</span></div>`;
+        }).join('');
+        const resto = v.itens.length > 3
+          ? `<div style="font-size:11px;color:#64748b;font-style:italic;margin-top:2px;">+ ${v.itens.length - 3} outro(s)…</div>`
+          : '';
+        // Tooltip com lista completa (útil pra vendas com muitos itens)
+        const tituloTooltip = v.itens.map(i => {
+          const cod = i.codigo ? `[${i.codigo}] ` : '';
+          const nome = i.produto || i.nome || i.descricao || '';
+          const qtd = formatarQtd(i.qtd || i.quantidade || 0);
+          return `${cod}${nome} × ${qtd}`;
+        }).join('\n');
+        itensTxt = `<div title="${escapeAttr(tituloTooltip)}" style="max-width:300px;">${primeiros}${resto}</div>`;
+      }
 
       // Notas fiscais vinculadas (uma venda pode ter várias)
       let nfTxt = '<span style="color:#94a3b8;">—</span>';
@@ -16578,42 +16598,63 @@ ${conteudo}
         ${n.obs ? `<div style="margin-top:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;color:#475569;"><strong>Observações:</strong><br>${escapeHtml(n.obs)}</div>` : ''}
       `;
 
-      // Itens da venda vinculada
-      if (v) {
-        const itensHtml = (v.itens || []).map(it => {
-          const qtdFormatada = Number(it.qtd || 0);
-          const qtdTxt = qtdFormatada % 1 === 0 ? qtdFormatada.toFixed(0) : qtdFormatada.toString().replace(/\.?0+$/, '');
-          const preco = Number(it.preco || it.precoUnit || 0);
-          const subtotal = qtdFormatada * preco;
+      // ITENS DA NOTA (nova tabela notas_saida_itens)
+      const itens = r.itens || [];
+      if (itens.length > 0) {
+        const itensHtml = itens.map(it => {
+          const qtdTxt = formatarQtd(it.quantidade);
+          const codigoLbl = it.codigo ? `<span style="font-family:monospace;color:#64748b;font-size:11px;">${escapeHtml(it.codigo)}</span> · ` : '';
+          const totalIt = Number(it.total || 0);
+          const descIt = Number(it.desconto_item || 0);
           return `
             <tr style="border-top:1px solid #f1f5f9;">
-              <td style="padding:6px 10px;">${escapeHtml(it.descricao || it.nome || '—')}</td>
+              <td style="padding:6px 10px;">${codigoLbl}${escapeHtml(it.descricao || '—')}</td>
+              <td style="padding:6px 10px;text-align:center;font-size:11px;color:#64748b;">${escapeHtml(it.unidade || '—')}</td>
               <td style="padding:6px 10px;text-align:center;">${qtdTxt}</td>
-              <td style="padding:6px 10px;text-align:right;">${formatarBRL(preco)}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;">${formatarBRL(subtotal)}</td>
+              <td style="padding:6px 10px;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
+              <td style="padding:6px 10px;text-align:right;color:${descIt > 0 ? '#dc2626' : '#94a3b8'};">${descIt > 0 ? '- ' + formatarBRL(descIt) : '—'}</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:600;">${formatarBRL(totalIt)}</td>
             </tr>
           `;
         }).join('');
 
         corpoHtml += `
           <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <strong style="color:#0891b2;font-size:14px;">🛒 Venda vinculada #${v.id}</strong>
-              <span style="font-size:12px;color:#64748b;">${v.data ? new Date(String(v.data).slice(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</span>
+            <div style="margin-bottom:10px;">
+              <strong style="color:#0891b2;font-size:14px;">📦 Itens da nota (${itens.length})</strong>
             </div>
-            ${itensHtml ? `
+            <div style="overflow-x:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:12px;">
                 <thead style="background:#f8fafc;">
                   <tr>
                     <th style="padding:6px 10px;text-align:left;">Item</th>
+                    <th style="padding:6px 10px;text-align:center;">Un</th>
                     <th style="padding:6px 10px;text-align:center;">Qtd</th>
-                    <th style="padding:6px 10px;text-align:right;">Preço</th>
-                    <th style="padding:6px 10px;text-align:right;">Subtotal</th>
+                    <th style="padding:6px 10px;text-align:right;">Valor unit.</th>
+                    <th style="padding:6px 10px;text-align:right;">Desconto</th>
+                    <th style="padding:6px 10px;text-align:right;">Total</th>
                   </tr>
                 </thead>
                 <tbody>${itensHtml}</tbody>
               </table>
-            ` : '<div style="color:#94a3b8;font-size:12px;">Sem itens registrados.</div>'}
+            </div>
+          </div>
+        `;
+      } else {
+        corpoHtml += `
+          <div style="margin-top:20px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;text-align:center;font-size:12px;color:#64748b;">
+            📭 Sem itens registrados (nota antiga migrada sem detalhamento).
+          </div>
+        `;
+      }
+
+      // Link pra venda vinculada (separado dos itens)
+      if (v) {
+        const vTotal = Number(v.total || 0);
+        corpoHtml += `
+          <div style="margin-top:14px;padding:10px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;font-size:12px;color:#1e3a8a;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <span>🛒 <strong>Venda vinculada #${v.id}</strong> · ${escapeHtml(v.cliente || '—')} · ${v.data ? new Date(String(v.data).slice(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</span>
+            <strong>${formatarBRL(vTotal)}</strong>
           </div>
         `;
       } else if (n.venda_id) {
