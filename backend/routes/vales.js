@@ -74,6 +74,26 @@ router.post('/', async (req, res) => {
     const v = Number(valor);
     if (!v || v <= 0) return res.status(400).json({ error: 'Valor deve ser positivo.' });
 
+    // Data efetiva do vale (se não informou, usa hoje)
+    const dataEfetiva = data || new Date().toISOString().slice(0, 10);
+    // Extrai mes/ano dessa data
+    const [ano, mes] = dataEfetiva.split('-').map(Number);
+
+    // Bloqueia se já existe fechamento pra essa profissional nesse mês
+    const jaFechado = await db.query(
+      `SELECT id, status FROM fechamentos_mensais
+       WHERE empresa_id=$1 AND profissional_id=$2 AND mes=$3 AND ano=$4`,
+      [req.user.empresaId, profissionalId, mes, ano]
+    );
+    if (jaFechado.rows.length > 0) {
+      const statusMsg = jaFechado.rows[0].status === 'pago' ? 'e PAGO' : '';
+      return res.status(400).json({
+        error: `O mês ${String(mes).padStart(2,'0')}/${ano} desta profissional já foi fechado ${statusMsg}. ` +
+               `Para adicionar este vale, primeiro reabra o fechamento em "📊 Fechamento Mensal", ` +
+               `ou registre o vale numa data de outro mês.`
+      });
+    }
+
     const r = await db.query(
       `INSERT INTO vales_profissional
          (empresa_id, profissional_id, data, valor, observacao, criado_por)
@@ -81,7 +101,7 @@ router.post('/', async (req, res) => {
       [
         req.user.empresaId,
         parseInt(profissionalId),
-        data || null,   // usa CURRENT_DATE se null
+        dataEfetiva,
         v,
         observacao || null,
         req.user.userId || null
@@ -104,14 +124,30 @@ router.put('/:id', async (req, res) => {
     const v = Number(valor);
     if (!v || v <= 0) return res.status(400).json({ error: 'Valor deve ser positivo.' });
 
-    // Verifica se já foi fechado
+    // Verifica se já foi fechado (o próprio vale)
     const chk = await db.query(
-      'SELECT fechamento_id FROM vales_profissional WHERE id=$1 AND empresa_id=$2',
+      'SELECT fechamento_id, profissional_id FROM vales_profissional WHERE id=$1 AND empresa_id=$2',
       [id, req.user.empresaId]
     );
     if (chk.rows.length === 0) return res.status(404).json({ error: 'Vale não encontrado.' });
     if (chk.rows[0].fechamento_id) {
       return res.status(400).json({ error: 'Este vale já foi incluído num fechamento. Não pode ser editado.' });
+    }
+
+    // Se está mudando a data, verifica se a nova data cai num mês fechado
+    if (data) {
+      const [ano, mes] = data.split('-').map(Number);
+      const jaFechado = await db.query(
+        `SELECT id FROM fechamentos_mensais
+         WHERE empresa_id=$1 AND profissional_id=$2 AND mes=$3 AND ano=$4`,
+        [req.user.empresaId, chk.rows[0].profissional_id, mes, ano]
+      );
+      if (jaFechado.rows.length > 0) {
+        return res.status(400).json({
+          error: `Não é possível mover este vale para ${String(mes).padStart(2,'0')}/${ano} ` +
+                 `porque esse mês já está fechado para a profissional.`
+        });
+      }
     }
 
     const r = await db.query(

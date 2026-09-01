@@ -170,17 +170,39 @@ router.get('/resumo/:mes/:ano', async (req, res) => {
       const calc = await calcularParaProf(req.user.empresaId, p.id, mes, ano);
       // Só inclui na lista quem teve movimento OU já tem fechamento
       if (calc.qtdAtendimentos > 0 || calc.totalVales > 0 || calc.fechamentoExistente) {
+
+        // Se já existe fechamento, retorna os TOTAIS DO SNAPSHOT
+        // (não recalcula, pra evitar divergência caso alguém adicione
+        //  vale/atendimento depois de fechado — que não deveria acontecer
+        //  mas por segurança). O card mostra os valores travados.
+        const fech = calc.fechamentoExistente;
+        let dadosMostrados;
+        if (fech) {
+          dadosMostrados = {
+            qtdAtendimentos: fech.qtdAtendimentos != null ? Number(fech.qtdAtendimentos) : calc.qtdAtendimentos,
+            totalServicos: fech.totalServicos != null ? Number(fech.totalServicos) : calc.totalServicos,
+            totalComissaoProdutos: fech.totalComissaoProdutos != null ? Number(fech.totalComissaoProdutos) : calc.totalComissaoProdutos,
+            totalTaxaEspaco: fech.totalTaxaEspaco != null ? Number(fech.totalTaxaEspaco) : calc.totalTaxaEspaco,
+            totalVales: fech.totalVales != null ? Number(fech.totalVales) : calc.totalVales,
+            valorLiquido: fech.valorLiquido != null ? Number(fech.valorLiquido) : calc.valorLiquido
+          };
+        } else {
+          dadosMostrados = {
+            qtdAtendimentos: calc.qtdAtendimentos,
+            totalServicos: calc.totalServicos,
+            totalComissaoProdutos: calc.totalComissaoProdutos,
+            totalTaxaEspaco: calc.totalTaxaEspaco,
+            totalVales: calc.totalVales,
+            valorLiquido: calc.valorLiquido
+          };
+        }
+
         resultado.push({
           profissionalId: p.id,
           profissionalNome: p.nome,
           ativo: p.ativo,
-          qtdAtendimentos: calc.qtdAtendimentos,
-          totalServicos: calc.totalServicos,
-          totalComissaoProdutos: calc.totalComissaoProdutos,
-          totalTaxaEspaco: calc.totalTaxaEspaco,
-          totalVales: calc.totalVales,
-          valorLiquido: calc.valorLiquido,
-          fechamento: calc.fechamentoExistente
+          ...dadosMostrados,
+          fechamento: fech
         });
       }
     }
