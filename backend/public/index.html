@@ -20781,6 +20781,11 @@ ${conteudo}
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const ativo = !!empresa.moduloFiscalAtivo;
     document.querySelectorAll('.fiscal-only').forEach(el => {
+      // Submenus (containers) devem começar fechados
+      if (el.id && el.id.startsWith('submenu-')) {
+        el.style.display = 'none';
+        return;
+      }
       el.style.display = ativo ? '' : 'none';
     });
   }
@@ -20789,6 +20794,12 @@ ${conteudo}
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const ativo = !!empresa.usaAmbientes;
     document.querySelectorAll('.feature-ambientes').forEach(el => {
+      // Submenus (containers com IDs "submenu-*") devem começar SEMPRE fechados;
+      // eles só abrem quando o usuário clica no botão do grupo.
+      if (el.id && el.id.startsWith('submenu-')) {
+        el.style.display = 'none'; // sempre fechado no início
+        return;
+      }
       el.style.display = ativo ? '' : 'none';
     });
     // Se ativo, carrega resumo pra atualizar badge do menu Lista de Compras
