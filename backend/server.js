@@ -37,6 +37,10 @@ app.use('/api/usuarios',        autenticar, verificarAcesso, require('./routes/u
 app.use('/api/empresa',         autenticar, verificarAcesso, require('./routes/empresa'));
 app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/caixa'));
 app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
+// Módulo Salão
+app.use('/api/profissionais',     autenticar, verificarAcesso, require('./routes/profissionais'));
+app.use('/api/servicos-salao',    autenticar, verificarAcesso, require('./routes/servicos-salao'));
+app.use('/api/taxas-maquininha',  autenticar, verificarAcesso, require('./routes/taxas-maquininha'));
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
 app.use('/api/master/uso-sistema', autenticarMaster, require('./routes/uso-sistema'));

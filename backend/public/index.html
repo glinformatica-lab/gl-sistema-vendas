@@ -616,6 +616,17 @@
       <button class="menu-btn submenu-item" onclick="showPage('notas-saida')">&#128196; Notas Fiscais de Saída</button>
     </div>
 
+    <!-- Salão (feature-salao) -->
+    <button class="menu-btn menu-grupo feature-salao" onclick="toggleGrupoMenu('salao')" data-grupo="salao" type="button" style="display:none;">
+      <span>&#128110;&#8205;&#9792;&#65039; Salão</span>
+      <span class="grupo-seta" id="seta-salao">▼</span>
+    </button>
+    <div class="submenu feature-salao" id="submenu-salao" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('sl-profissionais')">&#128101; Profissionais</button>
+      <button class="menu-btn submenu-item" onclick="showPage('sl-servicos')">&#9986;&#65039; Serviços</button>
+      <button class="menu-btn submenu-item" onclick="showPage('sl-taxas')">&#128179; Taxas de Maquininha</button>
+    </div>
+
     <!-- Configurações (admin-only) -->
     <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('config')" data-grupo="config" type="button">
       <span>&#9881;&#65039; Configurações</span>
@@ -2323,6 +2334,205 @@
           <button type="button" id="mg-btn-voltar-preview" onclick="mgVoltarPasso2()" style="padding:12px 20px;background:#eceef2;color:var(--azul);border:none;border-radius:8px;font-weight:600;cursor:pointer;">← Voltar</button>
           <button type="button" id="mg-btn-confirmar" onclick="mgConfirmarImportacao()" style="flex:1;padding:14px 20px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">🚀 Confirmar Importação</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- MÓDULO SALÃO -->
+    <!-- ============================================ -->
+
+    <!-- Profissionais do Salão -->
+    <div id="page-sl-profissionais" style="display:none;">
+      <div class="page-title">👥 Profissionais do Salão</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Cadastro das cabeleireiras parceiras. Aqui você define o percentual que cada uma paga pelo espaço e ganha em produtos vendidos.
+      </div>
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <button class="btn" onclick="slAbrirNovoProfissional()">+ Nova Profissional</button>
+        <input type="text" id="sl-busca-profissional" placeholder="🔍 Buscar por nome ou telefone"
+               style="flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
+               oninput="slRenderProfissionais()">
+        <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="sl-inc-inativas" onchange="slCarregarProfissionais()"> incluir inativas
+        </label>
+        <span id="sl-contador-profissionais" style="color:#668;font-size:13px;"></span>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-top:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Nome</th>
+              <th style="padding:10px;text-align:left;">Telefone</th>
+              <th style="padding:10px;text-align:center;">% Espaço</th>
+              <th style="padding:10px;text-align:center;">% Comissão Produto</th>
+              <th style="padding:10px;text-align:center;">Status</th>
+              <th style="padding:10px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-sl-profissionais">
+            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Profissional -->
+    <div id="modal-sl-profissional" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:600px;width:100%;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h2 id="sl-prof-titulo" style="color:#7c3aed;margin:0;font-size:20px;">Nova Profissional</h2>
+          <button onclick="slFecharModalProfissional()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+        <form id="form-sl-profissional" onsubmit="event.preventDefault(); slSalvarProfissional();">
+          <input type="hidden" id="sl-prof-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Nome *</label>
+              <input type="text" id="sl-prof-nome" required style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Telefone</label>
+              <input type="text" id="sl-prof-telefone" placeholder="(62) 99999-9999" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">CPF</label>
+              <input type="text" id="sl-prof-cpf" placeholder="000.000.000-00" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">PIX (para pagamento)</label>
+              <input type="text" id="sl-prof-pix" placeholder="CPF, e-mail ou chave" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Data de início</label>
+              <input type="date" id="sl-prof-data-inicio" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">% Espaço (que ela paga) *</label>
+              <input type="number" id="sl-prof-pct-espaco" step="0.01" value="10" required style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">% do serviço que ela paga ao salão</div>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">% Comissão Produto (que ela ganha)</label>
+              <input type="number" id="sl-prof-pct-comissao" step="0.01" value="0" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">% que ela ganha em produtos vendidos</div>
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Observações</label>
+              <textarea id="sl-prof-obs" rows="2" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;resize:vertical;"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="sl-prof-ativo" checked> Ativa
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" onclick="slFecharModalProfissional()" style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit" style="padding:10px 18px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Serviços do Salão -->
+    <div id="page-sl-servicos" style="display:none;">
+      <div class="page-title">✂️ Serviços do Salão</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Cadastro dos serviços que o salão oferece (corte, escova, coloração, etc). Você pode definir preço padrão e categoria.
+      </div>
+      <div class="actions" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <button class="btn" onclick="slAbrirNovoServico()">+ Novo Serviço</button>
+        <input type="text" id="sl-busca-servico" placeholder="🔍 Buscar por nome ou categoria"
+               style="flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
+               oninput="slRenderServicos()">
+        <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="sl-inc-inativos" onchange="slCarregarServicos()"> incluir inativos
+        </label>
+        <span id="sl-contador-servicos" style="color:#668;font-size:13px;"></span>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-top:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Nome</th>
+              <th style="padding:10px;text-align:left;">Categoria</th>
+              <th style="padding:10px;text-align:right;">Preço Padrão</th>
+              <th style="padding:10px;text-align:center;">Duração</th>
+              <th style="padding:10px;text-align:center;">Status</th>
+              <th style="padding:10px;text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-sl-servicos">
+            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Serviço -->
+    <div id="modal-sl-servico" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:600px;width:100%;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h2 id="sl-serv-titulo" style="color:#7c3aed;margin:0;font-size:20px;">Novo Serviço</h2>
+          <button onclick="slFecharModalServico()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+        <form id="form-sl-servico" onsubmit="event.preventDefault(); slSalvarServico();">
+          <input type="hidden" id="sl-serv-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Nome do serviço *</label>
+              <input type="text" id="sl-serv-nome" required placeholder="Ex: Corte feminino, Coloração completa"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Categoria</label>
+              <input type="text" id="sl-serv-categoria" placeholder="Ex: cabelo, unha, estética"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Preço padrão (R$)</label>
+              <input type="number" id="sl-serv-preco" step="0.01" value="0"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Duração padrão (minutos)</label>
+              <input type="number" id="sl-serv-duracao" min="0" placeholder="Ex: 60"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">Opcional. Ajuda no agendamento.</div>
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="sl-serv-ativo" checked> Ativo
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" onclick="slFecharModalServico()" style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit" style="padding:10px 18px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Taxas de Maquininha -->
+    <div id="page-sl-taxas" style="display:none;">
+      <div class="page-title">💳 Taxas de Maquininha</div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Configure aqui as taxas que a maquininha desconta em cada forma de pagamento. Essas taxas são aplicadas automaticamente nos atendimentos.
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:20px;max-width:600px;">
+        <div id="sl-taxas-container">
+          <div style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+          <button type="button" onclick="slSalvarTaxas()"
+                  style="padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">
+            💾 Salvar Taxas
+          </button>
+        </div>
+      </div>
+      <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 16px;margin-top:16px;max-width:600px;font-size:12px;color:#1e3a8a;">
+        💡 <strong>Dica:</strong> Use 0% para pagamentos que não têm taxa (dinheiro, geralmente). Taxas típicas: Débito ~1,5%, Crédito ~2,5%, PIX 0-1%.
       </div>
     </div>
 
@@ -7171,7 +7381,10 @@ https://sistema.glinformatica.com.br
     'configuracoes': 'config',
     'usuarios': 'config',
     'configuracoes-fiscais': 'config',
-    'migracao': 'config'
+    'migracao': 'config',
+    'sl-profissionais': 'salao',
+    'sl-servicos': 'salao',
+    'sl-taxas': 'salao'
   };
 
   // Abre/fecha um grupo de submenu manualmente
@@ -7435,6 +7648,17 @@ https://sistema.glinformatica.com.br
       }
       carregarNotasSaida();
     }
+    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.moduloSalao) {
+        alert('Este recurso está disponível apenas para empresas com Módulo Salão.');
+        showPage('dashboard');
+        return;
+      }
+      if (pg === 'sl-profissionais') slCarregarProfissionais();
+      if (pg === 'sl-servicos')      slCarregarServicos();
+      if (pg === 'sl-taxas')         slCarregarTaxas();
+    }
     if(pg === 'cotacoes') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.usaAmbientes) {
@@ -7567,7 +7791,8 @@ https://sistema.glinformatica.com.br
       }
       // Mostra/esconde menu fiscal (Plano Pro)
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
-      if (typeof atualizarVisibilidadeAmbientes === 'function') atualizarVisibilidadeAmbientes();
+      if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
+      if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
       // Mostra botão "Trocar Empresa" se cliente tem multi-empresa
       if (localStorage.getItem('multiEmpresa') === '1') {
         const btnTrocar = document.getElementById('btn-trocar-empresa');
@@ -7667,7 +7892,8 @@ https://sistema.glinformatica.com.br
       aplicarBloqueioPorPlano();
       // Re-aplica visibilidade do menu fiscal AGORA com dados frescos
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
-      if (typeof atualizarVisibilidadeAmbientes === 'function') atualizarVisibilidadeAmbientes();
+      if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
+      if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
     renderGraficosDashboard();
   });
@@ -16410,6 +16636,300 @@ ${conteudo}
     carregarNotasSaida();
   }
 
+  // ============================================
+  // MÓDULO SALÃO — Profissionais / Serviços / Taxas
+  // ============================================
+
+  let _slProfissionaisCache = [];
+  let _slServicosCache = [];
+
+  // ---------- PROFISSIONAIS ----------
+
+  async function slCarregarProfissionais() {
+    const tbody = document.getElementById('tbody-sl-profissionais');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+    const incluirInativas = document.getElementById('sl-inc-inativas')?.checked ? 'true' : 'false';
+    try {
+      _slProfissionaisCache = await api('GET', `/api/profissionais?incluirInativas=${incluirInativas}`);
+      slRenderProfissionais();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function slRenderProfissionais() {
+    const tbody = document.getElementById('tbody-sl-profissionais');
+    if (!tbody) return;
+    const termo = (document.getElementById('sl-busca-profissional')?.value || '').trim().toLowerCase();
+    let lista = _slProfissionaisCache;
+    if (termo) {
+      lista = lista.filter(p =>
+        (p.nome && p.nome.toLowerCase().includes(termo)) ||
+        (p.telefone && p.telefone.toLowerCase().includes(termo))
+      );
+    }
+    const contador = document.getElementById('sl-contador-profissionais');
+    if (contador) contador.textContent = `${lista.length} de ${_slProfissionaisCache.length}`;
+
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhuma profissional encontrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(p => `
+      <tr style="${!p.ativo ? 'opacity:0.5;' : ''}">
+        <td style="padding:10px;"><strong>${escapeHtml(p.nome)}</strong></td>
+        <td style="padding:10px;">${escapeHtml(p.telefone || '—')}</td>
+        <td style="padding:10px;text-align:center;">${Number(p.percentualEspaco).toFixed(2)}%</td>
+        <td style="padding:10px;text-align:center;">${Number(p.percentualComissaoProduto).toFixed(2)}%</td>
+        <td style="padding:10px;text-align:center;">
+          ${p.ativo
+            ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">ATIVA</span>'
+            : '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">INATIVA</span>'
+          }
+        </td>
+        <td style="padding:10px;text-align:center;">
+          <button class="btn-link" onclick="slEditarProfissional(${p.id})">Editar</button>
+          ${p.ativo ? ` | <button class="btn-link danger" onclick="slInativarProfissional(${p.id})">Inativar</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function slAbrirNovoProfissional() {
+    document.getElementById('sl-prof-titulo').textContent = 'Nova Profissional';
+    document.getElementById('sl-prof-id').value = '';
+    document.getElementById('form-sl-profissional').reset();
+    document.getElementById('sl-prof-pct-espaco').value = 10;
+    document.getElementById('sl-prof-pct-comissao').value = 0;
+    document.getElementById('sl-prof-ativo').checked = true;
+    document.getElementById('modal-sl-profissional').style.display = 'flex';
+    setTimeout(() => document.getElementById('sl-prof-nome').focus(), 100);
+  }
+
+  function slEditarProfissional(id) {
+    const p = _slProfissionaisCache.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('sl-prof-titulo').textContent = 'Editar Profissional';
+    document.getElementById('sl-prof-id').value = p.id;
+    document.getElementById('sl-prof-nome').value = p.nome || '';
+    document.getElementById('sl-prof-telefone').value = p.telefone || '';
+    document.getElementById('sl-prof-cpf').value = p.cpf || '';
+    document.getElementById('sl-prof-pix').value = p.pix || '';
+    document.getElementById('sl-prof-data-inicio').value = p.dataInicio ? String(p.dataInicio).slice(0, 10) : '';
+    document.getElementById('sl-prof-pct-espaco').value = p.percentualEspaco || 0;
+    document.getElementById('sl-prof-pct-comissao').value = p.percentualComissaoProduto || 0;
+    document.getElementById('sl-prof-obs').value = p.observacoes || '';
+    document.getElementById('sl-prof-ativo').checked = !!p.ativo;
+    document.getElementById('modal-sl-profissional').style.display = 'flex';
+  }
+
+  function slFecharModalProfissional() {
+    document.getElementById('modal-sl-profissional').style.display = 'none';
+  }
+
+  async function slSalvarProfissional() {
+    const id = document.getElementById('sl-prof-id').value;
+    const dados = {
+      nome: document.getElementById('sl-prof-nome').value.trim(),
+      telefone: document.getElementById('sl-prof-telefone').value.trim(),
+      cpf: document.getElementById('sl-prof-cpf').value.trim(),
+      pix: document.getElementById('sl-prof-pix').value.trim(),
+      dataInicio: document.getElementById('sl-prof-data-inicio').value || null,
+      percentualEspaco: parseFloat(document.getElementById('sl-prof-pct-espaco').value) || 0,
+      percentualComissaoProduto: parseFloat(document.getElementById('sl-prof-pct-comissao').value) || 0,
+      observacoes: document.getElementById('sl-prof-obs').value.trim(),
+      ativo: document.getElementById('sl-prof-ativo').checked
+    };
+    if (!dados.nome) { alert('Nome é obrigatório.'); return; }
+    try {
+      if (id) {
+        await api('PUT', `/api/profissionais/${id}`, dados);
+      } else {
+        await api('POST', '/api/profissionais', dados);
+      }
+      slFecharModalProfissional();
+      await slCarregarProfissionais();
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  async function slInativarProfissional(id) {
+    const p = _slProfissionaisCache.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`Inativar "${p.nome}"?\n\nA profissional NÃO será apagada — só ficará oculta. Você pode reativar depois.`)) return;
+    try {
+      await api('DELETE', `/api/profissionais/${id}`);
+      await slCarregarProfissionais();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  // ---------- SERVIÇOS ----------
+
+  async function slCarregarServicos() {
+    const tbody = document.getElementById('tbody-sl-servicos');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+    const incluirInativos = document.getElementById('sl-inc-inativos')?.checked ? 'true' : 'false';
+    try {
+      _slServicosCache = await api('GET', `/api/servicos-salao?incluirInativos=${incluirInativos}`);
+      slRenderServicos();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function slRenderServicos() {
+    const tbody = document.getElementById('tbody-sl-servicos');
+    if (!tbody) return;
+    const termo = (document.getElementById('sl-busca-servico')?.value || '').trim().toLowerCase();
+    let lista = _slServicosCache;
+    if (termo) {
+      lista = lista.filter(s =>
+        (s.nome && s.nome.toLowerCase().includes(termo)) ||
+        (s.categoria && s.categoria.toLowerCase().includes(termo))
+      );
+    }
+    const contador = document.getElementById('sl-contador-servicos');
+    if (contador) contador.textContent = `${lista.length} de ${_slServicosCache.length}`;
+
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#889;padding:20px;">Nenhum serviço encontrado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(s => `
+      <tr style="${!s.ativo ? 'opacity:0.5;' : ''}">
+        <td style="padding:10px;"><strong>${escapeHtml(s.nome)}</strong></td>
+        <td style="padding:10px;">${escapeHtml(s.categoria || '—')}</td>
+        <td style="padding:10px;text-align:right;">${formatarBRL(s.precoPadrao)}</td>
+        <td style="padding:10px;text-align:center;">${s.duracaoPadraoMin ? s.duracaoPadraoMin + ' min' : '—'}</td>
+        <td style="padding:10px;text-align:center;">
+          ${s.ativo
+            ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">ATIVO</span>'
+            : '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">INATIVO</span>'
+          }
+        </td>
+        <td style="padding:10px;text-align:center;">
+          <button class="btn-link" onclick="slEditarServico(${s.id})">Editar</button>
+          ${s.ativo ? ` | <button class="btn-link danger" onclick="slInativarServico(${s.id})">Inativar</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function slAbrirNovoServico() {
+    document.getElementById('sl-serv-titulo').textContent = 'Novo Serviço';
+    document.getElementById('sl-serv-id').value = '';
+    document.getElementById('form-sl-servico').reset();
+    document.getElementById('sl-serv-preco').value = 0;
+    document.getElementById('sl-serv-ativo').checked = true;
+    document.getElementById('modal-sl-servico').style.display = 'flex';
+    setTimeout(() => document.getElementById('sl-serv-nome').focus(), 100);
+  }
+
+  function slEditarServico(id) {
+    const s = _slServicosCache.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('sl-serv-titulo').textContent = 'Editar Serviço';
+    document.getElementById('sl-serv-id').value = s.id;
+    document.getElementById('sl-serv-nome').value = s.nome || '';
+    document.getElementById('sl-serv-categoria').value = s.categoria || '';
+    document.getElementById('sl-serv-preco').value = s.precoPadrao || 0;
+    document.getElementById('sl-serv-duracao').value = s.duracaoPadraoMin || '';
+    document.getElementById('sl-serv-ativo').checked = !!s.ativo;
+    document.getElementById('modal-sl-servico').style.display = 'flex';
+  }
+
+  function slFecharModalServico() {
+    document.getElementById('modal-sl-servico').style.display = 'none';
+  }
+
+  async function slSalvarServico() {
+    const id = document.getElementById('sl-serv-id').value;
+    const dados = {
+      nome: document.getElementById('sl-serv-nome').value.trim(),
+      categoria: document.getElementById('sl-serv-categoria').value.trim(),
+      precoPadrao: parseFloat(document.getElementById('sl-serv-preco').value) || 0,
+      duracaoPadraoMin: parseInt(document.getElementById('sl-serv-duracao').value) || null,
+      ativo: document.getElementById('sl-serv-ativo').checked,
+      produtosReceita: [] // por enquanto vazio; Fase 3 adicionará UI
+    };
+    if (!dados.nome) { alert('Nome é obrigatório.'); return; }
+    try {
+      if (id) {
+        await api('PUT', `/api/servicos-salao/${id}`, dados);
+      } else {
+        await api('POST', '/api/servicos-salao', dados);
+      }
+      slFecharModalServico();
+      await slCarregarServicos();
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  async function slInativarServico(id) {
+    const s = _slServicosCache.find(x => x.id === id);
+    if (!s) return;
+    if (!confirm(`Inativar "${s.nome}"?\n\nO serviço NÃO será apagado — só ficará oculto.`)) return;
+    try {
+      await api('DELETE', `/api/servicos-salao/${id}`);
+      await slCarregarServicos();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  // ---------- TAXAS DE MAQUININHA ----------
+
+  const SL_FORMAS_LABEL = {
+    dinheiro: '💵 Dinheiro',
+    pix: '📱 PIX',
+    debito: '💳 Débito',
+    credito: '💳 Crédito',
+    boleto: '📄 Boleto',
+    outros: '📋 Outros'
+  };
+
+  async function slCarregarTaxas() {
+    const container = document.getElementById('sl-taxas-container');
+    if (!container) return;
+    try {
+      const taxas = await api('GET', '/api/taxas-maquininha');
+      container.innerHTML = taxas.map(t => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+          <label style="flex:1;font-size:14px;font-weight:600;color:#334155;">${SL_FORMAS_LABEL[t.formaPagamento] || t.formaPagamento}</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" step="0.01" min="0" max="100" value="${t.taxaPercentual || 0}"
+                   data-forma="${t.formaPagamento}"
+                   class="sl-taxa-input"
+                   style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;text-align:right;">
+            <span style="font-size:14px;color:#64748b;">%</span>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      container.innerHTML = `<div style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function slSalvarTaxas() {
+    const inputs = document.querySelectorAll('.sl-taxa-input');
+    const taxas = Array.from(inputs).map(i => ({
+      formaPagamento: i.dataset.forma,
+      taxaPercentual: parseFloat(i.value) || 0
+    }));
+    try {
+      await api('PUT', '/api/taxas-maquininha', taxas);
+      alert('✅ Taxas atualizadas com sucesso!');
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
   async function carregarNotasSaida() {
     const tbody = document.getElementById('tbody-notas-saida');
     if (!tbody) return;
@@ -20822,6 +21342,19 @@ ${conteudo}
     if (ativo && ['admin', 'estoque'].includes(window._papelAtual) && typeof carregarCotacoes === 'function') {
       carregarCotacoes();
     }
+  }
+
+  function atualizarVisibilidadeSalao() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const ativo = !!empresa.moduloSalao;
+    document.querySelectorAll('.feature-salao').forEach(el => {
+      // Submenus (containers) começam fechados
+      if (el.id && el.id.startsWith('submenu-')) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = ativo ? '' : 'none';
+    });
   }
 
   // Troca a tab ativa nas Configurações Fiscais
