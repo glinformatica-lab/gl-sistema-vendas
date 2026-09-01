@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
     }
 
     // Filtro tipo
-    if (tipo && ['venda', 'devolucao', 'cupom', 'transferencia'].includes(tipo)) {
+    if (tipo && ['venda', 'cupom', 'devolucao', 'remessa', 'transferencia'].includes(tipo)) {
       where.push(`tipo = $${idx++}`);
       vals.push(tipo);
     }
@@ -116,6 +116,59 @@ router.get('/', async (req, res) => {
 
 // ==========================================
 // GET /:id — Detalhe da nota + itens da venda vinculada
+// ==========================================
+// ==========================================
+// GET /faturamento — Total de faturamento por período
+// REGRA: somente notas de VENDA + CUPOM
+//        NÃO conta devolução, remessa, transferência
+//        Ignora canceladas e denegadas
+// Query params: ?de=YYYY-MM-DD&ate=YYYY-MM-DD
+// IMPORTANTE: declarada ANTES de /:id pra evitar conflito de rota
+// ==========================================
+router.get('/faturamento', async (req, res) => {
+  try {
+    const { de, ate } = req.query;
+    const where = ['empresa_id = $1', `tipo IN ('venda', 'cupom')`,
+                   `(status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada'))`];
+    const vals = [req.user.empresaId];
+    let idx = 2;
+    if (de && /^\d{4}-\d{2}-\d{2}$/.test(de)) {
+      where.push(`data >= $${idx++}`);
+      vals.push(de);
+    }
+    if (ate && /^\d{4}-\d{2}-\d{2}$/.test(ate)) {
+      where.push(`data <= $${idx++}`);
+      vals.push(ate);
+    }
+    const r = await db.query(
+      `SELECT
+         COUNT(*)::int AS qtd_notas,
+         COALESCE(SUM(total), 0)::numeric AS total_bruto,
+         COALESCE(SUM(total_produtos), 0)::numeric AS total_produtos,
+         COALESCE(SUM(icms), 0)::numeric AS total_icms,
+         COUNT(*) FILTER (WHERE tipo='venda')::int AS qtd_venda,
+         COUNT(*) FILTER (WHERE tipo='cupom')::int AS qtd_cupom
+       FROM notas_saida WHERE ${where.join(' AND ')}`,
+      vals
+    );
+    const row = r.rows[0];
+    res.json({
+      periodo: { de: de || null, ate: ate || null },
+      qtdNotas: row.qtd_notas,
+      qtdVenda: row.qtd_venda,
+      qtdCupom: row.qtd_cupom,
+      totalBruto: Number(row.total_bruto) || 0,
+      totalProdutos: Number(row.total_produtos) || 0,
+      totalIcms: Number(row.total_icms) || 0
+    });
+  } catch (err) {
+    console.error('[notas-saida] GET /faturamento', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
+// ==========================================
+// GET /:id — Detalhe da nota + itens da tabela notas_saida_itens
 // ==========================================
 router.get('/:id', async (req, res) => {
   try {

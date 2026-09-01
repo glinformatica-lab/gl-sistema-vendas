@@ -2123,8 +2123,9 @@
                   style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
             <option value="">Todos</option>
             <option value="venda">Venda</option>
-            <option value="devolucao">Devolução</option>
             <option value="cupom">Cupom</option>
+            <option value="devolucao">Devolução</option>
+            <option value="remessa">Remessa</option>
             <option value="transferencia">Transferência</option>
           </select>
         </div>
@@ -16981,8 +16982,9 @@ ${conteudo}
     const tipoBadge = (t) => {
       const cores = {
         venda:         { bg:'#dbeafe', fg:'#1e40af', label:'Venda' },
-        devolucao:     { bg:'#fef2f2', fg:'#991b1b', label:'Devolução' },
         cupom:         { bg:'#f0fdf4', fg:'#166534', label:'Cupom' },
+        devolucao:     { bg:'#fef2f2', fg:'#991b1b', label:'Devolução' },
+        remessa:       { bg:'#fff7ed', fg:'#9a3412', label:'Remessa' },
         transferencia: { bg:'#f3e8ff', fg:'#6b21a8', label:'Transferência' }
       };
       const c = cores[t] || { bg:'#f1f5f9', fg:'#475569', label: t || '—' };
@@ -17081,8 +17083,9 @@ ${conteudo}
       };
       const tipoLabel = {
         venda: 'Venda',
-        devolucao: 'Devolução',
         cupom: 'Cupom',
+        devolucao: 'Devolução',
+        remessa: 'Remessa',
         transferencia: 'Transferência'
       };
 
