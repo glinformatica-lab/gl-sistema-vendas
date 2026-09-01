@@ -550,32 +550,32 @@
       <span class="grupo-seta" id="seta-cadastros">▼</span>
     </button>
     <div class="submenu" id="submenu-cadastros" style="display:none;">
-      <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
+      <button class="menu-btn submenu-item feature-ambientes estoque-hide esconde-salao" onclick="showPage('ambientes')" style="display:none;">&#127968; Ambientes</button>
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('clientes')">&#128100; Clientes</button>
-      <button class="menu-btn submenu-item" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
+      <button class="menu-btn submenu-item esconde-salao" onclick="showPage('fornecedores')">&#128188; Fornecedores</button>
       <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('marcas')" style="display:none;">&#127991;&#65039; Marcas</button>
       <button class="menu-btn submenu-item" onclick="showPage('produtos')">&#128230; Produtos</button>
-      <button class="menu-btn submenu-item estoque-hide" onclick="showPage('servicos')">&#128295; Serviços</button>
-      <button class="menu-btn submenu-item feature-ambientes estoque-hide" onclick="showPage('transportadoras')" style="display:none;">&#128666; Transportadoras</button>
+      <button class="menu-btn submenu-item estoque-hide esconde-salao" onclick="showPage('servicos')">&#128295; Serviços</button>
+      <button class="menu-btn submenu-item feature-ambientes estoque-hide esconde-salao" onclick="showPage('transportadoras')" style="display:none;">&#128666; Transportadoras</button>
     </div>
 
     <!-- Vendas -->
-    <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('vendas')" data-grupo="vendas" type="button">
+    <button class="menu-btn menu-grupo esconde-salao" onclick="toggleGrupoMenu('vendas')" data-grupo="vendas" type="button">
       <span>&#128722; Vendas</span>
       <span class="grupo-seta" id="seta-vendas">▼</span>
     </button>
-    <div class="submenu" id="submenu-vendas" style="display:none;">
+    <div class="submenu esconde-salao" id="submenu-vendas" style="display:none;">
       <button class="menu-btn submenu-item feature-ambientes" onclick="showPage('aprovacoes-financeiras')" style="display:none;">&#128176; Aprovações Financeiras <span id="badge-aprovacoes-fin" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('orcamentos')">&#128221; Orçamentos</button>
       <button class="menu-btn submenu-item estoque-hide" onclick="showPage('vendas')">&#128722; Vendas</button>
     </div>
 
     <!-- Estoque (Módulo Iluminação) -->
-    <button class="menu-btn menu-grupo feature-ambientes" onclick="toggleGrupoMenu('estoque')" data-grupo="estoque" type="button" style="display:none;">
+    <button class="menu-btn menu-grupo feature-ambientes esconde-salao" onclick="toggleGrupoMenu('estoque')" data-grupo="estoque" type="button" style="display:none;">
       <span>&#128230; Estoque <span id="badge-estoque-grupo" style="display:none;background:#8b5cf6;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></span>
       <span class="grupo-seta" id="seta-estoque">▼</span>
     </button>
-    <div class="submenu feature-ambientes" id="submenu-estoque" style="display:none;">
+    <div class="submenu feature-ambientes esconde-salao" id="submenu-estoque" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('cotacoes')">&#128172; Cotações <span id="badge-cotacoes" style="display:none;background:#7c3aed;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
       <button class="menu-btn submenu-item" onclick="showPage('entrada-mercadorias')">&#128229; Entrada de Mercadorias</button>
       <button class="menu-btn submenu-item" onclick="showPage('lista-compras')">&#128722; Lista de Compras <span id="badge-lista-compras" style="display:none;background:#f59e0b;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
@@ -584,11 +584,11 @@
     </div>
 
     <!-- Vendas Online (admin-only) -->
-    <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('vendas-online')" data-grupo="vendas-online" type="button">
+    <button class="menu-btn menu-grupo admin-only esconde-salao" onclick="toggleGrupoMenu('vendas-online')" data-grupo="vendas-online" type="button">
       <span>&#128187; Vendas Online <span id="badge-pedidos-novos-grupo" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></span>
       <span class="grupo-seta" id="seta-vendas-online">▼</span>
     </button>
-    <div class="submenu admin-only" id="submenu-vendas-online" style="display:none;">
+    <div class="submenu admin-only esconde-salao" id="submenu-vendas-online" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('catalogo')">&#128206; Catálogo Público</button>
       <button class="menu-btn submenu-item" onclick="showPage('pedidos-online')">&#128229; Pedidos Online <span id="badge-pedidos-novos" style="display:none;background:#dc2626;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:4px;">0</span></button>
     </div>
@@ -605,14 +605,14 @@
       <button class="menu-btn submenu-item admin-only" onclick="showPage('financeiro')">&#128202; Resumo Financeiro</button>
     </div>
 
-    <button class="menu-btn admin-only" onclick="showPage('relatorios')">&#128200; Relatórios</button>
+    <button class="menu-btn admin-only esconde-salao" onclick="showPage('relatorios')">&#128200; Relatórios</button>
 
     <!-- Fiscal (feature-ambientes) -->
-    <button class="menu-btn menu-grupo feature-ambientes" onclick="toggleGrupoMenu('fiscal')" data-grupo="fiscal" type="button" style="display:none;">
+    <button class="menu-btn menu-grupo feature-ambientes esconde-salao" onclick="toggleGrupoMenu('fiscal')" data-grupo="fiscal" type="button" style="display:none;">
       <span>&#129534; Fiscal</span>
       <span class="grupo-seta" id="seta-fiscal">▼</span>
     </button>
-    <div class="submenu feature-ambientes" id="submenu-fiscal" style="display:none;">
+    <div class="submenu feature-ambientes esconde-salao" id="submenu-fiscal" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('notas-saida')">&#128196; Notas Fiscais de Saída</button>
     </div>
 
@@ -667,6 +667,84 @@
     <!-- Dashboard -->
     <div id="page-dashboard">
       <div class="page-title">Dashboard</div>
+
+      <!-- ================================ -->
+      <!-- DASHBOARD SALÃO (só aparece se moduloSalao=true) -->
+      <!-- ================================ -->
+      <div id="dashboard-salao" class="feature-salao" style="display:none;">
+        <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:20px 24px;border-radius:14px;margin-bottom:20px;">
+          <div style="font-size:14px;opacity:0.85;">Bem-vinda ao seu salão! ✨</div>
+          <div id="ds-saudacao" style="font-size:22px;font-weight:700;margin-top:4px;">Bom dia!</div>
+          <div id="ds-data-hoje" style="font-size:13px;opacity:0.9;margin-top:2px;"></div>
+        </div>
+
+        <!-- Cards rápidos -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">📅 Agendamentos hoje</div>
+            <div id="ds-agend-hoje" style="font-size:32px;font-weight:700;color:#7c3aed;margin-top:6px;">—</div>
+            <div id="ds-agend-hoje-detalhe" style="font-size:11px;color:#94a3b8;margin-top:2px;">carregando...</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">✅ Atendidas hoje</div>
+            <div id="ds-atend-hoje" style="font-size:32px;font-weight:700;color:#10b981;margin-top:6px;">—</div>
+            <div id="ds-atend-hoje-detalhe" style="font-size:11px;color:#94a3b8;margin-top:2px;">carregando...</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">💰 Faturamento hoje</div>
+            <div id="ds-fat-hoje" style="font-size:32px;font-weight:700;color:#0891b2;margin-top:6px;">R$ —</div>
+            <div id="ds-fat-hoje-detalhe" style="font-size:11px;color:#94a3b8;margin-top:2px;">carregando...</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;">📊 Faturamento do mês</div>
+            <div id="ds-fat-mes" style="font-size:32px;font-weight:700;color:#f59e0b;margin-top:6px;">R$ —</div>
+            <div id="ds-fat-mes-detalhe" style="font-size:11px;color:#94a3b8;margin-top:2px;">carregando...</div>
+          </div>
+        </div>
+
+        <!-- Atalhos rápidos (botões grandes) -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+          <div style="font-size:14px;color:#334155;font-weight:600;margin-bottom:14px;">⚡ O que você quer fazer?</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+            <button onclick="showPage('sl-agenda')" style="padding:18px;background:#ede9fe;color:#5b21b6;border:2px solid #a78bfa;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
+              <div style="font-size:22px;margin-bottom:4px;">📅</div>
+              <div>Ver Agenda</div>
+              <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Ver / marcar horários</div>
+            </button>
+            <button onclick="showPage('sl-atendimentos')" style="padding:18px;background:#dcfce7;color:#166534;border:2px solid #86efac;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
+              <div style="font-size:22px;margin-bottom:4px;">💼</div>
+              <div>Novo Atendimento</div>
+              <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Registrar venda de serviço</div>
+            </button>
+            <button onclick="showPage('sl-profissionais')" style="padding:18px;background:#dbeafe;color:#1e40af;border:2px solid #93c5fd;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
+              <div style="font-size:22px;margin-bottom:4px;">👥</div>
+              <div>Profissionais</div>
+              <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Cadastrar cabeleireiras</div>
+            </button>
+            <button onclick="showPage('caixa')" style="padding:18px;background:#fef3c7;color:#92400e;border:2px solid #fcd34d;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">
+              <div style="font-size:22px;margin-bottom:4px;">💵</div>
+              <div>Caixa Diário</div>
+              <div style="font-size:11px;font-weight:400;opacity:0.75;margin-top:2px;">Ver movimento do dia</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Próximos agendamentos do dia -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="font-size:14px;color:#334155;font-weight:600;">📋 Próximos agendamentos de hoje</div>
+            <button onclick="showPage('sl-agenda')" style="background:none;border:none;color:#7c3aed;font-size:12px;font-weight:600;cursor:pointer;">Ver agenda completa →</button>
+          </div>
+          <div id="ds-proximos-agendamentos" style="font-size:13px;color:#94a3b8;text-align:center;padding:20px;">
+            Módulo de agenda ainda não implementado. Em breve!
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================ -->
+      <!-- DASHBOARD PADRÃO (loja normal) -->
+      <!-- ================================ -->
+      <div class="esconde-salao">
 
       <!-- Banner upgrade pro plano Básico -->
       <div id="banner-upgrade-vo" style="display:none;background:linear-gradient(135deg,#0891b2,#1e3a8a);color:#fff;padding:14px 20px;border-radius:10px;margin-bottom:18px;display:none;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -783,6 +861,7 @@
           <canvas id="grafico-formas-pagamento" style="max-height:260px;"></canvas>
         </div>
       </div>
+      </div><!-- /esconde-salao (dashboard padrão) -->
     </div>
 
     <!-- Clientes (INTEGRADO) -->
@@ -7539,6 +7618,24 @@ https://sistema.glinformatica.com.br
       alert('Você não tem permissão para acessar esta página.');
       return;
     }
+    // Modo Salão: bloqueia acesso a páginas escondidas (mesmo via URL/atalho)
+    (function() {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.moduloSalao) return;
+      const bloqueadasNoSalao = [
+        'vendas', 'orcamentos', 'aprovacoes-financeiras',
+        'ambientes', 'fornecedores', 'marcas', 'servicos', 'transportadoras',
+        'cotacoes', 'entrada-mercadorias', 'lista-compras', 'ordens-compra', 'separacao',
+        'catalogo', 'pedidos-online',
+        'notas-saida',
+        'relatorios'
+      ];
+      if (bloqueadasNoSalao.includes(pg)) {
+        alert('Esta funcionalidade não faz parte do Módulo Salão.');
+        showPage('dashboard');
+        throw new Error('modo-salao: pagina bloqueada'); // interrompe showPage
+      }
+    })();
     // Bloqueia Ambientes se empresa não tem recurso ativo
     if (pg === 'ambientes') {
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -7659,6 +7756,12 @@ https://sistema.glinformatica.com.br
       if (pg === 'sl-profissionais') slCarregarProfissionais();
       if (pg === 'sl-servicos')      slCarregarServicos();
       if (pg === 'sl-taxas')         slCarregarTaxas();
+    }
+    if(pg === 'dashboard') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (_emp.moduloSalao) {
+        carregarDashboardSalao();
+      }
     }
     if(pg === 'cotacoes') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -16646,6 +16749,39 @@ ${conteudo}
 
   // ---------- PROFISSIONAIS ----------
 
+  // ---------- DASHBOARD SALÃO ----------
+
+  function carregarDashboardSalao() {
+    // Saudação por horário
+    const h = new Date().getHours();
+    let saudacao;
+    if (h < 12) saudacao = 'Bom dia';
+    else if (h < 18) saudacao = 'Boa tarde';
+    else saudacao = 'Boa noite';
+    const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+    const nome = (usuario.nome || '').split(' ')[0];
+    const elSaud = document.getElementById('ds-saudacao');
+    if (elSaud) elSaud.textContent = `${saudacao}${nome ? ', ' + nome : ''}! ✨`;
+
+    // Data de hoje formatada em pt-BR
+    const hoje = new Date();
+    const dias = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+    const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    const elData = document.getElementById('ds-data-hoje');
+    if (elData) elData.textContent = `${dias[hoje.getDay()]}, ${hoje.getDate()} de ${meses[hoje.getMonth()]}`;
+
+    // Enquanto a Fase 2 (Agenda) e Fase 3 (Atendimentos) não estão prontas,
+    // os cards ficam zerados. Depois virão de /api/agendamentos e /api/atendimentos.
+    document.getElementById('ds-agend-hoje').textContent = '0';
+    document.getElementById('ds-agend-hoje-detalhe').textContent = 'nenhum agendado';
+    document.getElementById('ds-atend-hoje').textContent = '0';
+    document.getElementById('ds-atend-hoje-detalhe').textContent = 'nenhum atendimento';
+    document.getElementById('ds-fat-hoje').textContent = 'R$ 0,00';
+    document.getElementById('ds-fat-hoje-detalhe').textContent = 'ainda sem vendas';
+    document.getElementById('ds-fat-mes').textContent = 'R$ 0,00';
+    document.getElementById('ds-fat-mes-detalhe').textContent = 'ainda sem vendas';
+  }
+
   async function slCarregarProfissionais() {
     const tbody = document.getElementById('tbody-sl-profissionais');
     if (!tbody) return;
@@ -21357,6 +21493,23 @@ ${conteudo}
         return;
       }
       el.style.display = ativo ? '' : 'none';
+    });
+    // Modo Salão: esconde menus não relacionados
+    atualizarVisibilidadeModoSalao();
+  }
+
+  // Quando o Módulo Salão está ativo, esconde menus não essenciais pra deixar
+  // a UI enxuta pra dona do salão (que não usa vendas, orçamentos, estoque, etc)
+  function atualizarVisibilidadeModoSalao() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const modoSalao = !!empresa.moduloSalao;
+    document.querySelectorAll('.esconde-salao').forEach(el => {
+      if (modoSalao) {
+        el.style.display = 'none';
+      }
+      // Se modoSalao=false, NÃO forçamos display:'' porque outras regras
+      // (feature-ambientes, admin-only, etc) controlam a visibilidade normal.
+      // A remoção da classe .esconde-salao só é aplicada, não revertida.
     });
   }
 
