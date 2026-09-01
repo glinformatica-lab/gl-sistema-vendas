@@ -2824,7 +2824,7 @@
     <div id="page-sl-vales" style="display:none;">
       <div class="page-title">💵 Vales para Profissionais</div>
       <div style="color:#64748b;font-size:13px;margin-bottom:16px;">
-        Registre aqui adiantamentos que você paga durante o mês. Serão descontados no fechamento mensal.
+        Registre aqui adiantamentos que você paga durante o mês pra suas profissionais. No fim do mês, no <b>Fechamento Mensal</b>, esses valores serão descontados automaticamente.
       </div>
 
       <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -2833,9 +2833,10 @@
                 style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
           <option value="">Todas profissionais</option>
         </select>
-        <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;">
-          <input type="checkbox" id="vl-so-abertos" onchange="vlCarregar()"> só abertos (não fechados)
-        </label>
+        <input type="date" id="vl-filtro-de" onchange="vlCarregar()" title="Desde"
+               style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <input type="date" id="vl-filtro-ate" onchange="vlCarregar()" title="Até"
+               style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
         <span id="vl-total" style="margin-left:auto;font-size:14px;font-weight:700;color:#f59e0b;"></span>
       </div>
 
@@ -2847,12 +2848,11 @@
               <th style="padding:10px;text-align:left;">Profissional</th>
               <th style="padding:10px;text-align:right;">Valor</th>
               <th style="padding:10px;text-align:left;">Observação</th>
-              <th style="padding:10px;text-align:center;">Status</th>
               <th style="padding:10px;text-align:center;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbody-vales">
-            <tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
+            <tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -18557,18 +18557,21 @@ ${conteudo}
   async function vlCarregar() {
     const tbody = document.getElementById('tbody-vales');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
 
     const prof = document.getElementById('vl-filtro-prof')?.value || '';
-    const soAbertos = document.getElementById('vl-so-abertos')?.checked ? 'true' : 'false';
-    const params = new URLSearchParams({ somenteAbertos: soAbertos });
+    const de = document.getElementById('vl-filtro-de')?.value || '';
+    const ate = document.getElementById('vl-filtro-ate')?.value || '';
+    const params = new URLSearchParams();
     if (prof) params.append('profissionalId', prof);
+    if (de) params.append('de', de);
+    if (ate) params.append('ate', ate);
 
     try {
       _vlLista = await api('GET', '/api/vales?' + params);
       vlRenderizar();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -18579,29 +18582,22 @@ ${conteudo}
     document.getElementById('vl-total').textContent = `Total: R$ ${total.toFixed(2).replace('.', ',')}`;
 
     if (_vlLista.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum vale registrado no filtro.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum vale registrado neste filtro.</td></tr>';
       return;
     }
     tbody.innerHTML = _vlLista.map(v => {
-      const trancado = v.fechamentoId != null;
       const dataFmt = v.data ? v.data.split('-').reverse().join('/') : '';
+      // Vales já contabilizados em fechamento ficam sutilmente diferentes
+      // (menos evidente, sem badge grande - a proteção fica só na hora de apagar)
       return `
-        <tr style="${trancado ? 'opacity:0.75;' : ''}">
+        <tr>
           <td style="padding:10px;">${dataFmt}</td>
           <td style="padding:10px;"><b>${escapeHtml(v.profissionalNome)}</b></td>
           <td style="padding:10px;text-align:right;font-weight:700;color:#f59e0b;">R$ ${Number(v.valor).toFixed(2).replace('.', ',')}</td>
           <td style="padding:10px;font-size:12px;color:#64748b;">${escapeHtml(v.observacao || '—')}</td>
           <td style="padding:10px;text-align:center;">
-            ${trancado
-              ? '<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">🔒 FECHADO</span>'
-              : '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">ABERTO</span>'
-            }
-          </td>
-          <td style="padding:10px;text-align:center;">
-            ${trancado ? '<span style="color:#94a3b8;font-size:11px;">travado</span>' : `
-              <button class="btn-link" onclick="vlEditar(${v.id})">Editar</button>
-              | <button class="btn-link danger" onclick="vlApagar(${v.id})">Apagar</button>
-            `}
+            <button class="btn-link" onclick="vlEditar(${v.id})">Editar</button>
+            | <button class="btn-link danger" onclick="vlApagar(${v.id})">Apagar</button>
           </td>
         </tr>
       `;
@@ -18626,7 +18622,10 @@ ${conteudo}
   function vlEditar(id) {
     const v = _vlLista.find(x => x.id === id);
     if (!v) return;
-    if (v.fechamentoId) { alert('Vale já foi incluído no fechamento. Não pode ser editado.'); return; }
+    if (v.fechamentoId) {
+      alert(`Este vale já foi contabilizado no fechamento mensal de ${v.profissionalNome}.\n\nPara alterar, primeiro reabra o fechamento em "📊 Fechamento Mensal".`);
+      return;
+    }
     document.getElementById('vl-modal-titulo').textContent = '💵 Editar Vale';
     document.getElementById('vl-id').value = v.id;
     const sel = document.getElementById('vl-prof');
@@ -18654,6 +18653,10 @@ ${conteudo}
     };
     if (!dados.profissionalId) { alert('Selecione a profissional.'); return; }
     if (dados.valor <= 0) { alert('Valor deve ser maior que zero.'); return; }
+
+    // Nome da profissional pra mensagem amigável
+    const profNome = (_vlProfissionais.find(p => p.id === dados.profissionalId)?.nome) || '';
+
     try {
       if (id) {
         await api('PUT', `/api/vales/${id}`, { data: dados.data, valor: dados.valor, observacao: dados.observacao });
@@ -18662,6 +18665,11 @@ ${conteudo}
       }
       vlFecharModal();
       await vlCarregar();
+      if (!id) {
+        // Mensagem só na CRIAÇÃO (edição fica silenciosa pra não ser chato)
+        const valorFmt = 'R$ ' + dados.valor.toFixed(2).replace('.', ',');
+        alert(`✅ Vale de ${valorFmt} registrado para ${profNome}!`);
+      }
     } catch (err) {
       alert('Erro: ' + err.message);
     }
@@ -18670,7 +18678,11 @@ ${conteudo}
   async function vlApagar(id) {
     const v = _vlLista.find(x => x.id === id);
     if (!v) return;
-    if (!confirm(`Apagar vale de R$ ${Number(v.valor).toFixed(2)} de ${v.profissionalNome}?`)) return;
+    if (v.fechamentoId) {
+      alert(`Este vale já foi contabilizado no fechamento mensal de ${v.profissionalNome}.\n\nPara apagar, primeiro reabra o fechamento em "📊 Fechamento Mensal".`);
+      return;
+    }
+    if (!confirm(`Apagar vale de R$ ${Number(v.valor).toFixed(2).replace('.', ',')} de ${v.profissionalNome}?`)) return;
     try {
       await api('DELETE', `/api/vales/${id}`);
       await vlCarregar();
