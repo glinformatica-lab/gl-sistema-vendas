@@ -131,12 +131,12 @@ router.get('/empresas/:id', async (req, res) => {
   }
 });
 
-// Atualizar empresa (status, plano, vencimento, mensalidade, observação)
+// Atualizar empresa (status, plano, vencimento, mensalidade, observação, módulos)
 router.put('/empresas/:id', async (req, res) => {
-  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo, usaAmbientes } = req.body || {};
+  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo, usaAmbientes, moduloSalao } = req.body || {};
   // Valida valores
   const statusValidos = ['trial', 'ativa', 'vencida', 'bloqueada'];
-  const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
+  const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'salao', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
   if (status && !statusValidos.includes(status)) return res.status(400).json({ error: 'Status inválido.' });
   if (plano && !planosValidos.includes(plano)) return res.status(400).json({ error: 'Plano inválido.' });
   try {
@@ -153,6 +153,14 @@ router.put('/empresas/:id', async (req, res) => {
       const posParam = setModuloFiscal ? 9 : 8;
       setAmbientes = `, usa_ambientes = $${posParam}`;
     }
+    // Feature: modulo_salao
+    let setSalao = '';
+    if (moduloSalao === true || moduloSalao === false) {
+      let posParam = 8;
+      if (setModuloFiscal) posParam++;
+      if (setAmbientes) posParam++;
+      setSalao = `, modulo_salao = $${posParam}`;
+    }
     const params = [
       nome || null, status || null, plano || null, dataVencimento || null,
       valorMensalidade != null ? Number(valorMensalidade) : null,
@@ -161,6 +169,7 @@ router.put('/empresas/:id', async (req, res) => {
     ];
     if (setModuloFiscal) params.push(moduloFiscalAtivo);
     if (setAmbientes) params.push(usaAmbientes);
+    if (setSalao) params.push(moduloSalao);
     const r = await db.query(
       `UPDATE empresas SET
          nome = COALESCE($1, nome),
@@ -169,7 +178,7 @@ router.put('/empresas/:id', async (req, res) => {
          data_vencimento = COALESCE($4, data_vencimento),
          valor_mensalidade = COALESCE($5, valor_mensalidade),
          observacao = COALESCE($6, observacao)
-         ${setModuloFiscal}${setAmbientes}
+         ${setModuloFiscal}${setAmbientes}${setSalao}
        WHERE id=$7 RETURNING *`,
       params
     );
@@ -223,7 +232,7 @@ router.post('/empresas/:id/pagamentos', async (req, res) => {
   const { valor, dataPagamento, plano, formaPagamento, observacao } = req.body || {};
   if (!valor || valor <= 0) return res.status(400).json({ error: 'Valor inválido.' });
   if (!dataPagamento) return res.status(400).json({ error: 'Data de pagamento é obrigatória.' });
-  const planosPagamentoValidos = ['basico', 'pro', 'pro-fiscal', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
+  const planosPagamentoValidos = ['basico', 'pro', 'pro-fiscal', 'salao', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
   if (!plano || !planosPagamentoValidos.includes(plano)) {
     return res.status(400).json({ error: 'Plano deve ser válido.' });
   }

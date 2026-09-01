@@ -4935,6 +4935,22 @@
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+        <!-- Card SALÃO (só aparece pra empresas com módulo salão ativo) -->
+        <div id="card-salao" onclick="selecionarPlanoRenovacao('salao')"
+             style="display:none;border:3px solid #7c3aed;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#faf5ff,#fff);position:relative;grid-column:1/-1;">
+          <span style="position:absolute;top:-12px;right:12px;background:#7c3aed;color:#fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;">SEU PLANO</span>
+          <h3 style="color:#6d28d9;margin:0 0 6px 0;font-size:16px;">💇 Módulo Salão</h3>
+          <div style="font-size:32px;font-weight:900;color:#6d28d9;">R$ 149,90</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>📅 Agenda visual (dia/semana/mês)</li>
+            <li>💼 Atendimentos com cálculo automático</li>
+            <li>💵 Vales e Fechamento Mensal</li>
+            <li>👥 Cadastro de profissionais e serviços</li>
+            <li>📊 Baixa em estoque + comissões</li>
+          </ul>
+        </div>
+
         <!-- Card Básico -->
         <div id="card-basico" onclick="selecionarPlanoRenovacao('basico')"
              style="border:3px solid #e2e8f0;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:#fff;">
@@ -23622,7 +23638,8 @@ ${conteudo}
   // Configurações dos cards principais (sem o anual que agora é expansível)
   const _cardsRenovacao = [
     { id: 'card-basico', borderOff: '#e2e8f0', bgOff: '#fff', borderOn: '#1e3a8a', bgOn: 'linear-gradient(135deg, #f0f4ff, #fff)' },
-    { id: 'card-pro',    borderOff: '#0891b2', bgOff: '#f0f9ff', borderOn: '#0c4a6e', bgOn: 'linear-gradient(135deg, #cffafe, #fff)' }
+    { id: 'card-pro',    borderOff: '#0891b2', bgOff: '#f0f9ff', borderOn: '#0c4a6e', bgOn: 'linear-gradient(135deg, #cffafe, #fff)' },
+    { id: 'card-salao',  borderOff: '#7c3aed', bgOff: 'linear-gradient(135deg,#faf5ff,#fff)', borderOn: '#5b21b6', bgOn: 'linear-gradient(135deg, #ede9fe, #fff)' }
   ];
 
   function resetCardsRenovacao() {
@@ -23666,6 +23683,37 @@ ${conteudo}
     btn.style.background = '#94a3b8';
     btn.style.cursor = 'not-allowed';
     btn.textContent = 'Selecione um plano acima';
+
+    // === MODO SALÃO: mostra só o card do salão ===
+    // Se a empresa tem módulo salão, escondemos os planos da loja pra evitar confusão
+    let ehModoSalao = false;
+    try {
+      const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+      ehModoSalao = !!empresa.moduloSalao;
+    } catch(e) {}
+
+    const cardSalao = document.getElementById('card-salao');
+    const cardBasico = document.getElementById('card-basico');
+    const cardPro = document.getElementById('card-pro');
+    const cardProFiscal = document.getElementById('card-pro-fiscal');
+    const cardAnual = document.getElementById('card-anual');
+
+    if (ehModoSalao) {
+      // Modo salão: só o card salão
+      if (cardSalao) cardSalao.style.display = 'block';
+      if (cardBasico) cardBasico.style.display = 'none';
+      if (cardPro) cardPro.style.display = 'none';
+      if (cardProFiscal) cardProFiscal.style.display = 'none';
+      if (cardAnual) cardAnual.style.display = 'none';
+    } else {
+      // Modo loja normal: cards antigos
+      if (cardSalao) cardSalao.style.display = 'none';
+      if (cardBasico) cardBasico.style.display = '';
+      if (cardPro) cardPro.style.display = '';
+      if (cardProFiscal) cardProFiscal.style.display = '';
+      if (cardAnual) cardAnual.style.display = '';
+    }
+
     // Mostra plano atual
     try {
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -23673,6 +23721,7 @@ ${conteudo}
         'basico': 'Básico (R$ 99,90/mês)',
         'pro': 'Pro (R$ 149,90/mês)',
         'pro-fiscal': 'Pro Fiscal (R$ 249,90/mês)',
+        'salao': 'Módulo Salão (R$ 149,90/mês)',
         'basico-anual': 'Básico Anual (R$ 1.078,92/ano)',
         'pro-anual': 'Pro Anual (R$ 1.618,92/ano)',
         'pro-fiscal-anual': 'Pro Fiscal Anual (R$ 2.698,92/ano)',

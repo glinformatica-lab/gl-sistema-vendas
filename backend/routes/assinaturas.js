@@ -16,6 +16,8 @@ const PLANOS = {
   basico:        { nome: 'Plano Básico',     valor: 99.90,   meses: 1,  modulosVendaOnline: false, moduloFiscal: false },
   pro:           { nome: 'Plano Pro',        valor: 149.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: false },
   'pro-fiscal':  { nome: 'Plano Pro Fiscal', valor: 249.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: true  },
+  // === Plano SALÃO (módulo específico) ===
+  salao:         { nome: 'Módulo Salão',     valor: 149.90,  meses: 1,  modulosVendaOnline: false, moduloFiscal: false, moduloSalao: true },
   // === Planos ANUAIS (10% de desconto) ===
   'basico-anual':     { nome: 'Básico Anual',     valor: 1078.92, meses: 12, modulosVendaOnline: false, moduloFiscal: false },
   'pro-anual':        { nome: 'Pro Anual',        valor: 1618.92, meses: 12, modulosVendaOnline: true,  moduloFiscal: false },
@@ -599,23 +601,26 @@ async function processarPagamento(referencia, dadosPedido) {
 
       // Ativa empresa
       // Se for plano Pro, também ativa o módulo fiscal
+      // Se for plano Salão, ativa o módulo salão
       const planoConfigAtivacao = PLANOS[assin.plano] || {};
       const ativaModuloFiscal = !!planoConfigAtivacao.moduloFiscal;
+      const ativaModuloSalao = !!planoConfigAtivacao.moduloSalao;
+
+      // Monta partes dinâmicas do UPDATE
+      const setsExtras = [];
       if (ativaModuloFiscal) {
-        await client.query(
-          `UPDATE empresas SET
-             status='ativa', plano=$1, data_vencimento=$2,
-             modulo_fiscal_ativo=TRUE,
-             modulo_fiscal_ativado_em=CASE WHEN modulo_fiscal_ativo=FALSE THEN NOW() ELSE modulo_fiscal_ativado_em END
-           WHERE id=$3`,
-          [assin.plano, vencIso, assin.empresa_id]
-        );
-      } else {
-        await client.query(
-          `UPDATE empresas SET status='ativa', plano=$1, data_vencimento=$2 WHERE id=$3`,
-          [assin.plano, vencIso, assin.empresa_id]
-        );
+        setsExtras.push('modulo_fiscal_ativo=TRUE');
+        setsExtras.push('modulo_fiscal_ativado_em=CASE WHEN modulo_fiscal_ativo=FALSE THEN NOW() ELSE modulo_fiscal_ativado_em END');
       }
+      if (ativaModuloSalao) {
+        setsExtras.push('modulo_salao=TRUE');
+      }
+      const setExtrasStr = setsExtras.length > 0 ? ', ' + setsExtras.join(', ') : '';
+
+      await client.query(
+        `UPDATE empresas SET status='ativa', plano=$1, data_vencimento=$2${setExtrasStr} WHERE id=$3`,
+        [assin.plano, vencIso, assin.empresa_id]
+      );
 
       // Registra pagamento na tabela pagamentos (mesma usada pelo Master)
       const pagInsert = await client.query(
