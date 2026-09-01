@@ -622,6 +622,7 @@
       <span class="grupo-seta" id="seta-salao">▼</span>
     </button>
     <div class="submenu feature-salao" id="submenu-salao" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('sl-agenda')">&#128197; Agenda</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-profissionais')">&#128101; Profissionais</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-servicos')">&#9986;&#65039; Serviços</button>
       <button class="menu-btn submenu-item" onclick="showPage('sl-taxas')">&#128179; Taxas de Maquininha</button>
@@ -2420,6 +2421,167 @@
     <!-- ============================================ -->
     <!-- MÓDULO SALÃO -->
     <!-- ============================================ -->
+
+    <!-- Agenda -->
+    <div id="page-sl-agenda" style="display:none;">
+      <div class="page-title">📅 Agenda</div>
+
+      <!-- Toolbar: navegação + abas + botão -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;">
+          <!-- Navegação de data -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="agNavegar(-1)" style="padding:8px 12px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">‹</button>
+            <button onclick="agIrHoje()" style="padding:8px 12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Hoje</button>
+            <button onclick="agNavegar(1)" style="padding:8px 12px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">›</button>
+            <div id="ag-periodo" style="font-size:15px;font-weight:600;color:#334155;margin-left:8px;">—</div>
+          </div>
+
+          <!-- Abas de visualização -->
+          <div style="display:flex;background:#f1f5f9;border-radius:8px;padding:3px;">
+            <button id="ag-aba-dia" onclick="agTrocarVisao('dia')" style="padding:6px 14px;border:none;background:#7c3aed;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Dia</button>
+            <button id="ag-aba-semana" onclick="agTrocarVisao('semana')" style="padding:6px 14px;border:none;background:transparent;color:#334155;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Semana</button>
+            <button id="ag-aba-mes" onclick="agTrocarVisao('mes')" style="padding:6px 14px;border:none;background:transparent;color:#334155;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Mês</button>
+          </div>
+
+          <button onclick="agAbrirNovo()" style="padding:9px 16px;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">
+            + Novo Agendamento
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtro por profissional -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+        <label style="font-size:12px;color:#64748b;font-weight:600;margin-right:8px;">Filtrar por profissional:</label>
+        <select id="ag-filtro-prof" onchange="agRenderizar()"
+                style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+          <option value="">Todas</option>
+        </select>
+      </div>
+
+      <!-- Container da grade -->
+      <div id="ag-container" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;min-height:400px;">
+        <div style="text-align:center;padding:60px 20px;color:#94a3b8;">Carregando agenda...</div>
+      </div>
+
+      <!-- Legenda -->
+      <div style="display:flex;gap:14px;margin-top:12px;font-size:12px;color:#64748b;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:14px;height:14px;background:#dbeafe;border-left:3px solid #3b82f6;border-radius:3px;"></div> Agendado
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:14px;height:14px;background:#dcfce7;border-left:3px solid #10b981;border-radius:3px;"></div> Atendido
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:14px;height:14px;background:#f1f5f9;border-left:3px solid #94a3b8;border-radius:3px;text-decoration:line-through;"></div> Cancelado
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Agendamento -->
+    <div id="modal-sl-agenda" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10005;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:14px;max-width:600px;width:100%;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h2 id="ag-modal-titulo" style="color:#7c3aed;margin:0;font-size:20px;">Novo Agendamento</h2>
+          <button onclick="agFecharModal()" style="background:none;border:none;font-size:26px;color:#94a3b8;cursor:pointer;">×</button>
+        </div>
+        <form id="form-sl-agenda" onsubmit="event.preventDefault(); agSalvar();">
+          <input type="hidden" id="ag-id">
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Profissional *</label>
+              <select id="ag-profissional" required
+                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Serviço</label>
+              <select id="ag-servico"
+                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+                <option value="">— nenhum —</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Data *</label>
+              <input type="date" id="ag-data" required
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Hora início *</label>
+              <input type="time" id="ag-hora" required value="09:00"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">Duração (min)</label>
+              <input type="number" id="ag-duracao" min="15" step="15" value="60"
+                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+            </div>
+            <div></div>
+
+            <div style="grid-column:1/-1;padding-top:8px;border-top:1px solid #f1f5f9;margin-top:4px;">
+              <div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:8px;">CLIENTE</div>
+              <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;cursor:pointer;">
+                  <input type="radio" name="ag-tipo-cli" value="cadastrado" checked onchange="agTrocarTipoCliente()"> Cliente cadastrado
+                </label>
+                <label style="font-size:12px;color:#334155;display:flex;align-items:center;gap:5px;cursor:pointer;">
+                  <input type="radio" name="ag-tipo-cli" value="avulso" onchange="agTrocarTipoCliente()"> Cliente avulso
+                </label>
+              </div>
+            </div>
+
+            <div id="ag-bloco-cadastrado" style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Buscar cliente cadastrado *</label>
+              <div style="position:relative;">
+                <input type="text" id="ag-cliente-busca" placeholder="Digite o nome..."
+                       oninput="agBuscarClientes()" autocomplete="off"
+                       style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+                <div id="ag-cliente-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;z-index:10;"></div>
+              </div>
+              <input type="hidden" id="ag-cliente-id">
+              <div id="ag-cliente-sel" style="display:none;margin-top:6px;padding:6px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:12px;color:#166534;"></div>
+            </div>
+
+            <div id="ag-bloco-avulso" style="grid-column:1/-1;display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div>
+                  <label style="font-size:12px;color:#334155;font-weight:600;">Nome *</label>
+                  <input type="text" id="ag-cli-nome"
+                         style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+                </div>
+                <div>
+                  <label style="font-size:12px;color:#334155;font-weight:600;">Telefone</label>
+                  <input type="text" id="ag-cli-tel" placeholder="(62) 99999-9999"
+                         style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+                </div>
+              </div>
+            </div>
+
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Observações</label>
+              <textarea id="ag-obs" rows="2"
+                        style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;resize:vertical;"></textarea>
+            </div>
+          </div>
+
+          <!-- Ações (aparecem no modo edição) -->
+          <div id="ag-acoes-edicao" style="display:none;padding-top:12px;margin-top:12px;border-top:1px solid #f1f5f9;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" onclick="agMarcarStatus('atendido')" style="padding:8px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">✅ Marcar como atendido</button>
+              <button type="button" onclick="agMarcarStatus('cancelado')" style="padding:8px 14px;background:#94a3b8;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">❌ Cancelar</button>
+              <button type="button" onclick="agApagar()" style="padding:8px 14px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">🗑️ Apagar</button>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" onclick="agFecharModal()" style="padding:10px 18px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button type="submit" style="padding:10px 18px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Profissionais do Salão -->
     <div id="page-sl-profissionais" style="display:none;">
@@ -7464,7 +7626,8 @@ https://sistema.glinformatica.com.br
     'migracao': 'config',
     'sl-profissionais': 'salao',
     'sl-servicos': 'salao',
-    'sl-taxas': 'salao'
+    'sl-taxas': 'salao',
+    'sl-agenda': 'salao'
   };
 
   // Abre/fecha um grupo de submenu manualmente
@@ -7746,7 +7909,7 @@ https://sistema.glinformatica.com.br
       }
       carregarNotasSaida();
     }
-    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas') {
+    if(pg === 'sl-profissionais' || pg === 'sl-servicos' || pg === 'sl-taxas' || pg === 'sl-agenda') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (!_emp.moduloSalao) {
         alert('Este recurso está disponível apenas para empresas com Módulo Salão.');
@@ -7756,6 +7919,7 @@ https://sistema.glinformatica.com.br
       if (pg === 'sl-profissionais') slCarregarProfissionais();
       if (pg === 'sl-servicos')      slCarregarServicos();
       if (pg === 'sl-taxas')         slCarregarTaxas();
+      if (pg === 'sl-agenda')        agEntrar();
     }
     if(pg === 'dashboard') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
@@ -16749,6 +16913,543 @@ ${conteudo}
 
   // ---------- PROFISSIONAIS ----------
 
+  // ============================================
+  // MÓDULO SALÃO — AGENDA
+  // ============================================
+
+  // Estado global
+  let _agVisao = 'dia';           // 'dia' | 'semana' | 'mes'
+  let _agDataAtual = new Date();  // data central da visualização
+  let _agAgendamentos = [];       // cache de agendamentos carregados
+  let _agProfissionais = [];      // cache de profissionais
+  let _agServicos = [];           // cache de serviços
+  let _agClienteBuscaTimer = null;
+  const AG_HORA_INI = 8;          // 08h
+  const AG_HORA_FIM = 20;         // 20h
+  const AG_SLOT_MIN = 60;         // slots de 60 min
+
+  // Formatadores auxiliares
+  function agFmtData(d) {
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  }
+  function agFmtDataIso(d) {
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+  function agFmtHora(h) {
+    if (!h) return '';
+    return String(h).slice(0, 5);
+  }
+  function agParseData(iso) {
+    // "2026-09-01" → Date local (sem timezone bagunçar)
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  const AG_DIAS_SEM = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const AG_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Cor determinística por profissional (paleta de 8 cores)
+  const AG_CORES = [
+    { bg:'#dbeafe', bd:'#3b82f6' }, // azul
+    { bg:'#fce7f3', bd:'#ec4899' }, // rosa
+    { bg:'#fef3c7', bd:'#f59e0b' }, // amarelo
+    { bg:'#e0e7ff', bd:'#6366f1' }, // índigo
+    { bg:'#ccfbf1', bd:'#14b8a6' }, // teal
+    { bg:'#fed7aa', bd:'#f97316' }, // laranja
+    { bg:'#dcfce7', bd:'#10b981' }, // verde
+    { bg:'#e9d5ff', bd:'#a855f7' }, // roxo
+  ];
+  function agCorProf(profId) {
+    return AG_CORES[Math.abs(profId) % AG_CORES.length];
+  }
+
+  // ---------- CARREGAMENTO ----------
+
+  async function agEntrar() {
+    // Carrega dados de apoio (profissionais + serviços) — cacheados
+    if (_agProfissionais.length === 0) {
+      try {
+        _agProfissionais = await api('GET', '/api/profissionais');
+      } catch (err) {
+        _agProfissionais = [];
+      }
+    }
+    if (_agServicos.length === 0) {
+      try {
+        _agServicos = await api('GET', '/api/servicos-salao');
+      } catch (err) {
+        _agServicos = [];
+      }
+    }
+    agPopularFiltroProf();
+    await agCarregarPeriodo();
+  }
+
+  function agPopularFiltroProf() {
+    const sel = document.getElementById('ag-filtro-prof');
+    if (!sel) return;
+    const valor = sel.value;
+    sel.innerHTML = '<option value="">Todas</option>' +
+      _agProfissionais.map(p => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+    sel.value = valor;
+  }
+
+  // Calcula o intervalo (de-ate) da visualização atual
+  function agIntervalo() {
+    const d = new Date(_agDataAtual);
+    if (_agVisao === 'dia') {
+      return { de: agFmtDataIso(d), ate: agFmtDataIso(d) };
+    }
+    if (_agVisao === 'semana') {
+      const inicio = new Date(d);
+      inicio.setDate(inicio.getDate() - inicio.getDay()); // domingo
+      const fim = new Date(inicio);
+      fim.setDate(fim.getDate() + 6);
+      return { de: agFmtDataIso(inicio), ate: agFmtDataIso(fim) };
+    }
+    // mês
+    const inicio = new Date(d.getFullYear(), d.getMonth(), 1);
+    const fim = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { de: agFmtDataIso(inicio), ate: agFmtDataIso(fim) };
+  }
+
+  async function agCarregarPeriodo() {
+    const { de, ate } = agIntervalo();
+    try {
+      _agAgendamentos = await api('GET', `/api/agendamentos?de=${de}&ate=${ate}`);
+    } catch (err) {
+      _agAgendamentos = [];
+    }
+    agRenderizar();
+  }
+
+  // ---------- NAVEGAÇÃO ----------
+
+  function agNavegar(dir) {
+    const d = new Date(_agDataAtual);
+    if (_agVisao === 'dia') d.setDate(d.getDate() + dir);
+    else if (_agVisao === 'semana') d.setDate(d.getDate() + (dir * 7));
+    else d.setMonth(d.getMonth() + dir);
+    _agDataAtual = d;
+    agCarregarPeriodo();
+  }
+
+  function agIrHoje() {
+    _agDataAtual = new Date();
+    agCarregarPeriodo();
+  }
+
+  function agTrocarVisao(v) {
+    _agVisao = v;
+    // Atualiza estilo das abas
+    ['dia','semana','mes'].forEach(vv => {
+      const btn = document.getElementById('ag-aba-' + vv);
+      if (!btn) return;
+      if (vv === v) {
+        btn.style.background = '#7c3aed';
+        btn.style.color = '#fff';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = '#334155';
+      }
+    });
+    agCarregarPeriodo();
+  }
+
+  // ---------- RENDERIZAÇÃO ----------
+
+  function agRenderizar() {
+    // Atualiza label do período
+    agAtualizarLabelPeriodo();
+
+    // Filtro por profissional
+    const filtroProf = document.getElementById('ag-filtro-prof')?.value;
+    let lista = _agAgendamentos;
+    if (filtroProf) lista = lista.filter(a => String(a.profissionalId) === filtroProf);
+
+    if (_agVisao === 'dia') return agRenderDia(lista);
+    if (_agVisao === 'semana') return agRenderSemana(lista);
+    return agRenderMes(lista);
+  }
+
+  function agAtualizarLabelPeriodo() {
+    const el = document.getElementById('ag-periodo');
+    if (!el) return;
+    const d = _agDataAtual;
+    if (_agVisao === 'dia') {
+      el.textContent = `${AG_DIAS_SEM[d.getDay()]}, ${d.getDate()} de ${AG_MESES[d.getMonth()]}`;
+    } else if (_agVisao === 'semana') {
+      const { de, ate } = agIntervalo();
+      const d1 = agParseData(de);
+      const d2 = agParseData(ate);
+      el.textContent = `${d1.getDate()}/${d1.getMonth()+1} — ${d2.getDate()}/${d2.getMonth()+1} de ${d.getFullYear()}`;
+    } else {
+      el.textContent = `${AG_MESES[d.getMonth()]} ${d.getFullYear()}`;
+    }
+  }
+
+  // Slot Y (px) baseado na hora
+  function agSlotY(hora, min) {
+    const totalMin = (hora - AG_HORA_INI) * 60 + min;
+    return (totalMin / AG_SLOT_MIN) * 60; // 60px por slot de 1h
+  }
+
+  function agRenderDia(lista) {
+    const container = document.getElementById('ag-container');
+    if (!container) return;
+    const dataIso = agFmtDataIso(_agDataAtual);
+    const doDia = lista.filter(a => a.data === dataIso);
+
+    let html = '<div style="display:flex;">';
+    // Coluna de horários
+    html += '<div style="width:60px;background:#f8fafc;border-right:1px solid #e2e8f0;flex-shrink:0;">';
+    html += '<div style="height:36px;border-bottom:1px solid #e2e8f0;"></div>';
+    for (let h = AG_HORA_INI; h <= AG_HORA_FIM; h++) {
+      html += `<div style="height:60px;border-bottom:1px solid #f1f5f9;padding:3px 8px;text-align:right;font-size:11px;color:#64748b;">${String(h).padStart(2,'0')}:00</div>`;
+    }
+    html += '</div>';
+
+    // Coluna principal
+    html += '<div style="flex:1;position:relative;">';
+    html += '<div style="height:36px;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 12px;font-size:12px;font-weight:600;color:#7c3aed;">Todos os agendamentos</div>';
+    // Grade
+    html += '<div style="position:relative;">';
+    for (let h = AG_HORA_INI; h <= AG_HORA_FIM; h++) {
+      html += `<div onclick="agAbrirNovoNoSlot(${h})" style="height:60px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background=''"></div>`;
+    }
+
+    // Agendamentos posicionados
+    for (const a of doDia) {
+      const [h, m] = String(a.horaInicio).split(':').map(Number);
+      const top = agSlotY(h, m);
+      const altura = ((a.duracaoMin || 60) / 60) * 60;
+      const cor = agCorProf(a.profissionalId);
+      const opac = a.status === 'cancelado' ? 0.5 : 1;
+      const risco = a.status === 'cancelado' ? 'text-decoration:line-through;' : '';
+      const check = a.status === 'atendido' ? '✅ ' : '';
+      const bgFinal = a.status === 'atendido' ? '#dcfce7' : (a.status === 'cancelado' ? '#f1f5f9' : cor.bg);
+      const bdFinal = a.status === 'atendido' ? '#10b981' : (a.status === 'cancelado' ? '#94a3b8' : cor.bd);
+      html += `
+        <div onclick="agAbrirEdicao(${a.id})" style="position:absolute;top:${top}px;left:6px;right:6px;height:${altura - 2}px;
+                    background:${bgFinal};border-left:4px solid ${bdFinal};border-radius:6px;padding:6px 10px;
+                    cursor:pointer;overflow:hidden;opacity:${opac};${risco}box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="font-size:12px;font-weight:700;color:#334155;">${check}${agFmtHora(a.horaInicio)} - ${escapeHtml(a.clienteNome)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:1px;">${escapeHtml(a.profissionalNome || '')} ${a.servicoNome ? '· ' + escapeHtml(a.servicoNome) : ''}</div>
+        </div>
+      `;
+    }
+    html += '</div></div></div>';
+
+    if (doDia.length === 0) {
+      html += '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">Nenhum agendamento neste dia. Clique num horário pra criar.</div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function agRenderSemana(lista) {
+    const container = document.getElementById('ag-container');
+    if (!container) return;
+    const { de } = agIntervalo();
+    const dInicio = agParseData(de);
+    const dias = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(dInicio);
+      d.setDate(d.getDate() + i);
+      dias.push(d);
+    }
+    const hoje = agFmtDataIso(new Date());
+
+    let html = '<div style="display:flex;">';
+    // Coluna hora
+    html += '<div style="width:50px;background:#f8fafc;border-right:1px solid #e2e8f0;flex-shrink:0;">';
+    html += '<div style="height:50px;border-bottom:1px solid #e2e8f0;"></div>';
+    for (let h = AG_HORA_INI; h <= AG_HORA_FIM; h++) {
+      html += `<div style="height:50px;border-bottom:1px solid #f1f5f9;padding:2px 5px;text-align:right;font-size:10px;color:#64748b;">${String(h).padStart(2,'0')}h</div>`;
+    }
+    html += '</div>';
+
+    // 7 colunas de dias
+    for (const d of dias) {
+      const iso = agFmtDataIso(d);
+      const doDia = lista.filter(a => a.data === iso);
+      const isHoje = iso === hoje;
+      html += '<div style="flex:1;border-right:1px solid #e2e8f0;position:relative;min-width:0;">';
+      html += `<div style="height:50px;background:${isHoje ? '#ede9fe' : '#f8fafc'};border-bottom:1px solid #e2e8f0;padding:6px;text-align:center;">
+        <div style="font-size:10px;color:#64748b;">${AG_DIAS_SEM[d.getDay()].slice(0,3)}</div>
+        <div style="font-size:15px;font-weight:700;color:${isHoje ? '#7c3aed' : '#334155'};">${d.getDate()}</div>
+      </div>`;
+
+      html += '<div style="position:relative;">';
+      for (let h = AG_HORA_INI; h <= AG_HORA_FIM; h++) {
+        html += `<div style="height:50px;border-bottom:1px solid #f1f5f9;"></div>`;
+      }
+
+      for (const a of doDia) {
+        const [h, m] = String(a.horaInicio).split(':').map(Number);
+        const top = ((h - AG_HORA_INI) * 60 + m) / 60 * 50;
+        const altura = ((a.duracaoMin || 60) / 60) * 50;
+        const cor = agCorProf(a.profissionalId);
+        const opac = a.status === 'cancelado' ? 0.5 : 1;
+        const bgFinal = a.status === 'atendido' ? '#dcfce7' : (a.status === 'cancelado' ? '#f1f5f9' : cor.bg);
+        const bdFinal = a.status === 'atendido' ? '#10b981' : (a.status === 'cancelado' ? '#94a3b8' : cor.bd);
+        html += `
+          <div onclick="agAbrirEdicao(${a.id})" style="position:absolute;top:${top}px;left:2px;right:2px;height:${altura - 1}px;
+                      background:${bgFinal};border-left:3px solid ${bdFinal};border-radius:4px;padding:2px 4px;
+                      cursor:pointer;overflow:hidden;opacity:${opac};font-size:10px;line-height:1.2;">
+            <div style="font-weight:700;color:#334155;">${agFmtHora(a.horaInicio)}</div>
+            <div style="color:#64748b;">${escapeHtml((a.clienteNome || '').slice(0,15))}</div>
+          </div>
+        `;
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  function agRenderMes(lista) {
+    const container = document.getElementById('ag-container');
+    if (!container) return;
+    const d = _agDataAtual;
+    const ano = d.getFullYear();
+    const mes = d.getMonth();
+    const primeiroDia = new Date(ano, mes, 1);
+    const ultimoDia = new Date(ano, mes + 1, 0);
+    const inicioGrade = new Date(primeiroDia);
+    inicioGrade.setDate(inicioGrade.getDate() - inicioGrade.getDay());
+    const hoje = agFmtDataIso(new Date());
+
+    let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);">';
+    // Cabeçalho
+    for (const dia of AG_DIAS_SEM) {
+      html += `<div style="background:#f8fafc;padding:8px;text-align:center;font-size:11px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">${dia.slice(0,3)}</div>`;
+    }
+    // 6 semanas × 7 dias
+    for (let i = 0; i < 42; i++) {
+      const dc = new Date(inicioGrade);
+      dc.setDate(dc.getDate() + i);
+      const iso = agFmtDataIso(dc);
+      const doMes = dc.getMonth() === mes;
+      const isHoje = iso === hoje;
+      const doDia = lista.filter(a => a.data === iso);
+
+      html += `<div onclick="agClicarDia('${iso}')" style="min-height:90px;padding:5px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:${isHoje ? '#ede9fe' : (doMes ? '#fff' : '#f8fafc')};cursor:pointer;overflow:hidden;">`;
+      html += `<div style="font-size:12px;font-weight:${isHoje ? '700' : '500'};color:${doMes ? (isHoje ? '#7c3aed' : '#334155') : '#cbd5e1'};">${dc.getDate()}</div>`;
+      // Até 3 agendamentos por dia
+      for (const a of doDia.slice(0, 3)) {
+        const cor = agCorProf(a.profissionalId);
+        const bd = a.status === 'atendido' ? '#10b981' : (a.status === 'cancelado' ? '#94a3b8' : cor.bd);
+        html += `<div style="font-size:10px;background:${cor.bg};border-left:2px solid ${bd};padding:1px 4px;margin-top:2px;border-radius:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${agFmtHora(a.horaInicio)} ${escapeHtml((a.clienteNome || '').slice(0,10))}</div>`;
+      }
+      if (doDia.length > 3) {
+        html += `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:600;">+ ${doDia.length - 3} mais</div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  // Clica num dia na visão mês → vai pra visão dia
+  function agClicarDia(iso) {
+    _agDataAtual = agParseData(iso);
+    agTrocarVisao('dia');
+  }
+
+  // Clica num slot da visão dia → abre modal com hora preenchida
+  function agAbrirNovoNoSlot(hora) {
+    agAbrirNovo();
+    document.getElementById('ag-hora').value = String(hora).padStart(2,'0') + ':00';
+    document.getElementById('ag-data').value = agFmtDataIso(_agDataAtual);
+  }
+
+  // ---------- MODAL ----------
+
+  function agAbrirNovo() {
+    document.getElementById('ag-modal-titulo').textContent = 'Novo Agendamento';
+    document.getElementById('ag-id').value = '';
+    document.getElementById('form-sl-agenda').reset();
+    document.getElementById('ag-duracao').value = 60;
+    document.getElementById('ag-hora').value = '09:00';
+    document.getElementById('ag-data').value = agFmtDataIso(_agDataAtual);
+    document.getElementById('ag-acoes-edicao').style.display = 'none';
+
+    // Popula selects
+    const selProf = document.getElementById('ag-profissional');
+    selProf.innerHTML = '<option value="">Selecione...</option>' +
+      _agProfissionais.filter(p => p.ativo).map(p => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+    const selServ = document.getElementById('ag-servico');
+    selServ.innerHTML = '<option value="">— nenhum —</option>' +
+      _agServicos.filter(s => s.ativo).map(s => `<option value="${s.id}" data-duracao="${s.duracaoPadraoMin || ''}">${escapeHtml(s.nome)}</option>`).join('');
+
+    // Cliente cadastrado por padrão
+    document.querySelector('input[name="ag-tipo-cli"][value="cadastrado"]').checked = true;
+    agTrocarTipoCliente();
+    document.getElementById('ag-cliente-id').value = '';
+    document.getElementById('ag-cliente-busca').value = '';
+    document.getElementById('ag-cliente-sel').style.display = 'none';
+
+    document.getElementById('modal-sl-agenda').style.display = 'flex';
+  }
+
+  async function agAbrirEdicao(id) {
+    const a = _agAgendamentos.find(x => x.id === id);
+    if (!a) return;
+
+    agAbrirNovo();
+    document.getElementById('ag-modal-titulo').textContent = 'Editar Agendamento';
+    document.getElementById('ag-id').value = a.id;
+    document.getElementById('ag-profissional').value = a.profissionalId || '';
+    document.getElementById('ag-servico').value = a.servicoId || '';
+    document.getElementById('ag-data').value = a.data;
+    document.getElementById('ag-hora').value = agFmtHora(a.horaInicio);
+    document.getElementById('ag-duracao').value = a.duracaoMin || 60;
+    document.getElementById('ag-obs').value = a.observacoes || '';
+    document.getElementById('ag-acoes-edicao').style.display = 'block';
+
+    if (a.clienteId) {
+      document.querySelector('input[name="ag-tipo-cli"][value="cadastrado"]').checked = true;
+      agTrocarTipoCliente();
+      document.getElementById('ag-cliente-id').value = a.clienteId;
+      document.getElementById('ag-cliente-busca').value = a.clienteNome || '';
+      const sel = document.getElementById('ag-cliente-sel');
+      sel.style.display = 'block';
+      sel.textContent = `✓ ${a.clienteNome}` + (a.clienteTelefone ? ` — ${a.clienteTelefone}` : '');
+    } else {
+      document.querySelector('input[name="ag-tipo-cli"][value="avulso"]').checked = true;
+      agTrocarTipoCliente();
+      document.getElementById('ag-cli-nome').value = a.clienteNome || '';
+      document.getElementById('ag-cli-tel').value = a.clienteTelefone || '';
+    }
+  }
+
+  function agFecharModal() {
+    document.getElementById('modal-sl-agenda').style.display = 'none';
+    document.getElementById('ag-cliente-sug').style.display = 'none';
+  }
+
+  function agTrocarTipoCliente() {
+    const tipo = document.querySelector('input[name="ag-tipo-cli"]:checked')?.value;
+    document.getElementById('ag-bloco-cadastrado').style.display = tipo === 'cadastrado' ? 'block' : 'none';
+    document.getElementById('ag-bloco-avulso').style.display = tipo === 'avulso' ? 'block' : 'none';
+  }
+
+  function agBuscarClientes() {
+    clearTimeout(_agClienteBuscaTimer);
+    _agClienteBuscaTimer = setTimeout(async () => {
+      const termo = document.getElementById('ag-cliente-busca').value.trim();
+      const sug = document.getElementById('ag-cliente-sug');
+      if (termo.length < 2) { sug.style.display = 'none'; return; }
+      // Filtra do cache dbClientes (já carregado no login)
+      const filtrados = (dbClientes || [])
+        .filter(c => (c.nome || '').toLowerCase().includes(termo.toLowerCase()))
+        .slice(0, 10);
+      if (filtrados.length === 0) {
+        sug.innerHTML = '<div style="padding:8px 12px;color:#94a3b8;font-size:12px;">Nenhum cliente. Use "avulso" ou cadastre em Clientes.</div>';
+      } else {
+        sug.innerHTML = filtrados.map(c => `
+          <div onclick="agSelecionarCliente(${c.id})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:13px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+            <strong>${escapeHtml(c.nome)}</strong>
+            ${c.telefone ? `<span style="color:#64748b;font-size:11px;margin-left:6px;">${escapeHtml(c.telefone)}</span>` : ''}
+          </div>
+        `).join('');
+      }
+      sug.style.display = 'block';
+    }, 200);
+  }
+
+  function agSelecionarCliente(id) {
+    const c = (dbClientes || []).find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('ag-cliente-id').value = c.id;
+    document.getElementById('ag-cliente-busca').value = c.nome;
+    document.getElementById('ag-cliente-sug').style.display = 'none';
+    const sel = document.getElementById('ag-cliente-sel');
+    sel.style.display = 'block';
+    sel.textContent = `✓ ${c.nome}` + (c.telefone ? ` — ${c.telefone}` : '');
+  }
+
+  async function agSalvar() {
+    const id = document.getElementById('ag-id').value;
+    const tipoCli = document.querySelector('input[name="ag-tipo-cli"]:checked')?.value;
+
+    let clienteId = null, clienteNome = '', clienteTelefone = '';
+    if (tipoCli === 'cadastrado') {
+      clienteId = parseInt(document.getElementById('ag-cliente-id').value) || null;
+      if (!clienteId) { alert('Selecione um cliente cadastrado (ou marque "avulso").'); return; }
+      const c = (dbClientes || []).find(x => x.id === clienteId);
+      if (c) { clienteNome = c.nome; clienteTelefone = c.telefone || ''; }
+    } else {
+      clienteNome = document.getElementById('ag-cli-nome').value.trim();
+      clienteTelefone = document.getElementById('ag-cli-tel').value.trim();
+      if (!clienteNome) { alert('Informe o nome do cliente.'); return; }
+    }
+
+    const servicoId = document.getElementById('ag-servico').value || null;
+    const servicoNome = servicoId
+      ? (document.getElementById('ag-servico').options[document.getElementById('ag-servico').selectedIndex].text)
+      : null;
+
+    const dados = {
+      profissionalId: parseInt(document.getElementById('ag-profissional').value) || null,
+      clienteId,
+      clienteNome,
+      clienteTelefone,
+      data: document.getElementById('ag-data').value,
+      horaInicio: document.getElementById('ag-hora').value,
+      duracaoMin: parseInt(document.getElementById('ag-duracao').value) || 60,
+      servicoId: servicoId ? parseInt(servicoId) : null,
+      servicoNome,
+      observacoes: document.getElementById('ag-obs').value.trim()
+    };
+    if (!dados.profissionalId) { alert('Selecione a profissional.'); return; }
+
+    try {
+      if (id) {
+        await api('PUT', `/api/agendamentos/${id}`, dados);
+      } else {
+        await api('POST', '/api/agendamentos', dados);
+      }
+      agFecharModal();
+      await agCarregarPeriodo();
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    }
+  }
+
+  async function agMarcarStatus(status) {
+    const id = document.getElementById('ag-id').value;
+    if (!id) return;
+    const msg = status === 'atendido'
+      ? 'Marcar este agendamento como ATENDIDO?'
+      : 'CANCELAR este agendamento?';
+    if (!confirm(msg)) return;
+    try {
+      await api('PUT', `/api/agendamentos/${id}/status`, { status });
+      agFecharModal();
+      await agCarregarPeriodo();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
+  async function agApagar() {
+    const id = document.getElementById('ag-id').value;
+    if (!id) return;
+    if (!confirm('APAGAR este agendamento?\n\nEssa ação não pode ser desfeita.')) return;
+    try {
+      await api('DELETE', `/api/agendamentos/${id}`);
+      agFecharModal();
+      await agCarregarPeriodo();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
   // ---------- DASHBOARD SALÃO ----------
 
   function carregarDashboardSalao() {
@@ -16770,16 +17471,62 @@ ${conteudo}
     const elData = document.getElementById('ds-data-hoje');
     if (elData) elData.textContent = `${dias[hoje.getDay()]}, ${hoje.getDate()} de ${meses[hoje.getMonth()]}`;
 
-    // Enquanto a Fase 2 (Agenda) e Fase 3 (Atendimentos) não estão prontas,
-    // os cards ficam zerados. Depois virão de /api/agendamentos e /api/atendimentos.
-    document.getElementById('ds-agend-hoje').textContent = '0';
-    document.getElementById('ds-agend-hoje-detalhe').textContent = 'nenhum agendado';
-    document.getElementById('ds-atend-hoje').textContent = '0';
-    document.getElementById('ds-atend-hoje-detalhe').textContent = 'nenhum atendimento';
+    // Puxa agendamentos de hoje
+    (async () => {
+      try {
+        const lista = await api('GET', '/api/agendamentos/hoje');
+        const agendados = lista.filter(a => a.status === 'agendado');
+        const atendidos = lista.filter(a => a.status === 'atendido');
+
+        document.getElementById('ds-agend-hoje').textContent = agendados.length;
+        document.getElementById('ds-agend-hoje-detalhe').textContent =
+          agendados.length === 0 ? 'nenhum agendado' :
+          agendados.length === 1 ? '1 marcado' : `${agendados.length} marcados`;
+
+        document.getElementById('ds-atend-hoje').textContent = atendidos.length;
+        document.getElementById('ds-atend-hoje-detalhe').textContent =
+          atendidos.length === 0 ? 'ainda nenhum' :
+          atendidos.length === 1 ? '1 concluído' : `${atendidos.length} concluídos`;
+
+        // Popula lista de próximos agendamentos
+        const cont = document.getElementById('ds-proximos-agendamentos');
+        if (cont) {
+          const agora = new Date();
+          const proximos = agendados
+            .filter(a => {
+              const [hh, mm] = String(a.horaInicio).split(':').map(Number);
+              const d = new Date();
+              d.setHours(hh, mm, 0, 0);
+              return d >= agora;
+            })
+            .slice(0, 5);
+          if (proximos.length === 0) {
+            cont.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Nenhum agendamento restante hoje.</div>';
+          } else {
+            cont.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' +
+              proximos.map(a => `
+                <div onclick="showPage('sl-agenda'); setTimeout(()=>agAbrirEdicao(${a.id}),300);"
+                     style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;cursor:pointer;border-left:3px solid #7c3aed;">
+                  <div style="font-size:18px;font-weight:700;color:#7c3aed;min-width:60px;">${agFmtHora(a.horaInicio)}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:14px;font-weight:600;color:#334155;">${escapeHtml(a.clienteNome)}</div>
+                    <div style="font-size:12px;color:#64748b;">${escapeHtml(a.profissionalNome || '')} ${a.servicoNome ? '· ' + escapeHtml(a.servicoNome) : ''}</div>
+                  </div>
+                </div>
+              `).join('') + '</div>';
+          }
+        }
+      } catch (err) {
+        document.getElementById('ds-agend-hoje').textContent = '—';
+        document.getElementById('ds-atend-hoje').textContent = '—';
+      }
+    })();
+
+    // Faturamento ainda não implementado (Fase 3 - Atendimentos)
     document.getElementById('ds-fat-hoje').textContent = 'R$ 0,00';
-    document.getElementById('ds-fat-hoje-detalhe').textContent = 'ainda sem vendas';
+    document.getElementById('ds-fat-hoje-detalhe').textContent = 'em breve';
     document.getElementById('ds-fat-mes').textContent = 'R$ 0,00';
-    document.getElementById('ds-fat-mes-detalhe').textContent = 'ainda sem vendas';
+    document.getElementById('ds-fat-mes-detalhe').textContent = 'em breve';
   }
 
   async function slCarregarProfissionais() {
