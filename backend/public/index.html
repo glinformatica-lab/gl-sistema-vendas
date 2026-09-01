@@ -538,6 +538,10 @@
 <div id="container">
   <nav id="menu">
     <div id="logo">GL <span style="color:var(--verde)">Sistema de Vendas</span></div>
+    <div id="relogio-menu" style="padding:0 16px 16px;color:#64748b;font-size:12px;line-height:1.4;border-bottom:1px solid #f1f5f9;margin-bottom:8px;">
+      <div id="relogio-data" style="text-transform:capitalize;">—</div>
+      <div id="relogio-hora" style="font-size:16px;font-weight:700;color:#334155;font-variant-numeric:tabular-nums;margin-top:2px;">--:--:--</div>
+    </div>
     <button class="menu-btn" onclick="abrirBuscaGlobal()" style="background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 12px 4px;border-radius:8px;padding:8px 12px;font-size:13px;width:calc(100% - 24px);" title="Busca Global (Ctrl+K)">
       <span>&#128269; Buscar...</span>
       <kbd style="background:#fff;color:#64748b;padding:1px 6px;border-radius:4px;font-size:10px;font-family:monospace;border:1px solid #cbd5e1;">Ctrl+K</kbd>
@@ -21926,6 +21930,26 @@ ${conteudo}
 
   function escapeAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
   function escapeHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Relógio em tempo real no menu esquerdo
+  (function iniciarRelogio() {
+    const dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    function tick() {
+      const d = new Date();
+      const elData = document.getElementById('relogio-data');
+      const elHora = document.getElementById('relogio-hora');
+      if (elData) elData.textContent = `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`;
+      if (elHora) {
+        const hh = String(d.getHours()).padStart(2,'0');
+        const mm = String(d.getMinutes()).padStart(2,'0');
+        const ss = String(d.getSeconds()).padStart(2,'0');
+        elHora.textContent = `${hh}:${mm}:${ss}`;
+      }
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
 
   // ====== RENOVAÇÃO DE ASSINATURA ======
   let _planoRenovacao = null;
