@@ -13203,23 +13203,39 @@ https://sistema.glinformatica.com.br
     const titulo = isNf ? 'NOTA FISCAL DE ENTRADA' : 'RECIBO DE ENTRADA';
     const subtitulo = isNf
       ? `NF ${e.numero || ''}${e.serie ? ' — Série ' + e.serie : ''}`
-      : `Documento: ${e.doc}`;
+      : `Documento: ${e.doc || '—'}`;
     const total = isNf ? e.totalNf : e.totalGeral;
-    const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
+    // Pagamento pode vir null (entradas migradas) — mostra "—"
+    const pagBase = e.pagamento || null;
+    const pagamentoLabel = pagBase
+      ? ({ 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[pagBase] || pagBase)
+      : '—';
 
     const colsExtra = isNf ? '<th>NCM</th><th>CFOP</th><th>Un</th>' : '';
     const itensArr = Array.isArray(e.itens) ? e.itens : [];
+
+    // Helper defensivo: aceita nomes variados que apareceram ao longo dos anos.
+    // Entradas antigas migradas podem vir com {valor} em vez de {custo}, e
+    // {nome/descricao} em vez de {produto}.
+    const nomeItem = (it) => it.produto || it.nome || it.descricao || '(sem descrição)';
+    const custoItem = (it) => Number(it.custo != null ? it.custo : (it.valor != null ? it.valor : (it.valor_unitario || 0)));
+    const qtdItem = (it) => Number(it.qtd != null ? it.qtd : (it.quantidade || 0));
+
     const linhas = itensArr.length > 0
-      ? itensArr.map(it => `
+      ? itensArr.map(it => {
+          const q = qtdItem(it);
+          const c = custoItem(it);
+          return `
         <tr>
           <td>${it.codigo || '-'}</td>
-          <td>${it.produto}</td>
-          ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || 'UN'}</td>` : ''}
-          <td style="text-align:right;">${formatarQtd(it.qtd)}</td>
-          <td style="text-align:right;">${formatarBRL(it.custo)}</td>
-          <td style="text-align:right;">${formatarBRL(it.qtd * it.custo)}</td>
+          <td>${nomeItem(it)}</td>
+          ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || it.unidade || 'UN'}</td>` : ''}
+          <td style="text-align:right;">${formatarQtd(q)}</td>
+          <td style="text-align:right;">${formatarBRL(c)}</td>
+          <td style="text-align:right;">${formatarBRL(q * c)}</td>
         </tr>
-      `).join('')
+      `;
+        }).join('')
       : `<tr><td colspan="${isNf ? 8 : 5}" style="text-align:center;padding:16px;color:#666;font-style:italic;">Nota sem detalhamento de itens (migração histórica).</td></tr>`;
 
     let totaisExtra = '';
@@ -13259,7 +13275,7 @@ https://sistema.glinformatica.com.br
 
   <h2>Dados do Fornecedor</h2>
   <div class="grid">
-    <div><span class="lbl">Fornecedor:</span> ${e.fornecedor}</div>
+    <div><span class="lbl">Fornecedor:</span> ${e.fornecedor || '—'}</div>
     ${isNf ? `<div><span class="lbl">CNPJ:</span> ${e.cnpj || '-'}</div>` : ''}
     ${isNf && e.chave ? `<div style="grid-column: 1/-1;"><span class="lbl">Chave de Acesso:</span> ${e.chave}</div>` : ''}
   </div>
@@ -13272,7 +13288,7 @@ https://sistema.glinformatica.com.br
       <div><span class="lbl">Data Emissão:</span> ${formatarDataBR(e.dataEmissao || '')}</div>
       <div><span class="lbl">Data Entrada:</span> ${formatarDataBR(e.dataEntrada || e.data || '')}</div>
     ` : `
-      <div><span class="lbl">Documento:</span> ${e.doc}</div>
+      <div><span class="lbl">Documento:</span> ${e.doc || '—'}</div>
       <div><span class="lbl">Data:</span> ${formatarDataBR(e.data)}</div>
     `}
     <div><span class="lbl">Pagamento:</span> ${pagamentoLabel}</div>
