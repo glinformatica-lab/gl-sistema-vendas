@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
     if (status) {
       if (status === 'sem_nfe') {
         where.push(`status_nfe IS NULL`);
-      } else if (['autorizada', 'cancelada', 'denegada'].includes(status)) {
+      } else if (['autorizada', 'cancelada', 'denegada', 'rejeitada'].includes(status)) {
         where.push(`status_nfe = $${idx++}`);
         vals.push(status);
       }
@@ -162,13 +162,12 @@ router.get('/emitentes', async (req, res) => {
 });
 
 // ==========================================
-// GET /:id — Detalhe da nota + itens da venda vinculada
-// ==========================================
-// ==========================================
 // GET /faturamento — Total de faturamento por período
 // REGRA: somente notas de VENDA + CUPOM
 //        NÃO conta devolução, remessa, transferência
-//        Ignora canceladas e denegadas
+//        Ignora canceladas, denegadas e rejeitadas
+//        (rejeitada = SEFAZ recusou; existe só pra explicar buracos
+//         na numeração, nunca virou faturamento)
 // Query params: ?de=YYYY-MM-DD&ate=YYYY-MM-DD&emitenteCnpj=XXXXXXXX
 // IMPORTANTE: declarada ANTES de /:id pra evitar conflito de rota
 // ==========================================
@@ -176,7 +175,7 @@ router.get('/faturamento', async (req, res) => {
   try {
     const { de, ate, emitenteCnpj } = req.query;
     const where = ['empresa_id = $1', `tipo IN ('venda', 'cupom')`,
-                   `(status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada'))`];
+                   `(status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada', 'rejeitada'))`];
     const vals = [req.user.empresaId];
     let idx = 2;
     if (de && /^\d{4}-\d{2}-\d{2}$/.test(de)) {
