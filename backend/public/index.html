@@ -12476,11 +12476,21 @@ https://sistema.glinformatica.com.br
   }
 
   // Monta o cabeçalho dos recibos com dados da empresa (logo + identificação)
-  function cabecalhoEmpresaParaRecibo() {
+  // Cabeçalho de impressão da empresa.
+  // Aceita um objeto de override — útil pra empresas multi-CNPJ (id 43):
+  // uma entrada/nota vem com emitente_cnpj/emitente_nome próprios, que
+  // podem ser diferentes do CNPJ padrão da empresa logada.
+  function cabecalhoEmpresaParaRecibo(override) {
     let empresa = {};
     try { empresa = JSON.parse(localStorage.getItem('empresa') || '{}'); } catch(_) {}
-    const nome = empresa.nome || '—';
-    const cnpj = empresa.cnpj ? `<div><span class="lbl">CNPJ:</span> ${empresa.cnpj}</div>` : '';
+    // Se veio override com emitente, usa dele; senão cai pra empresa
+    const emitenteNome = override && override.emitenteNome;
+    const emitenteCnpj = override && override.emitenteCnpj;
+    const nome = emitenteNome || empresa.nome || '—';
+    const cnpjTexto = emitenteCnpj
+      ? (typeof formatarCnpjBR === 'function' ? formatarCnpjBR(emitenteCnpj) : emitenteCnpj)
+      : empresa.cnpj;
+    const cnpj = cnpjTexto ? `<div><span class="lbl">CNPJ:</span> ${cnpjTexto}</div>` : '';
     const tel  = empresa.telefone ? `<div><span class="lbl">Tel:</span> ${empresa.telefone}</div>` : '';
     const email = empresa.email ? `<div><span class="lbl">E-mail:</span> ${empresa.email}</div>` : '';
     const enderecoLinha = [empresa.endereco, empresa.bairro].filter(Boolean).join(', ');
@@ -12495,7 +12505,7 @@ https://sistema.glinformatica.com.br
       <div class="empresa-header" style="display:flex;align-items:flex-start;gap:18px;padding-bottom:14px;border-bottom:2px solid #3960f9;margin-bottom:18px;">
         ${logoBlock ? `<div style="flex-shrink:0;">${logoBlock}</div>` : ''}
         <div style="flex:1;">
-          <div style="font-size:20px;font-weight:900;color:#222;">${nome}</div>
+          <div style="font-size:20px;font-weight:900;color:#222;">${escapeHtml(nome)}</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px;font-size:12px;">
             ${cnpj}${tel}${email}
           </div>
@@ -13119,9 +13129,9 @@ https://sistema.glinformatica.com.br
       e.itens.forEach(it => {
         adicionarItemSemNf();
         const tr = document.querySelector('#tbody-itens-sem-nf tr:last-child');
-        tr.querySelector('.item-produto').value = it.produto;
-        tr.querySelector('.item-qtd').value     = it.qtd;
-        tr.querySelector('.item-valor').value   = it.custo;
+        tr.querySelector('.item-produto').value = entradaFmt.nome(it);
+        tr.querySelector('.item-qtd').value     = entradaFmt.qtd(it);
+        tr.querySelector('.item-valor').value   = entradaFmt.precoUnit(it);
         if(it.precoVenda != null) tr.querySelector('.item-preco-venda').value = it.precoVenda;
         recalcularLinha(tr);
       });
@@ -13157,8 +13167,8 @@ https://sistema.glinformatica.com.br
       // Itens
       document.getElementById('tbody-itens-com-nf').innerHTML = '';
       e.itens.forEach(it => adicionarItemComNf({
-        codigo: it.codigo, produto: it.produto, ncm: it.ncm, cfop: it.cfop, un: it.un,
-        qtd: it.qtd, valor: it.custo, precoVenda: it.precoVenda
+        codigo: it.codigo, produto: entradaFmt.nome(it), ncm: it.ncm, cfop: it.cfop, un: it.un || it.unidade,
+        qtd: entradaFmt.qtd(it), valor: entradaFmt.precoUnit(it), precoVenda: it.precoVenda
       }));
       atualizarTotaisCnf();
       document.querySelector('#form-entrada-com-nf h2').textContent = 'Editar Entrada com NF';
@@ -13198,12 +13208,56 @@ https://sistema.glinformatica.com.br
     w.document.close();
     w.addEventListener('load', () => { w.focus(); w.print(); });
   }
+  // ============================================
+  // HELPERS DE ENTRADA (usados por: imprimir, modal detalhe, edição)
+  // Precisam viver aqui pra ficar consistentes.
+  //
+  // Formato ATUAL dos itens do JSONB entradas.itens:
+  //   {codigo, nome, qtd, precoUnit, total}
+  //
+  // Outros formatos apareceram ao longo dos anos e ainda existem em base
+  // migrada, por isso os fallbacks:
+  //   - produto/nome/descricao pra descrição
+  //   - qtd/quantidade
+  //   - precoUnit/precoUnitario/valor_unitario/custo/valor
+  //   - total (usa o valor gravado, NÃO recalcula qtd × preço — porque o
+  //     desconto da nota é rateado item a item dentro de 'total')
+  // ============================================
+  const entradaFmt = {
+    // Fallback universal: null/undefined/'' vira '—'
+    v: (x) => (x === null || x === undefined || x === '') ? '—' : x,
+    nome: (it) => it.nome || it.produto || it.descricao || '(sem descrição)',
+    qtd:  (it) => Number(it.qtd != null ? it.qtd : (it.quantidade || 0)),
+    precoUnit: (it) => {
+      // Ordem importa: precoUnit é o padrão atual
+      const v = it.precoUnit != null ? it.precoUnit
+             : it.precoUnitario != null ? it.precoUnitario
+             : it.valor_unitario != null ? it.valor_unitario
+             : it.custo != null ? it.custo
+             : it.valor != null ? it.valor
+             : 0;
+      return Number(v) || 0;
+    },
+    total: (it) => {
+      // NÃO recalcula: usa o total gravado, se existir.
+      // O desconto da nota é rateado item a item DENTRO desse campo.
+      // Só recalcula se realmente não veio total (formato bem antigo).
+      if (it.total != null) return Number(it.total) || 0;
+      if (it.subtotal != null) return Number(it.subtotal) || 0;
+      // Último recurso: qtd × preço
+      return entradaFmt.qtd(it) * entradaFmt.precoUnit(it);
+    },
+    ncm:  (it) => it.ncm || '-',
+    cfop: (it) => it.cfop || '-',
+    un:   (it) => it.un || it.unidade || '-'
+  };
+
   function gerarHtmlImpressao(e) {
     const isNf = e.tipo === 'com-nf';
     const titulo = isNf ? 'NOTA FISCAL DE ENTRADA' : 'RECIBO DE ENTRADA';
     const subtitulo = isNf
-      ? `NF ${e.numero || ''}${e.serie ? ' — Série ' + e.serie : ''}`
-      : `Documento: ${e.doc || '—'}`;
+      ? `NF ${entradaFmt.v(e.numero)}${e.serie ? ' — Série ' + e.serie : ''}`
+      : `Documento: ${entradaFmt.v(e.doc)}`;
     const total = isNf ? e.totalNf : e.totalGeral;
     // Pagamento pode vir null (entradas migradas) — mostra "—"
     const pagBase = e.pagamento || null;
@@ -13214,25 +13268,19 @@ https://sistema.glinformatica.com.br
     const colsExtra = isNf ? '<th>NCM</th><th>CFOP</th><th>Un</th>' : '';
     const itensArr = Array.isArray(e.itens) ? e.itens : [];
 
-    // Helper defensivo: aceita nomes variados que apareceram ao longo dos anos.
-    // Entradas antigas migradas podem vir com {valor} em vez de {custo}, e
-    // {nome/descricao} em vez de {produto}.
-    const nomeItem = (it) => it.produto || it.nome || it.descricao || '(sem descrição)';
-    const custoItem = (it) => Number(it.custo != null ? it.custo : (it.valor != null ? it.valor : (it.valor_unitario || 0)));
-    const qtdItem = (it) => Number(it.qtd != null ? it.qtd : (it.quantidade || 0));
-
     const linhas = itensArr.length > 0
       ? itensArr.map(it => {
-          const q = qtdItem(it);
-          const c = custoItem(it);
+          const q = entradaFmt.qtd(it);
+          const p = entradaFmt.precoUnit(it);
+          const t = entradaFmt.total(it);
           return `
         <tr>
-          <td>${it.codigo || '-'}</td>
-          <td>${nomeItem(it)}</td>
-          ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || it.unidade || 'UN'}</td>` : ''}
+          <td>${entradaFmt.v(it.codigo || '-')}</td>
+          <td>${escapeHtml(entradaFmt.nome(it))}</td>
+          ${isNf ? `<td>${entradaFmt.ncm(it)}</td><td>${entradaFmt.cfop(it)}</td><td>${entradaFmt.un(it)}</td>` : ''}
           <td style="text-align:right;">${formatarQtd(q)}</td>
-          <td style="text-align:right;">${formatarBRL(c)}</td>
-          <td style="text-align:right;">${formatarBRL(q * c)}</td>
+          <td style="text-align:right;">${formatarBRL(p)}</td>
+          <td style="text-align:right;">${formatarBRL(t)}</td>
         </tr>
       `;
         }).join('')
@@ -13269,7 +13317,7 @@ https://sistema.glinformatica.com.br
   @media print { body { padding: 10px; } }
 </style></head>
 <body>
-  ${cabecalhoEmpresaParaRecibo()}
+  ${cabecalhoEmpresaParaRecibo({ emitenteNome: e.emitenteNome, emitenteCnpj: e.emitenteCnpj })}
   <h1>${titulo}</h1>
   <div class="sub">${subtitulo} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleString('pt-BR')}</div>
 
