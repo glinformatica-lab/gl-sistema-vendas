@@ -966,6 +966,13 @@
             <option value="">Todos</option>
           </select>
         </label>
+        <label id="ent-filtro-emitente-wrap" style="display:none;flex-direction:column;font-size:12px;color:#5b21b6;font-weight:600;">
+          🏢 Empresa emitente
+          <select id="ent-filtro-emitente" onchange="_entPaginaForn = 1; carregarEntradasFornPaginado();"
+                  style="margin-top:4px;padding:7px 10px;border:1px solid #7c3aed;border-radius:6px;font-size:13px;min-width:220px;background:#faf5ff;color:#5b21b6;font-weight:600;">
+            <option value="">Todas as empresas</option>
+          </select>
+        </label>
         <label style="display:flex;flex-direction:column;font-size:12px;color:#555;font-weight:600;flex:1;min-width:200px;">
           Buscar (produto, código, NF, documento)
           <input type="text" id="filtro-ent-busca" oninput="nsAgendarBuscaForn();" placeholder="🔍 ex: 1234, cabo HDMI, NF 5587"
@@ -980,6 +987,7 @@
           <tr>
             <th>Data</th>
             <th>Fornecedor</th>
+            <th class="ent-col-emitente" style="display:none;">Emitente</th>
             <th>Tipo</th>
             <th>Documento</th>
             <th>Total</th>
@@ -2204,6 +2212,13 @@
           <input type="date" id="ns-filtro-ate" onchange="_nsPagina = 1; carregarNotasSaida()"
                  style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
         </div>
+        <div id="ns-filtro-emitente-wrap" style="display:none;grid-column:span 2;">
+          <label style="font-size:11px;color:#334155;font-weight:600;">🏢 Empresa emitente</label>
+          <select id="ns-filtro-emitente" onchange="_nsPagina = 1; carregarNotasSaida()"
+                  style="width:100%;padding:8px;border:1px solid #7c3aed;border-radius:6px;font-size:13px;background:#faf5ff;font-weight:600;color:#5b21b6;">
+            <option value="">Todas as empresas</option>
+          </select>
+        </div>
         <div>
           <label style="font-size:11px;color:#334155;font-weight:600;">Tipo</label>
           <select id="ns-filtro-tipo" onchange="_nsPagina = 1; carregarNotasSaida()"
@@ -2250,6 +2265,7 @@
               <th style="padding:10px;text-align:left;">Data</th>
               <th style="padding:10px;text-align:left;">Número</th>
               <th style="padding:10px;text-align:center;">Série</th>
+              <th class="ns-col-emitente" style="padding:10px;text-align:left;display:none;">Emitente</th>
               <th style="padding:10px;text-align:center;">Tipo</th>
               <th style="padding:10px;text-align:left;">Cliente</th>
               <th style="padding:10px;text-align:center;">CFOP</th>
@@ -9828,18 +9844,73 @@ https://sistema.glinformatica.com.br
     }, 400);
   }
 
+  // Cache de emitentes (entradas)
+  let _entEmitentes = null;
+
+  async function entCarregarEmitentes() {
+    try {
+      const r = await api('GET', '/api/entradas/emitentes');
+      _entEmitentes = r.emitentes || [];
+
+      const wrap = document.getElementById('ent-filtro-emitente-wrap');
+      const sel = document.getElementById('ent-filtro-emitente');
+      const cols = document.querySelectorAll('.ent-col-emitente');
+
+      if (_entEmitentes.length >= 2) {
+        if (wrap) wrap.style.display = '';
+        cols.forEach(c => c.style.display = '');
+        const opcoes = ['<option value="">Todas as empresas</option>'];
+        _entEmitentes.forEach(e => {
+          const cnpjFmt = formatarCnpjBR(e.emitente_cnpj);
+          const nomeCurto = (e.emitente_nome || '(sem nome)').length > 40
+            ? (e.emitente_nome || '').slice(0, 38) + '…'
+            : (e.emitente_nome || '(sem nome)');
+          opcoes.push(`<option value="${e.emitente_cnpj}">${escapeHtml(nomeCurto)} — ${cnpjFmt} (${e.notas.toLocaleString('pt-BR')})</option>`);
+        });
+        if (r.semCnpjNotas > 0) {
+          opcoes.push(`<option value="sem-cnpj">— Sem CNPJ informado (${r.semCnpjNotas})</option>`);
+        }
+        if (sel) sel.innerHTML = opcoes.join('');
+      } else {
+        if (wrap) wrap.style.display = 'none';
+        cols.forEach(c => c.style.display = 'none');
+      }
+    } catch (err) {
+      console.warn('[ent] erro carregando emitentes:', err.message);
+    }
+  }
+
+  function entNomeCurtoEmitente(cnpj) {
+    if (!cnpj || !_entEmitentes) return '';
+    const e = _entEmitentes.find(x => x.emitente_cnpj === cnpj);
+    if (!e || !e.emitente_nome) return cnpj;
+    const nome = e.emitente_nome.trim();
+    if (nome.length <= 22) return nome;
+    return nome.slice(0, 20) + '…';
+  }
+
   async function carregarEntradasFornPaginado() {
     const tbody = document.getElementById('tbody-entradas-fornecedores');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</td></tr>';
+
+    // Primeira carga: descobre emitentes
+    if (_entEmitentes === null) {
+      await entCarregarEmitentes();
+    }
+    const temEmitente = _entEmitentes && _entEmitentes.length >= 2;
+    const colspan = temEmitente ? 8 : 7;
+
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</td></tr>`;
 
     const params = new URLSearchParams();
     const mes = document.getElementById('filtro-ent-mes')?.value || '';
     const forn = document.getElementById('filtro-ent-fornecedor')?.value || '';
     const busca = document.getElementById('filtro-ent-busca')?.value?.trim() || '';
+    const emitente = document.getElementById('ent-filtro-emitente')?.value || '';
     if (mes) params.set('mes', mes);
     if (forn) params.set('fornecedor', forn);
     if (busca) params.set('busca', busca);
+    if (emitente) params.set('emitenteCnpj', emitente);
     params.set('pagina', _entPaginaForn);
     params.set('porPagina', 50);
 
@@ -9851,15 +9922,15 @@ https://sistema.glinformatica.com.br
       const c = document.getElementById('contador-entradas');
       if (c) {
         const mostrando = Math.min(50, r.entradas.length);
-        const filtroAtivo = mes || forn || busca;
+        const filtroAtivo = mes || forn || busca || emitente;
         c.textContent = filtroAtivo
           ? `Mostrando ${mostrando} de ${r.total} · Total: ${formatarBRL(r.somaTotal)}`
           : `Mostrando ${mostrando} de ${r.total} entrada(s) · Total: ${formatarBRL(r.somaTotal)}`;
       }
 
       if (!r.entradas || r.entradas.length === 0) {
-        const msg = (mes || forn || busca) ? 'Nenhuma entrada encontrada com os filtros aplicados.' : 'Nenhuma entrada registrada.';
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#889;padding:20px;">${msg}</td></tr>`;
+        const msg = (mes || forn || busca || emitente) ? 'Nenhuma entrada encontrada com os filtros aplicados.' : 'Nenhuma entrada registrada.';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#889;padding:20px;">${msg}</td></tr>`;
         return;
       }
 
@@ -9878,10 +9949,15 @@ https://sistema.glinformatica.com.br
         const linhaUsuarioCriou = isAdmin && e.criadoPorNome
           ? `<div style="font-size:10px;color:#64748b;margin-top:2px;font-weight:400;">👤 ${escapeHtml(e.criadoPorNome)}</div>`
           : '';
+        // Coluna emitente (só se aplicável)
+        const colEmit = temEmitente
+          ? `<td style="font-size:11px;color:#5b21b6;font-weight:600;">${e.emitenteCnpj ? escapeHtml(entNomeCurtoEmitente(e.emitenteCnpj)) : '<span style="color:#94a3b8;font-weight:400;">—</span>'}</td>`
+          : '';
         return `
           <tr>
             <td>${formatarDataBR(e.data)}</td>
             <td>${escapeHtml(e.fornecedor || '')}${infoUsuarioIcone}${linhaUsuarioCriou}</td>
+            ${colEmit}
             <td>${badge}</td>
             <td>${escapeHtml(documento)}</td>
             <td>${formatarBRL(total)}</td>
@@ -9900,7 +9976,7 @@ https://sistema.glinformatica.com.br
         const podeNext = _entPaginaForn < _entTotalPaginasForn;
         html += `
           <tr>
-            <td colspan="7" style="text-align:center;padding:14px;background:#f8fafc;">
+            <td colspan="${colspan}" style="text-align:center;padding:14px;background:#f8fafc;">
               <button onclick="_entPaginaForn--; carregarEntradasFornPaginado()" ${podePrev ? '' : 'disabled'}
                       style="padding:8px 14px;background:${podePrev ? '#3960f9' : '#e2e8f0'};color:${podePrev ? '#fff' : '#94a3b8'};border:none;border-radius:6px;font-weight:600;cursor:${podePrev ? 'pointer' : 'not-allowed'};margin-right:8px;">
                 ← Anterior
@@ -9916,7 +9992,7 @@ https://sistema.glinformatica.com.br
       }
       tbody.innerHTML = html;
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:20px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -9925,6 +10001,7 @@ https://sistema.glinformatica.com.br
     const m = document.getElementById('filtro-ent-mes');     if(m) m.value = '';
     const f = document.getElementById('filtro-ent-fornecedor'); if(f) f.value = '';
     const b = document.getElementById('filtro-ent-busca');   if(b) b.value = '';
+    const em = document.getElementById('ent-filtro-emitente'); if(em) em.value = '';
     carregarEntradasFornPaginado();
     // Se a página estoque estiver aberta, sincroniza
     if (document.getElementById('page-entrada-mercadorias')?.style.display !== 'none') {
@@ -17325,6 +17402,8 @@ ${conteudo}
     document.getElementById('ns-filtro-tipo').value = '';
     document.getElementById('ns-filtro-status').value = '';
     document.getElementById('ns-filtro-busca').value = '';
+    const selEmit = document.getElementById('ns-filtro-emitente');
+    if (selEmit) selEmit.value = '';
     _nsPagina = 1;
     carregarNotasSaida();
   }
@@ -19508,10 +19587,77 @@ ${conteudo}
     }
   }
 
+  // Cache de emitentes (CNPJs distintos). Preenchido na primeira vez que
+  // entra na tela e reciclado enquanto o usuário fica ali.
+  let _nsEmitentes = null;
+
+  async function nsCarregarEmitentes() {
+    try {
+      const r = await api('GET', '/api/notas-saida/emitentes');
+      _nsEmitentes = r.emitentes || [];
+
+      // Só mostra o filtro se tiver mais de 1 emitente distinto
+      const wrap = document.getElementById('ns-filtro-emitente-wrap');
+      const sel = document.getElementById('ns-filtro-emitente');
+      const cols = document.querySelectorAll('.ns-col-emitente');
+
+      if (_nsEmitentes.length >= 2) {
+        wrap.style.display = '';
+        cols.forEach(c => c.style.display = '');
+
+        // Popula opções
+        const opcoes = ['<option value="">Todas as empresas</option>'];
+        _nsEmitentes.forEach(e => {
+          const cnpjFmt = formatarCnpjBR(e.emitente_cnpj);
+          const nomeCurto = (e.emitente_nome || '(sem nome)').length > 40
+            ? (e.emitente_nome || '').slice(0, 38) + '…'
+            : (e.emitente_nome || '(sem nome)');
+          opcoes.push(`<option value="${e.emitente_cnpj}">${escapeHtml(nomeCurto)} — ${cnpjFmt} (${e.notas.toLocaleString('pt-BR')})</option>`);
+        });
+        if (r.semCnpjNotas > 0) {
+          opcoes.push(`<option value="sem-cnpj">— Sem CNPJ informado (${r.semCnpjNotas})</option>`);
+        }
+        sel.innerHTML = opcoes.join('');
+      } else {
+        wrap.style.display = 'none';
+        cols.forEach(c => c.style.display = 'none');
+      }
+    } catch (err) {
+      console.warn('[ns] erro carregando emitentes:', err.message);
+    }
+  }
+
+  // Formata CNPJ 14 dígitos → 00.000.000/0000-00
+  function formatarCnpjBR(s) {
+    const d = String(s || '').replace(/\D/g, '');
+    if (d.length !== 14) return s || '';
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  }
+
+  // Nome CURTO do emitente (pra caber na coluna). Usa o cache.
+  function nsNomeCurtoEmitente(cnpj) {
+    if (!cnpj || !_nsEmitentes) return '';
+    const e = _nsEmitentes.find(x => x.emitente_cnpj === cnpj);
+    if (!e || !e.emitente_nome) return cnpj;
+    // Pega as primeiras palavras significativas
+    const nome = e.emitente_nome.trim();
+    if (nome.length <= 22) return nome;
+    return nome.slice(0, 20) + '…';
+  }
+
   async function carregarNotasSaida() {
     const tbody = document.getElementById('tbody-notas-saida');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>';
+
+    // Primeira carga: descobre emitentes primeiro (pra saber se mostra coluna)
+    if (_nsEmitentes === null) {
+      await nsCarregarEmitentes();
+    }
+
+    // Colspan dinâmico (9 base + 1 se tem emitente)
+    const temEmitente = _nsEmitentes && _nsEmitentes.length >= 2;
+    const colspan = temEmitente ? 10 : 9;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:30px;color:#94a3b8;">Carregando...</td></tr>`;
 
     const params = new URLSearchParams();
     const de = document.getElementById('ns-filtro-de').value;
@@ -19519,11 +19665,13 @@ ${conteudo}
     const tipo = document.getElementById('ns-filtro-tipo').value;
     const status = document.getElementById('ns-filtro-status').value;
     const busca = document.getElementById('ns-filtro-busca').value.trim();
+    const emitente = document.getElementById('ns-filtro-emitente')?.value || '';
     if (de) params.set('de', de);
     if (ate) params.set('ate', ate);
     if (tipo) params.set('tipo', tipo);
     if (status) params.set('status', status);
     if (busca) params.set('busca', busca);
+    if (emitente) params.set('emitenteCnpj', emitente);
     params.set('pagina', _nsPagina);
     params.set('porPagina', _nsPorPagina);
 
@@ -19532,7 +19680,7 @@ ${conteudo}
       _nsCache = r.notas || [];
       renderNotasSaida(r);
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:30px;color:#dc2626;">Erro: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -19540,6 +19688,9 @@ ${conteudo}
     const tbody = document.getElementById('tbody-notas-saida');
     const resumo = document.getElementById('ns-resumo');
     const paginacao = document.getElementById('ns-paginacao');
+
+    const temEmitente = _nsEmitentes && _nsEmitentes.length >= 2;
+    const colspan = temEmitente ? 10 : 9;
 
     // Resumo
     if (r.total > 0) {
@@ -19550,7 +19701,7 @@ ${conteudo}
     }
 
     if (!r.notas || r.notas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8;">📭 Nenhuma nota fiscal encontrada.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:40px;color:#94a3b8;">📭 Nenhuma nota fiscal encontrada.</td></tr>`;
       paginacao.style.display = 'none';
       return;
     }
@@ -19583,6 +19734,10 @@ ${conteudo}
     tbody.innerHTML = r.notas.map(n => {
       const dt = n.data ? new Date(String(n.data).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
       const bgLinha = n.status_nfe === 'cancelada' ? 'background:#fef2f2;' : '';
+      // Coluna emitente (só se aplicável)
+      const colEmitente = temEmitente
+        ? `<td style="padding:10px;font-size:11px;color:#5b21b6;font-weight:600;">${n.emitente_cnpj ? escapeHtml(nsNomeCurtoEmitente(n.emitente_cnpj)) : '<span style="color:#94a3b8;font-weight:400;">—</span>'}</td>`
+        : '';
       return `
         <tr style="border-top:1px solid #f1f5f9;cursor:pointer;${bgLinha}"
             onclick="abrirDetalheNotaSaida(${n.id})"
@@ -19590,6 +19745,7 @@ ${conteudo}
           <td style="padding:10px;font-size:12px;color:#64748b;">${dt}</td>
           <td style="padding:10px;"><strong>${escapeHtml(n.numero || '—')}</strong></td>
           <td style="padding:10px;text-align:center;color:#64748b;">${escapeHtml(n.serie || '—')}</td>
+          ${colEmitente}
           <td style="padding:10px;text-align:center;">${tipoBadge(n.tipo)}</td>
           <td style="padding:10px;">${escapeHtml(n.cliente || '—')}</td>
           <td style="padding:10px;text-align:center;font-size:12px;color:#64748b;">${escapeHtml(n.cfop || '—')}</td>
@@ -19667,6 +19823,13 @@ ${conteudo}
       };
 
       let corpoHtml = `
+        ${n.emitente_cnpj ? `
+        <div style="background:#faf5ff;border:1px solid #d8b4fe;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+          <div style="font-size:10px;color:#6b21a8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">🏢 EMITENTE</div>
+          <div style="font-weight:700;color:#5b21b6;margin-top:2px;">${escapeHtml(n.emitente_nome || '(sem nome)')}</div>
+          <div style="font-family:monospace;font-size:12px;color:#7c3aed;margin-top:2px;">CNPJ: ${formatarCnpjBR(n.emitente_cnpj)}</div>
+        </div>
+        ` : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
           <div><strong>Número:</strong> ${escapeHtml(n.numero || '—')}</div>
           <div><strong>Série:</strong> ${escapeHtml(n.serie || '—')}</div>

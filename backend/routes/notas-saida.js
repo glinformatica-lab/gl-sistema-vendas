@@ -27,7 +27,7 @@ router.use(requerAmbientes);
 // ==========================================
 router.get('/', async (req, res) => {
   try {
-    const { de, ate, tipo, status, busca } = req.query;
+    const { de, ate, tipo, status, busca, emitenteCnpj } = req.query;
     let pagina = parseInt(req.query.pagina) || 1;
     let porPagina = parseInt(req.query.porPagina) || 50;
     if (pagina < 1) pagina = 1;
@@ -63,6 +63,19 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // Filtro emitente (CNPJ só dígitos). "sem-cnpj" pra listar as sem emitente.
+    if (emitenteCnpj) {
+      if (emitenteCnpj === 'sem-cnpj') {
+        where.push(`emitente_cnpj IS NULL`);
+      } else {
+        const cnpjLimpo = String(emitenteCnpj).replace(/\D/g, '');
+        if (cnpjLimpo) {
+          where.push(`emitente_cnpj = $${idx++}`);
+          vals.push(cnpjLimpo);
+        }
+      }
+    }
+
     // Busca: numero, cliente (ILIKE) ou chave (igualdade exata)
     if (busca && busca.trim()) {
       const b = busca.trim();
@@ -93,7 +106,8 @@ router.get('/', async (req, res) => {
     const offset = (pagina - 1) * porPagina;
     const rLista = await db.query(
       `SELECT id, venda_id, numero, serie, tipo, data, cliente, cfop,
-              chave, status_nfe, total, total_produtos, icms, obs, codigo_legado, criada_em
+              chave, status_nfe, total, total_produtos, icms, obs, codigo_legado, criada_em,
+              emitente_cnpj, emitente_nome
        FROM notas_saida WHERE ${whereSql}
        ORDER BY data DESC, numero DESC
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -115,6 +129,39 @@ router.get('/', async (req, res) => {
 });
 
 // ==========================================
+// GET /emitentes — Lista de CNPJs emitentes distintos
+// Retorna array vazio ou com 1 item se a empresa tem CNPJ único
+// (o frontend usa isso pra decidir se mostra o filtro)
+// ==========================================
+router.get('/emitentes', async (req, res) => {
+  try {
+    // Conta distintos (não nulos) e nulos separados
+    const r = await db.query(
+      `SELECT emitente_cnpj, emitente_nome, COUNT(*)::int AS notas
+       FROM notas_saida
+       WHERE empresa_id = $1 AND emitente_cnpj IS NOT NULL
+       GROUP BY emitente_cnpj, emitente_nome
+       ORDER BY notas DESC`,
+      [req.user.empresaId]
+    );
+    // Conta quantas notas SEM emitente (útil pra opção "Sem CNPJ")
+    const rNulas = await db.query(
+      `SELECT COUNT(*)::int AS qtd
+       FROM notas_saida
+       WHERE empresa_id = $1 AND emitente_cnpj IS NULL`,
+      [req.user.empresaId]
+    );
+    res.json({
+      emitentes: r.rows,           // [{emitente_cnpj, emitente_nome, notas}]
+      semCnpjNotas: rNulas.rows[0].qtd
+    });
+  } catch (err) {
+    console.error('[notas-saida] GET /emitentes', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
+// ==========================================
 // GET /:id — Detalhe da nota + itens da venda vinculada
 // ==========================================
 // ==========================================
@@ -122,12 +169,12 @@ router.get('/', async (req, res) => {
 // REGRA: somente notas de VENDA + CUPOM
 //        NÃO conta devolução, remessa, transferência
 //        Ignora canceladas e denegadas
-// Query params: ?de=YYYY-MM-DD&ate=YYYY-MM-DD
+// Query params: ?de=YYYY-MM-DD&ate=YYYY-MM-DD&emitenteCnpj=XXXXXXXX
 // IMPORTANTE: declarada ANTES de /:id pra evitar conflito de rota
 // ==========================================
 router.get('/faturamento', async (req, res) => {
   try {
-    const { de, ate } = req.query;
+    const { de, ate, emitenteCnpj } = req.query;
     const where = ['empresa_id = $1', `tipo IN ('venda', 'cupom')`,
                    `(status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada'))`];
     const vals = [req.user.empresaId];
@@ -139,6 +186,18 @@ router.get('/faturamento', async (req, res) => {
     if (ate && /^\d{4}-\d{2}-\d{2}$/.test(ate)) {
       where.push(`data <= $${idx++}`);
       vals.push(ate);
+    }
+    // Filtro emitente
+    if (emitenteCnpj) {
+      if (emitenteCnpj === 'sem-cnpj') {
+        where.push(`emitente_cnpj IS NULL`);
+      } else {
+        const cnpjLimpo = String(emitenteCnpj).replace(/\D/g, '');
+        if (cnpjLimpo) {
+          where.push(`emitente_cnpj = $${idx++}`);
+          vals.push(cnpjLimpo);
+        }
+      }
     }
     const r = await db.query(
       `SELECT

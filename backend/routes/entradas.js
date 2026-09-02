@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 // GET /paginado — Lista paginada com filtros (versão otimizada)
 router.get('/paginado', async (req, res) => {
   try {
-    const { mes, fornecedor, busca } = req.query;
+    const { mes, fornecedor, busca, emitenteCnpj } = req.query;
     let pagina = parseInt(req.query.pagina) || 1;
     let porPagina = parseInt(req.query.porPagina) || 50;
     if (pagina < 1) pagina = 1;
@@ -61,6 +61,19 @@ router.get('/paginado', async (req, res) => {
     if (fornecedor && fornecedor.trim()) {
       where.push(`fornecedor = $${idx++}`);
       vals.push(fornecedor.trim());
+    }
+
+    // Filtro emitente (CNPJ só dígitos)
+    if (emitenteCnpj) {
+      if (emitenteCnpj === 'sem-cnpj') {
+        where.push(`emitente_cnpj IS NULL`);
+      } else {
+        const cnpjLimpo = String(emitenteCnpj).replace(/\D/g, '');
+        if (cnpjLimpo) {
+          where.push(`emitente_cnpj = $${idx++}`);
+          vals.push(cnpjLimpo);
+        }
+      }
     }
 
     // Busca: apenas em campos indexáveis (número, doc, fornecedor)
@@ -93,6 +106,7 @@ router.get('/paginado', async (req, res) => {
     const rLista = await db.query(
       `SELECT e.id, e.data, e.tipo, e.numero, e.serie, e.doc, e.fornecedor,
               e.total_nf, e.total_geral, e.pagamento, e.criado_por,
+              e.emitente_cnpj, e.emitente_nome,
               uc.nome AS criado_por_nome
        FROM entradas e
        LEFT JOIN usuarios uc ON uc.id = e.criado_por
@@ -120,6 +134,33 @@ router.get('/paginado', async (req, res) => {
   }
 });
 
+// GET /emitentes — CNPJs emitentes distintos (frontend só mostra filtro se > 1)
+router.get('/emitentes', async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT emitente_cnpj, emitente_nome, COUNT(*)::int AS notas
+       FROM entradas
+       WHERE empresa_id = $1 AND emitente_cnpj IS NOT NULL
+       GROUP BY emitente_cnpj, emitente_nome
+       ORDER BY notas DESC`,
+      [req.user.empresaId]
+    );
+    const rNulas = await db.query(
+      `SELECT COUNT(*)::int AS qtd
+       FROM entradas
+       WHERE empresa_id = $1 AND emitente_cnpj IS NULL`,
+      [req.user.empresaId]
+    );
+    res.json({
+      emitentes: r.rows,
+      semCnpjNotas: rNulas.rows[0].qtd
+    });
+  } catch (err) {
+    console.error('[entradas] GET /emitentes', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
 // GET /fornecedores-distintos — Lista de fornecedores únicos (pro select)
 router.get('/fornecedores-distintos', async (req, res) => {
   try {
@@ -140,6 +181,7 @@ router.get('/fornecedores-distintos', async (req, res) => {
 router.get('/resumo-mes', async (req, res) => {
   try {
     const mes = req.query.mes || new Date().toISOString().slice(0, 7);
+    const { emitenteCnpj } = req.query;
     if (!/^\d{4}-\d{2}$/.test(mes)) {
       return res.status(400).json({ error: 'Mês inválido.' });
     }
@@ -150,12 +192,27 @@ router.get('/resumo-mes', async (req, res) => {
     if (mesFim > 12) { mesFim = 1; anoFim++; }
     const dataFim = `${anoFim}-${String(mesFim).padStart(2, '0')}-01`;
 
+    const where = ['empresa_id=$1', 'data >= $2', 'data < $3'];
+    const vals = [req.user.empresaId, dataIni, dataFim];
+    let idx = 4;
+    if (emitenteCnpj) {
+      if (emitenteCnpj === 'sem-cnpj') {
+        where.push('emitente_cnpj IS NULL');
+      } else {
+        const cnpjLimpo = String(emitenteCnpj).replace(/\D/g, '');
+        if (cnpjLimpo) {
+          where.push(`emitente_cnpj = $${idx++}`);
+          vals.push(cnpjLimpo);
+        }
+      }
+    }
+
     const r = await db.query(
       `SELECT COUNT(*)::int AS total,
               COALESCE(SUM(COALESCE(total_nf, total_geral, 0)), 0)::numeric AS soma_total
        FROM entradas
-       WHERE empresa_id=$1 AND data >= $2 AND data < $3`,
-      [req.user.empresaId, dataIni, dataFim]
+       WHERE ${where.join(' AND ')}`,
+      vals
     );
     res.json({
       mes,
