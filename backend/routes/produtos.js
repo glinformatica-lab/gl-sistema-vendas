@@ -14,10 +14,41 @@ const camelizar = (row) => {
 const toNum = (v) => (v == null ? 0 : Number(v));
 
 // Listar produtos da empresa
+// Query params:
+//   ?incluirDescontinuados=true → inclui produtos com categoria='DESCONTINUADO'
+//   IMPORTANTE: essa categoria "DESCONTINUADO" foi criada só pra empresa 43
+//   (Studio Luz) na migração histórica. Filtramos APENAS lá; nas outras
+//   empresas o parâmetro é ignorado e retorna tudo normal.
+const EMPRESAS_COM_DESCONTINUADOS = [43];  // Studio Luz
+// GET /tem-descontinuados — Frontend usa pra mostrar/esconder checkbox
+// "Mostrar descontinuados" e badges na listagem
+router.get('/tem-descontinuados', async (req, res) => {
+  try {
+    const empresaTemDescontinuado = EMPRESAS_COM_DESCONTINUADOS.includes(req.user.empresaId);
+    if (!empresaTemDescontinuado) {
+      return res.json({ temDescontinuados: false, qtd: 0 });
+    }
+    const r = await db.query(
+      `SELECT COUNT(*)::int AS qtd FROM produtos
+       WHERE empresa_id = $1 AND COALESCE(categoria,'') = 'DESCONTINUADO'`,
+      [req.user.empresaId]
+    );
+    res.json({ temDescontinuados: r.rows[0].qtd > 0, qtd: r.rows[0].qtd });
+  } catch (err) {
+    console.error('[produtos] GET /tem-descontinuados', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
+    const empresaTemDescontinuado = EMPRESAS_COM_DESCONTINUADOS.includes(req.user.empresaId);
+    const incluirDesc = req.query.incluirDescontinuados === 'true';
+    const filtroDesc = (empresaTemDescontinuado && !incluirDesc)
+      ? ` AND COALESCE(categoria, '') <> 'DESCONTINUADO'`
+      : '';
     const r = await db.query(
-      'SELECT * FROM produtos WHERE empresa_id = $1 ORDER BY nome',
+      `SELECT * FROM produtos WHERE empresa_id = $1${filtroDesc} ORDER BY nome`,
       [req.user.empresaId]
     );
     res.json(r.rows.map(p => ({

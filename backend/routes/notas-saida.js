@@ -92,15 +92,29 @@ router.get('/', async (req, res) => {
 
     const whereSql = where.join(' AND ');
 
-    // Consulta principal (com soma e count agregados)
+    // Consulta principal (count + soma_total = da consulta filtrada, seja qual for)
+    // + soma_faturamento = REGRA OFICIAL de faturamento
+    //    (venda+cupom, sem cancelada/denegada/rejeitada),
+    //    APLICADA POR CIMA dos mesmos filtros do usuário
+    //    — assim o usuário sabe: "das 4.950 filtradas, só X são faturamento"
     const rCount = await db.query(
       `SELECT COUNT(*)::int AS total,
-              COALESCE(SUM(total), 0)::numeric AS soma_total
+              COALESCE(SUM(total), 0)::numeric AS soma_total,
+              COUNT(*) FILTER (
+                WHERE tipo IN ('venda', 'cupom')
+                  AND (status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada', 'rejeitada'))
+              )::int AS qtd_faturamento,
+              COALESCE(SUM(total) FILTER (
+                WHERE tipo IN ('venda', 'cupom')
+                  AND (status_nfe IS NULL OR status_nfe NOT IN ('cancelada', 'denegada', 'rejeitada'))
+              ), 0)::numeric AS soma_faturamento
        FROM notas_saida WHERE ${whereSql}`,
       vals
     );
     const total = rCount.rows[0].total;
     const somaTotal = Number(rCount.rows[0].soma_total) || 0;
+    const qtdFaturamento = rCount.rows[0].qtd_faturamento;
+    const somaFaturamento = Number(rCount.rows[0].soma_faturamento) || 0;
 
     // Lista paginada
     const offset = (pagina - 1) * porPagina;
@@ -118,6 +132,8 @@ router.get('/', async (req, res) => {
       notas: rLista.rows,
       total,
       somaTotal,
+      qtdFaturamento,
+      somaFaturamento,
       pagina,
       porPagina,
       totalPaginas: Math.ceil(total / porPagina)
@@ -125,6 +141,29 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('[notas-saida] GET /', err);
     res.status(500).json({ error: 'Erro ao listar notas: ' + err.message });
+  }
+});
+
+// ==========================================
+// GET /status-distintos — Lista os status_nfe reais da empresa
+// Retorna [{status, notas}] ordenado por qtd. O frontend usa isso pra
+// montar o select "Situação" sem opções mortas (que retornam zero).
+// Regra: incluir sempre 'denegada' e '__sem_nfe__' (mesmo com zero) só
+// se o backend quiser. Aqui devolvemos SÓ o que existe — decisão fica no front.
+// ==========================================
+router.get('/status-distintos', async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT COALESCE(status_nfe, '__sem_nfe__') AS status, COUNT(*)::int AS notas
+       FROM notas_saida
+       WHERE empresa_id = $1
+       GROUP BY 1 ORDER BY 2 DESC`,
+      [req.user.empresaId]
+    );
+    res.json({ statuses: r.rows });
+  } catch (err) {
+    console.error('[notas-saida] GET /status-distintos', err);
+    res.status(500).json({ error: 'Erro: ' + err.message });
   }
 });
 

@@ -1234,6 +1234,10 @@
         <input type="text" id="busca-produtos" placeholder="🔍 Buscar por código, nome, categoria, fornecedor, referência ou código de barras"
                style="flex:1;min-width:260px;padding:10px 14px;border:1px solid var(--cinza-borda);border-radius:8px;font-size:14px;"
                oninput="_limiteProdutos = 50; renderProdutos();">
+        <label id="chk-mostrar-desc-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;padding:8px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;">
+          <input type="checkbox" id="chk-mostrar-descontinuados" onchange="toggleDescontinuados(this.checked)" style="cursor:pointer;">
+          Mostrar descontinuados
+        </label>
         <span id="contador-produtos" style="color:#668;font-size:13px;"></span>
       </div>
       <table>
@@ -2236,10 +2240,6 @@
           <select id="ns-filtro-status" onchange="_nsPagina = 1; carregarNotasSaida()"
                   style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
             <option value="">Todas</option>
-            <option value="autorizada">Autorizada</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="denegada">Denegada</option>
-            <option value="sem_nfe">Sem NF-e</option>
           </select>
         </div>
         <div style="grid-column:1/-1;">
@@ -8268,6 +8268,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
     if(pg === 'orcamentos') carregarOrcamentos();
+    if(pg === 'produtos') verificarDescontinuados();
     if(pg === 'fornecedores') {
       // Renderiza a lista de fornecedores (rápido) + entradas (agora só roda quando visível)
       if (typeof renderFornecedores === 'function') renderFornecedores();
@@ -9268,6 +9269,32 @@ https://sistema.glinformatica.com.br
   }
   let _limiteProdutos = 50;
 
+  // Recarrega produtos incluindo (ou não) DESCONTINUADO
+  // Também mostra/esconde o checkbox baseado em ter categoria descontinuado na empresa
+  async function toggleDescontinuados(incluir) {
+    try {
+      const url = incluir ? '/api/produtos?incluirDescontinuados=true' : '/api/produtos';
+      dbProdutos = await api('GET', url);
+      renderProdutos();
+    } catch (err) {
+      alert('Erro ao recarregar produtos: ' + err.message);
+    }
+  }
+
+  // Detecta se tem produto DESCONTINUADO (mostra o checkbox se sim).
+  // Usa endpoint leve /tem-descontinuados em vez de baixar toda a lista.
+  async function verificarDescontinuados() {
+    try {
+      const r = await api('GET', '/api/produtos/tem-descontinuados');
+      const wrap = document.getElementById('chk-mostrar-desc-wrap');
+      if (wrap) wrap.style.display = r.temDescontinuados ? 'inline-flex' : 'none';
+    } catch (err) {
+      // se falhar, esconde por segurança
+      const wrap = document.getElementById('chk-mostrar-desc-wrap');
+      if (wrap) wrap.style.display = 'none';
+    }
+  }
+
   function renderProdutos() {
     const tbody = document.getElementById('tbody-produtos');
     if(!tbody) return;
@@ -9342,10 +9369,15 @@ https://sistema.glinformatica.com.br
       const badgeMarca = p.marca
         ? `<span style="display:inline-block;margin-left:6px;background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;" title="Marca">${escapeHtml(p.marca)}</span>`
         : '';
+      const ehDesc = (p.categoria || '') === 'DESCONTINUADO';
+      const badgeDesc = ehDesc
+        ? `<span style="display:inline-block;margin-left:6px;background:#e2e8f0;color:#475569;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;" title="Produto fora de linha - só existe para histórico fiscal">📦 Descontinuado</span>`
+        : '';
+      const opacidade = ehDesc ? 'opacity:0.75;' : '';
       return `
-      <tr>
+      <tr style="${opacidade}">
         <td>${p.codigo || '-'}</td>
-        <td>${escapeHtml(p.nome)}${badgeMarca}${iconeFoto}</td>
+        <td>${escapeHtml(p.nome)}${badgeMarca}${badgeDesc}${iconeFoto}</td>
         <td>${p.categoria || '-'}</td>
         <td>${p.fornecedor || '-'}</td>
         <td>${p.estoque || 0}</td>
@@ -13031,7 +13063,13 @@ https://sistema.glinformatica.com.br
 
   // ====== EXCLUIR ENTRADA ======
   async function excluirEntrada(id) {
-    const e = dbEntradas.find(x => x.id === id);
+    let e = (typeof dbEntradas !== 'undefined' && Array.isArray(dbEntradas))
+      ? dbEntradas.find(x => x.id === id)
+      : null;
+    if (!e) {
+      try { e = await api('GET', '/api/entradas/' + id); }
+      catch (err) { alert(`Entrada #${id} não encontrada: ${err.message}`); return; }
+    }
     if (!e) { alert('Entrada não encontrada.'); return; }
 
     if (window._papelAtual !== 'admin') {
@@ -13063,8 +13101,14 @@ https://sistema.glinformatica.com.br
   }
 
   // ====== EDITAR ENTRADA EXISTENTE ======
-  function editarEntrada(id) {
-    const e = dbEntradas.find(x => x.id === id);
+  async function editarEntrada(id) {
+    let e = (typeof dbEntradas !== 'undefined' && Array.isArray(dbEntradas))
+      ? dbEntradas.find(x => x.id === id)
+      : null;
+    if (!e) {
+      try { e = await api('GET', '/api/entradas/' + id); }
+      catch (err) { alert(`Entrada #${id} não encontrada: ${err.message}`); return; }
+    }
     if(!e) { alert('Entrada não encontrada.'); return; }
     _entradaEditandoId = id;
 
@@ -13123,12 +13167,30 @@ https://sistema.glinformatica.com.br
   }
 
   // ====== IMPRIMIR ENTRADA ======
-  function imprimirEntrada(id) {
-    const e = dbEntradas.find(x => x.id === id);
-    if(!e) { alert('Entrada não encontrada.'); return; }
+  async function imprimirEntrada(id) {
+    // 1) Tenta usar cache local (tela Estoque tem dbEntradas populado)
+    let e = (typeof dbEntradas !== 'undefined' && Array.isArray(dbEntradas))
+      ? dbEntradas.find(x => x.id === id)
+      : null;
+
+    // 2) Se não achou no cache (tela Fornecedores usa server-side pagination),
+    //    busca via API
+    if (!e) {
+      try {
+        e = await api('GET', '/api/entradas/' + id);
+      } catch (err) {
+        alert(`Não foi possível imprimir entrada #${id}: ${err.message}`);
+        return;
+      }
+    }
+    if (!e) {
+      alert(`Entrada #${id} não encontrada.`);
+      return;
+    }
+
     const html = gerarHtmlImpressao(e);
     const w = window.open('', '_blank', 'width=900,height=700');
-    if(!w) {
+    if (!w) {
       alert('Não foi possível abrir a janela de impressão. Verifique se o navegador está bloqueando pop-ups.');
       return;
     }
@@ -13146,16 +13208,19 @@ https://sistema.glinformatica.com.br
     const pagamentoLabel = { 'A Vista':'À vista', 'A Prazo':'A prazo', 'PIX':'PIX', 'Cartao':'Cartão', 'Boleto':'Boleto', 'Outros':'Outros' }[e.pagamento] || e.pagamento;
 
     const colsExtra = isNf ? '<th>NCM</th><th>CFOP</th><th>Un</th>' : '';
-    const linhas = e.itens.map(it => `
-      <tr>
-        <td>${it.codigo || '-'}</td>
-        <td>${it.produto}</td>
-        ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || 'UN'}</td>` : ''}
-        <td style="text-align:right;">${formatarQtd(it.qtd)}</td>
-        <td style="text-align:right;">${formatarBRL(it.custo)}</td>
-        <td style="text-align:right;">${formatarBRL(it.qtd * it.custo)}</td>
-      </tr>
-    `).join('');
+    const itensArr = Array.isArray(e.itens) ? e.itens : [];
+    const linhas = itensArr.length > 0
+      ? itensArr.map(it => `
+        <tr>
+          <td>${it.codigo || '-'}</td>
+          <td>${it.produto}</td>
+          ${isNf ? `<td>${it.ncm || '-'}</td><td>${it.cfop || '-'}</td><td>${it.un || 'UN'}</td>` : ''}
+          <td style="text-align:right;">${formatarQtd(it.qtd)}</td>
+          <td style="text-align:right;">${formatarBRL(it.custo)}</td>
+          <td style="text-align:right;">${formatarBRL(it.qtd * it.custo)}</td>
+        </tr>
+      `).join('')
+      : `<tr><td colspan="${isNf ? 8 : 5}" style="text-align:center;padding:16px;color:#666;font-style:italic;">Nota sem detalhamento de itens (migração histórica).</td></tr>`;
 
     let totaisExtra = '';
     if(isNf) {
@@ -19591,6 +19656,38 @@ ${conteudo}
   // entra na tela e reciclado enquanto o usuário fica ali.
   let _nsEmitentes = null;
 
+  // Carrega opções REAIS do select "Situação" a partir dos dados da empresa.
+  // Mostra a contagem em cada uma e esconde as que retornariam zero. Mesmo
+  // padrão do filtro de emitente — nada de opções mortas na tela.
+  async function nsCarregarStatuses() {
+    try {
+      const r = await api('GET', '/api/notas-saida/status-distintos');
+      const sel = document.getElementById('ns-filtro-status');
+      if (!sel) return;
+      const valAntes = sel.value;
+
+      const labels = {
+        autorizada: '✅ Autorizada',
+        cancelada:  '❌ Cancelada',
+        denegada:   '⚠️ Denegada',
+        rejeitada:  '🚫 Rejeitada',
+        '__sem_nfe__': '📄 Sem NF-e'
+      };
+
+      const opts = ['<option value="">Todas as situações</option>'];
+      (r.statuses || []).forEach(row => {
+        if (row.notas === 0) return; // segurança extra
+        const label = labels[row.status] || row.status;
+        const val = row.status === '__sem_nfe__' ? 'sem_nfe' : row.status;
+        opts.push(`<option value="${val}">${label} (${row.notas.toLocaleString('pt-BR')})</option>`);
+      });
+      sel.innerHTML = opts.join('');
+      sel.value = valAntes;
+    } catch (err) {
+      console.warn('[ns] erro carregando status:', err.message);
+    }
+  }
+
   async function nsCarregarEmitentes() {
     try {
       const r = await api('GET', '/api/notas-saida/emitentes');
@@ -19649,9 +19746,10 @@ ${conteudo}
     const tbody = document.getElementById('tbody-notas-saida');
     if (!tbody) return;
 
-    // Primeira carga: descobre emitentes primeiro (pra saber se mostra coluna)
+    // Primeira carga: descobre emitentes E situações reais (pra montar selects sem opção morta)
     if (_nsEmitentes === null) {
       await nsCarregarEmitentes();
+      await nsCarregarStatuses();
     }
 
     // Colspan dinâmico (9 base + 1 se tem emitente)
@@ -19692,10 +19790,19 @@ ${conteudo}
     const temEmitente = _nsEmitentes && _nsEmitentes.length >= 2;
     const colspan = temEmitente ? 10 : 9;
 
-    // Resumo
+    // Resumo (linhas 1 e 2)
     if (r.total > 0) {
       resumo.style.display = '';
-      resumo.innerHTML = `📊 <strong>${r.total.toLocaleString('pt-BR')}</strong> nota(s) · Soma total: <strong>${formatarBRL(r.somaTotal || 0)}</strong>`;
+      // Se os 2 números coincidem (usuário filtrou só faturamento), mostra 1 linha só
+      const igual = r.total === r.qtdFaturamento && Math.abs(r.somaTotal - r.somaFaturamento) < 0.01;
+      if (igual) {
+        resumo.innerHTML = `💰 <strong>${r.total.toLocaleString('pt-BR')}</strong> nota(s) · Faturamento: <strong>${formatarBRL(r.somaFaturamento || 0)}</strong>`;
+      } else {
+        resumo.innerHTML =
+          `📊 <strong>${r.total.toLocaleString('pt-BR')}</strong> nota(s) filtradas · Soma: <strong>${formatarBRL(r.somaTotal || 0)}</strong>` +
+          `<br>💰 <span style="color:#166534;">Faturamento oficial (venda + cupom, sem canceladas/denegadas/rejeitadas): ` +
+          `<strong>${(r.qtdFaturamento || 0).toLocaleString('pt-BR')}</strong> nota(s) · <strong>${formatarBRL(r.somaFaturamento || 0)}</strong></span>`;
+      }
     } else {
       resumo.style.display = 'none';
     }
@@ -19725,7 +19832,8 @@ ${conteudo}
       const cores = {
         autorizada: { bg:'#dcfce7', fg:'#166534', label:'✅ Autorizada' },
         cancelada:  { bg:'#fef2f2', fg:'#991b1b', label:'❌ Cancelada' },
-        denegada:   { bg:'#fef3c7', fg:'#92400e', label:'⚠️ Denegada' }
+        denegada:   { bg:'#fef3c7', fg:'#92400e', label:'⚠️ Denegada' },
+        rejeitada:  { bg:'#f1f5f9', fg:'#475569', label:'🚫 Rejeitada' }
       };
       const c = cores[s] || { bg:'#f1f5f9', fg:'#475569', label: s };
       return `<span style="background:${c.bg};color:${c.fg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${c.label}</span>`;
@@ -19812,7 +19920,8 @@ ${conteudo}
       const statusLabel = {
         autorizada: '✅ Autorizada',
         cancelada:  '❌ Cancelada',
-        denegada:   '⚠️ Denegada'
+        denegada:   '⚠️ Denegada',
+        rejeitada:  '🚫 Rejeitada'
       };
       const tipoLabel = {
         venda: 'Venda',
@@ -19864,11 +19973,20 @@ ${conteudo}
       // ITENS DA NOTA (nova tabela notas_saida_itens)
       const itens = r.itens || [];
       if (itens.length > 0) {
+        // Se ALGUM item tem cfop ou ncm preenchido, mostra as colunas
+        const mostrarCfop = itens.some(it => it.cfop);
+        const mostrarNcm = itens.some(it => it.ncm);
         const itensHtml = itens.map(it => {
           const qtdTxt = formatarQtd(it.quantidade);
           const codigoLbl = it.codigo ? `<span style="font-family:monospace;color:#64748b;font-size:11px;">${escapeHtml(it.codigo)}</span> · ` : '';
           const totalIt = Number(it.total || 0);
           const descIt = Number(it.desconto_item || 0);
+          const colCfop = mostrarCfop
+            ? `<td style="padding:6px 10px;text-align:center;font-size:11px;color:#64748b;font-family:monospace;">${escapeHtml(it.cfop || '')}</td>`
+            : '';
+          const colNcm = mostrarNcm
+            ? `<td style="padding:6px 10px;text-align:center;font-size:11px;color:#64748b;font-family:monospace;">${escapeHtml(it.ncm || '')}</td>`
+            : '';
           return `
             <tr style="border-top:1px solid #f1f5f9;">
               <td style="padding:6px 10px;">${codigoLbl}${escapeHtml(it.descricao || '—')}</td>
@@ -19877,14 +19995,23 @@ ${conteudo}
               <td style="padding:6px 10px;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
               <td style="padding:6px 10px;text-align:right;color:${descIt > 0 ? '#dc2626' : '#94a3b8'};">${descIt > 0 ? '- ' + formatarBRL(descIt) : '—'}</td>
               <td style="padding:6px 10px;text-align:right;font-weight:600;">${formatarBRL(totalIt)}</td>
+              ${colCfop}
+              ${colNcm}
             </tr>
           `;
         }).join('');
 
+        // Soma itens (útil pra conferir se bate com total_produtos)
+        const somaItens = itens.reduce((s, it) => s + Number(it.total || 0), 0);
+        const bateComTotal = Math.abs(somaItens - Number(n.total_produtos || 0)) < 0.01;
+
         corpoHtml += `
           <div style="margin-top:20px;padding-top:14px;border-top:2px solid #e2e8f0;">
-            <div style="margin-bottom:10px;">
+            <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <strong style="color:#0891b2;font-size:14px;">📦 Itens da nota (${itens.length})</strong>
+              <span style="font-size:11px;color:${bateComTotal ? '#166534' : '#b91c1c'};font-weight:600;">
+                Soma dos itens: ${formatarBRL(somaItens)}${bateComTotal ? ' ✓' : ''}
+              </span>
             </div>
             <div style="overflow-x:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -19896,6 +20023,8 @@ ${conteudo}
                     <th style="padding:6px 10px;text-align:right;">Valor unit.</th>
                     <th style="padding:6px 10px;text-align:right;">Desconto</th>
                     <th style="padding:6px 10px;text-align:right;">Total</th>
+                    ${mostrarCfop ? '<th style="padding:6px 10px;text-align:center;">CFOP</th>' : ''}
+                    ${mostrarNcm ? '<th style="padding:6px 10px;text-align:center;">NCM</th>' : ''}
                   </tr>
                 </thead>
                 <tbody>${itensHtml}</tbody>
@@ -19904,9 +20033,15 @@ ${conteudo}
           </div>
         `;
       } else {
+        // Distingue: se a nota tem total_produtos > 0 mas sem itens = provável migração
+        // Se total = 0 também, é nota vazia mesmo
+        const temValor = Number(n.total_produtos || 0) > 0 || Number(n.total || 0) > 0;
+        const msg = temValor
+          ? `📭 Esta nota não tem itens detalhados. Cabeçalho: ${formatarBRL(n.total)}.`
+          : `📭 Nota sem itens.`;
         corpoHtml += `
           <div style="margin-top:20px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;text-align:center;font-size:12px;color:#64748b;">
-            📭 Sem itens registrados (nota antiga migrada sem detalhamento).
+            ${msg}
           </div>
         `;
       }

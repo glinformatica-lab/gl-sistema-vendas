@@ -362,6 +362,44 @@ router.post('/', async (req, res) => {
   }
 });
 
+// GET /:id — Detalhe de uma entrada específica (usado por imprimir e editar).
+// Retorna também emitente_cnpj/nome. Se itens é '[]' ou JSONB vazio,
+// devolve array vazio — o frontend imprime só cabeçalho.
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido.' });
+
+    const r = await db.query(
+      `SELECT e.*, uc.nome AS criado_por_nome
+       FROM entradas e
+       LEFT JOIN usuarios uc ON uc.id = e.criado_por
+       WHERE e.id = $1 AND e.empresa_id = $2`,
+      [id, req.user.empresaId]
+    );
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: 'Entrada não encontrada.' });
+    }
+    const e = r.rows[0];
+    // Normaliza itens (JSONB pode vir string ou objeto)
+    let itens = e.itens;
+    if (typeof itens === 'string') {
+      try { itens = JSON.parse(itens); } catch { itens = []; }
+    }
+    if (!Array.isArray(itens)) itens = [];
+
+    res.json({
+      ...camelizar(e),
+      totalGeral: toNum(e.total_geral),
+      totalNf: toNum(e.total_nf),
+      itens
+    });
+  } catch (err) {
+    console.error('[entradas] GET /:id', err);
+    res.status(500).json({ error: 'Erro ao buscar entrada: ' + err.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   // Só admin ou quem criou a entrada pode excluir
   if (req.user.papel !== 'admin') {
