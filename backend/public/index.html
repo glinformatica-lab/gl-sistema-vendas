@@ -10206,12 +10206,11 @@ https://sistema.glinformatica.com.br
     return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  // Formata quantidade removendo zeros à direita (2.000 → "2", 2.5 → "2,5")
+  // Formata quantidade sempre com 2 casas decimais e vírgula (padrão BR)
+  // Ex: 2 → "2,00" ; 2.5 → "2,50" ; 1.234 → "1,23"
   function formatarQtd(q) {
     const num = Number(q) || 0;
-    if (num % 1 === 0) return num.toFixed(0);
-    // Remove zeros à direita: 2.500 → 2.5
-    return num.toString().replace(/\.?0+$/, '').replace('.', ',');
+    return num.toFixed(2).replace('.', ',');
   }
 
   // Submit do formulário
@@ -22674,7 +22673,7 @@ ${conteudo}
     _dupItemIdx = idx;
     document.getElementById('dup-produto-info').innerHTML = `
       <strong>Item:</strong> ${escapeHtml(it.descricao)}<br>
-      <strong>Valor unit:</strong> ${formatarBRL(it.valor_unitario)} · <strong>Qtd atual:</strong> ${it.quantidade}
+      <strong>Valor unit:</strong> ${formatarBRL(it.valor_unitario)} · <strong>Qtd atual:</strong> ${formatarQtd(it.quantidade)}
     `;
     // Limpa busca
     const buscaEl = document.getElementById('dup-busca');
@@ -22692,8 +22691,8 @@ ${conteudo}
           <input type="checkbox" data-amb-id="${a.id}" style="width:18px;height:18px;cursor:pointer;">
           <div style="flex:1;font-weight:600;color:#334155;">🏠 ${escapeHtml(a.nome)}</div>
           <label style="font-size:11px;color:#64748b;">Qtd:</label>
-          <input type="number" step="0.001" min="0.001" value="${it.quantidade}" data-amb-qtd="${a.id}"
-            style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;text-align:center;">
+          <input type="text" inputmode="decimal" value="${formatarQtd(it.quantidade)}" data-amb-qtd="${a.id}"
+            style="width:80px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;text-align:center;">
         </label>
       `).join('');
     }
@@ -22742,7 +22741,7 @@ ${conteudo}
     checks.forEach(cb => {
       const ambId = parseInt(cb.dataset.ambId);
       const qtdInput = document.querySelector(`#dup-lista-ambientes input[data-amb-qtd="${ambId}"]`);
-      const qtd = parseFloat(qtdInput.value) || original.quantidade;
+      const qtd = parseQtdBR(qtdInput.value) || original.quantidade;
       _orcItensTemp.push({
         ...original,
         quantidade: qtd,
@@ -23285,7 +23284,7 @@ ${conteudo}
             <div style="font-weight:600;">${escapeHtml(it.descricao)}</div>
             ${descImp}
           </td>
-          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${it.quantidade}</td>
+          <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">${formatarQtd(it.quantidade)}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(it.valor_unitario)}</td>
           <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">${formatarBRL(it.total)}</td>
         </tr>
@@ -23470,7 +23469,7 @@ ${conteudo}
         <tr>
           <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${tipoLabels[it.tipo] || ''}</td>
           <td style="padding:6px;border-bottom:1px solid #e2e8f0;">${escapeHtml(it.descricao)}</td>
-          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;">${qtd}</td>
+          <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;">${formatarQtd(qtd)}</td>
           <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fef9e7;">${ehProduto ? formatarBRL(custoUnit) : '<span style="color:#94a3b8;">—</span>'}</td>
           <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatarBRL(vu)}</td>
           <td style="padding:6px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fef9e7;font-weight:700;color:${corMargem};">${ehProduto ? margemPct.toFixed(1) + '%' : '<span style="color:#94a3b8;font-weight:400;">—</span>'}</td>
@@ -23583,7 +23582,7 @@ ${conteudo}
             </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;">
               <div style="font-size:13px;color:#475569;">
-                <div><strong>Quantidade:</strong> ${it.quantidade}</div>
+                <div><strong>Quantidade:</strong> ${formatarQtd(it.quantidade)}</div>
                 <div><strong>Valor Unit:</strong> ${formatarBRL(it.valor_unitario)}</div>
               </div>
               <div style="font-size:18px;font-weight:700;color:#16a34a;">
