@@ -22842,6 +22842,33 @@ ${conteudo}
     // Feedback opcional
     // alert(`${totalCriados} ${totalCriados === 1 ? 'item duplicado' : 'itens duplicados'} em ${checks.length} ${checks.length === 1 ? 'ambiente' : 'ambientes'}.`);
   }
+  // ============================================
+  // Helpers: quantidade em formato BR (2 casas + vírgula)
+  // Usados nos itens do orçamento
+  // ============================================
+  function fmtQtdBR(v) {
+    // 1 → "1,00" ; 2.5 → "2,50" ; 1.234 → "1,23"
+    const n = Number(v);
+    if (!isFinite(n)) return '1,00';
+    return n.toFixed(2).replace('.', ',');
+  }
+  function parseQtdBR(str) {
+    // "1,50" → 1.5 ; "2" → 2 ; "1.234,56" → 1234.56 (aceita ambos separadores)
+    if (typeof str !== 'string') str = String(str || '');
+    // Remove tudo que não é dígito, vírgula ou ponto
+    let limpo = str.replace(/[^\d,.-]/g, '').trim();
+    if (!limpo) return 0;
+    // Se tem vírgula E ponto, ponto é separador de milhar → remove
+    if (limpo.includes(',') && limpo.includes('.')) {
+      limpo = limpo.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Só vírgula (BR) → troca por ponto
+      limpo = limpo.replace(',', '.');
+    }
+    const n = parseFloat(limpo);
+    return isFinite(n) ? n : 0;
+  }
+
   function renderItensOrc() {
     const tbody = document.getElementById('orc-itens-tbody');
     if (!tbody) return;
@@ -22945,10 +22972,14 @@ ${conteudo}
         </td>
         ${colAmbiente}
         <td style="padding:6px;">
-          <input type="number" step="0.001" min="0.001" value="${it.quantidade}" oninput="atualizarItemOrc(${i},'quantidade',parseFloat(this.value)||1)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;font-size:13px;">
+          <input type="text" inputmode="decimal" value="${fmtQtdBR(it.quantidade)}"
+                 onchange="atualizarItemOrc(${i},'quantidade', parseQtdBR(this.value)); this.value = fmtQtdBR(parseQtdBR(this.value));"
+                 style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;font-size:13px;">
         </td>
         <td style="padding:6px;">
-          <input type="number" step="0.01" min="0" value="${it.valor_unitario}" oninput="atualizarItemOrc(${i},'valor_unitario',parseFloat(this.value)||0)" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
+          <input type="text" inputmode="decimal" value="${fmtQtdBR(it.valor_unitario)}"
+                 onchange="atualizarItemOrc(${i},'valor_unitario', parseQtdBR(this.value)); this.value = fmtQtdBR(parseQtdBR(this.value));"
+                 style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:4px;text-align:right;font-size:13px;">
         </td>
         ${colCusto}${colMargem}
         <td style="padding:6px;text-align:right;font-weight:600;">${formatarBRL(valorTotal)}</td>
