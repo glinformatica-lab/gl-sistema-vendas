@@ -194,12 +194,35 @@ router.put('/:id', async (req, res) => {
   const {
     cliente_id, cliente_nome,
     validade_dias, observacoes, condicoes_pagamento,
-    desconto, itens, transportadora_id
+    desconto, itens, transportadora_id,
+    vendedor_id  // só admin pode mudar (senão ignorado)
   } = req.body || {};
 
   // Verifica se o vendedor é dono do orçamento
   const verif = await verificarDonoOrcamento(req, id);
   if (!verif.ok) return res.status(verif.code).json({ error: verif.msg });
+
+  // Se veio vendedor_id no body, valida se é admin (só admin pode mudar)
+  let novoVendedorId = null;
+  let novoVendedorNome = null;
+  const podeAlterarVendedor = (req.user.papel === 'admin' || req.user.papel === 'master');
+  if (vendedor_id !== undefined && podeAlterarVendedor) {
+    if (vendedor_id === null || vendedor_id === '' || vendedor_id === 0) {
+      novoVendedorId = null;
+      novoVendedorNome = null;
+    } else {
+      // Valida se o vendedor pertence à mesma empresa
+      const vUsr = await db.query(
+        'SELECT id, nome FROM usuarios WHERE id=$1 AND empresa_id=$2',
+        [parseInt(vendedor_id), req.user.empresaId]
+      );
+      if (vUsr.rows.length === 0) {
+        return res.status(400).json({ error: 'Vendedor inválido para esta empresa.' });
+      }
+      novoVendedorId = vUsr.rows[0].id;
+      novoVendedorNome = vUsr.rows[0].nome;
+    }
+  }
 
   const client = await db.pool.connect();
   try {
@@ -239,15 +262,27 @@ router.put('/:id', async (req, res) => {
     dataValidade.setDate(dataValidade.getDate() + validadeDias);
     const dataValidadeIso = dataValidade.toISOString().slice(0, 10);
 
+    // Monta partes dinâmicas: se admin alterou vendedor, atualiza também
+    const setsVendedor = (vendedor_id !== undefined && podeAlterarVendedor)
+      ? ', vendedor_id=$12, vendedor_nome=$13'
+      : '';
+    const valsUpdate = [
+      cliente_id || null, (cliente_nome || '').trim(), validadeDias, dataValidadeIso,
+      subtotal, descontoNum, total,
+      observacoes || null, condicoes_pagamento || null, transportadora_id || null, id
+    ];
+    if (vendedor_id !== undefined && podeAlterarVendedor) {
+      valsUpdate.push(novoVendedorId, novoVendedorNome);
+    }
+
     await client.query(
       `UPDATE orcamentos SET
        cliente_id=$1, cliente_nome=$2, validade_dias=$3, data_validade=$4,
        subtotal=$5, desconto=$6, total=$7,
        observacoes=$8, condicoes_pagamento=$9, transportadora_id=$10, atualizado_em=NOW()
+       ${setsVendedor}
        WHERE id=$11`,
-      [cliente_id || null, (cliente_nome || '').trim(), validadeDias, dataValidadeIso,
-       subtotal, descontoNum, total,
-       observacoes || null, condicoes_pagamento || null, transportadora_id || null, id]
+      valsUpdate
     );
 
     // Recria itens

@@ -4621,6 +4621,16 @@
         <input type="text" id="orc-cliente-nome" placeholder="Cliente sem cadastro? Digite o nome completo aqui" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
       </div>
 
+      <!-- Vendedor (só admin/master vê) -->
+      <div id="orc-vendedor-box" style="display:none;margin-bottom:14px;background:#faf5ff;border:1px solid #d8b4fe;border-radius:8px;padding:12px 14px;">
+        <label style="display:block;font-weight:700;color:#6b21a8;font-size:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">
+          👤 Vendedor responsável <span style="font-weight:400;color:#94a3b8;text-transform:none;">(só admin pode alterar)</span>
+        </label>
+        <select id="orc-vendedor-id" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+          <option value="">— Sem vendedor definido —</option>
+        </select>
+      </div>
+
       <!-- Itens -->
       <h3 style="color:var(--azul);font-size:15px;margin:22px 0 12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">Itens do orçamento</h3>
 
@@ -22193,6 +22203,8 @@ ${conteudo}
       if (selTransp) selTransp.value = '';
     }
     renderItensOrc();
+    // Popular seletor vendedor (só admin vê)
+    await orcPreencherVendedor(null);
     document.getElementById('modal-orcamento').style.display = 'flex';
 
     // 💾 AUTOSAVE — Orçamento Novo
@@ -22278,6 +22290,8 @@ ${conteudo}
       });
       renderItensOrc();
       document.getElementById('orc-erro').style.display = 'none';
+      // Popular seletor vendedor com valor atual (só admin vê)
+      await orcPreencherVendedor(orc.vendedor_id);
       document.getElementById('modal-orcamento').style.display = 'flex';
 
       // 💾 AUTOSAVE — Orçamento em Edição
@@ -22959,6 +22973,52 @@ ${conteudo}
     if (elSub) elSub.textContent = formatarBRL(subtotal);
     if (elTot) elTot.textContent = formatarBRL(total);
   }
+  // ============================================
+  // Popular seletor de vendedor no modal de orçamento
+  // Só admin/master vê o campo. Carrega lista de usuários da empresa.
+  // ============================================
+  let _orcVendedoresCache = null;
+  async function orcPreencherVendedor(vendedorIdSelecionado) {
+    const box = document.getElementById('orc-vendedor-box');
+    const sel = document.getElementById('orc-vendedor-id');
+    if (!box || !sel) return;
+
+    // Só admin/master vê
+    const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+    const ehAdmin = (usuario.papel === 'admin' || usuario.papel === 'master');
+    if (!ehAdmin) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+
+    // Carrega lista (uma vez) — endpoint já existe pra listar usuários da empresa
+    if (!_orcVendedoresCache) {
+      try {
+        _orcVendedoresCache = await api('GET', '/api/usuarios');
+      } catch (e) {
+        console.warn('[orc] Não conseguiu carregar usuários:', e.message);
+        _orcVendedoresCache = [];
+      }
+    }
+
+    // Popula o select: primeira opção "sem vendedor", depois usuários da empresa
+    const opts = ['<option value="">— Sem vendedor definido —</option>'];
+    (_orcVendedoresCache || []).forEach(u => {
+      const nome = u.nome || u.email || `#${u.id}`;
+      const papel = u.papel ? ` (${u.papel})` : '';
+      opts.push(`<option value="${u.id}">${escapeHtml(nome)}${escapeHtml(papel)}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+
+    // Pré-seleciona o vendedor atual
+    if (vendedorIdSelecionado) {
+      sel.value = String(vendedorIdSelecionado);
+    } else {
+      sel.value = '';
+    }
+  }
+
   async function salvarOrcamento() {
     const id = document.getElementById('orc-id').value;
     const erro = document.getElementById('orc-erro');
@@ -22973,6 +23033,15 @@ ${conteudo}
       desconto: parseFloat(document.getElementById('orc-desconto').value) || 0,
       itens: _orcItensTemp
     };
+
+    // Se admin/master, envia vendedor_id também (backend só aceita se for admin)
+    const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+    if (usuario.papel === 'admin' || usuario.papel === 'master') {
+      const vendSel = document.getElementById('orc-vendedor-id');
+      if (vendSel) {
+        dados.vendedor_id = vendSel.value ? parseInt(vendSel.value) : null;
+      }
+    }
     if (!dados.cliente_nome) { erro.textContent = 'Informe o cliente.'; erro.style.display = 'block'; return; }
     if (dados.itens.length === 0) { erro.textContent = 'Adicione pelo menos 1 item.'; erro.style.display = 'block'; return; }
     if (dados.itens.some(it => !it.descricao)) { erro.textContent = 'Preencha a descrição de todos os itens.'; erro.style.display = 'block'; return; }
