@@ -75,16 +75,34 @@ router.post('/lancar', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Valida senha admin: busca qualquer admin da empresa e testa a senha
-    const rAdmins = await client.query(
-      `SELECT id, nome, senha_hash FROM usuarios
-       WHERE empresa_id=$1 AND papel='admin' AND (bloqueado IS NULL OR bloqueado=false)`,
-      [req.user.empresaId]
-    );
+    // Valida senha admin.
+    // - Se o usuário logado JÁ é admin: valida a senha dele mesmo (autoriza a própria ação).
+    // - Se é vendedor/atendente: procura QUALQUER admin da empresa cuja senha bate.
+    // Padrão idêntico ao usado em orcamentos.js (cancelar orçamento com desconto alto).
     let adminValido = null;
-    for (const adm of rAdmins.rows) {
-      const ok = await bcrypt.compare(senhaAdmin, adm.senha_hash);
-      if (ok) { adminValido = adm; break; }
+    if (req.user.papel === 'admin' || req.user.papel === 'master') {
+      const rMe = await client.query(
+        'SELECT id, nome, senha_hash FROM usuarios WHERE id=$1 LIMIT 1',
+        [req.user.userId]
+      );
+      if (rMe.rows.length > 0 && rMe.rows[0].senha_hash) {
+        const ok = await bcrypt.compare(senhaAdmin, rMe.rows[0].senha_hash);
+        if (ok) adminValido = { id: rMe.rows[0].id, nome: rMe.rows[0].nome };
+      }
+    }
+    if (!adminValido) {
+      // Fallback: busca qualquer admin da empresa (funciona pra vendedor pedindo
+      // senha do chefe, e também se o próprio admin errou a senha, tenta outro)
+      const rAdmins = await client.query(
+        `SELECT id, nome, senha_hash FROM usuarios
+         WHERE empresa_id=$1 AND papel='admin' AND (bloqueado IS NULL OR bloqueado=false)`,
+        [req.user.empresaId]
+      );
+      for (const adm of rAdmins.rows) {
+        if (!adm.senha_hash) continue;
+        const ok = await bcrypt.compare(senhaAdmin, adm.senha_hash);
+        if (ok) { adminValido = { id: adm.id, nome: adm.nome }; break; }
+      }
     }
     if (!adminValido) {
       await client.query('ROLLBACK');
