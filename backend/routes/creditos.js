@@ -77,13 +77,13 @@ router.post('/lancar', async (req, res) => {
 
     // Valida senha admin: busca qualquer admin da empresa e testa a senha
     const rAdmins = await client.query(
-      `SELECT id, nome, senha FROM usuarios
+      `SELECT id, nome, senha_hash FROM usuarios
        WHERE empresa_id=$1 AND papel='admin' AND (bloqueado IS NULL OR bloqueado=false)`,
       [req.user.empresaId]
     );
     let adminValido = null;
     for (const adm of rAdmins.rows) {
-      const ok = await bcrypt.compare(senhaAdmin, adm.senha);
+      const ok = await bcrypt.compare(senhaAdmin, adm.senha_hash);
       if (ok) { adminValido = adm; break; }
     }
     if (!adminValido) {
