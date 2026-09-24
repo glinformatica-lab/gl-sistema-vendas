@@ -185,7 +185,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Já existe um produto com esse nome.' });
     }
     console.error('[produtos/create]', err);
-    res.status(500).json({ error: 'Erro ao cadastrar produto.' });
+    // Devolve a mensagem real do PostgreSQL pra facilitar diagnóstico
+    res.status(500).json({ error: 'Erro ao cadastrar produto: ' + (err.message || err.code || 'desconhecido') });
   }
 });
 
@@ -277,7 +278,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Já existe outro produto com esse nome.' });
     }
     console.error('[produtos/update]', err);
-    res.status(500).json({ error: 'Erro ao atualizar produto.' });
+    res.status(500).json({ error: 'Erro ao atualizar produto: ' + (err.message || err.code || 'desconhecido') });
   }
 });
 
