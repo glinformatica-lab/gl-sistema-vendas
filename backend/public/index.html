@@ -5619,22 +5619,6 @@
       <h2>Nova Venda</h2>
       <div class="subtitle">Registre uma nova venda. O estoque será descontado automaticamente.</div>
 
-      <!-- Seletor Fiscal / Não Fiscal — só quando módulo INTEGRA HIPER está ativo -->
-      <div class="feature-integra-hiper" style="display:none;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-bottom:14px;">
-        <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:8px;">📄 TIPO DA VENDA</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:2px solid #16a34a;border-radius:8px;cursor:pointer;font-weight:600;color:#166534;">
-            <input type="radio" name="nv-tipo-nota" value="fiscal" checked onchange="nvTrocarTipoNota()" style="cursor:pointer;">
-            🧾 COM NOTA (fiscal)
-          </label>
-          <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;font-weight:600;color:#64748b;">
-            <input type="radio" name="nv-tipo-nota" value="nao_fiscal" onchange="nvTrocarTipoNota()" style="cursor:pointer;">
-            🚫 SEM NOTA (não fiscal)
-          </label>
-        </div>
-        <div id="nv-tipo-nota-info" style="font-size:11px;color:#64748b;margin-top:8px;">Usará o preço COM NOTA (fiscal) dos produtos.</div>
-      </div>
-
       <!-- Dados da Venda -->
       <div class="form-row">
         <div class="form-field" style="flex:2;">
@@ -5961,21 +5945,21 @@
             <input type="number" id="npr-preco-custo" min="0.01" step="0.01" placeholder="0,00" required>
           </div>
           <div class="form-field" style="margin-bottom:0;">
-            <label id="npr-preco-venda-label">Preço de Venda (R$)*</label>
+            <label>Preço de Venda (R$)*</label>
             <input type="number" id="npr-preco-venda" min="0.01" step="0.01" placeholder="0,00" required>
           </div>
         </div>
 
-        <!-- Preço NÃO FISCAL — só aparece quando módulo INTEGRA HIPER está ativo -->
+        <!-- Preço Hiper — só aparece quando módulo INTEGRA HIPER está ativo -->
         <div class="form-row feature-integra-hiper" style="margin-bottom:14px;display:none;">
           <div class="form-field" style="margin-bottom:0;">
-            <label style="color:#b45309;">🚫 Preço Venda SEM NOTA (R$)</label>
-            <input type="number" id="npr-preco-venda-nao-fiscal" min="0" step="0.01" placeholder="0,00">
-            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Preço usado quando a venda for marcada como "sem nota fiscal"</div>
+            <label style="color:#1e40af;">🏷️ Preço no Hiper (R$)</label>
+            <input type="number" id="npr-preco-hiper" min="0" step="0.01" placeholder="0,00">
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Apenas informativo — mostra o valor praticado no sistema Hiper (não é usado nas vendas do GL)</div>
           </div>
           <div class="form-field" style="margin-bottom:0;">
             <div style="font-size:11px;color:#64748b;padding-top:22px;">
-              💡 O campo "Preço de Venda" acima é usado como preço FISCAL (com nota fiscal).
+              💡 O campo "Preço de Venda" acima é o valor usado nas vendas do GL Sistema.
             </div>
           </div>
         </div>
@@ -9689,8 +9673,8 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
     // Preço não fiscal (só se módulo INTEGRA HIPER ativo — campo pode estar oculto)
-    const pnf = document.getElementById('npr-preco-venda-nao-fiscal');
-    if (pnf) pnf.value = p.precoVendaNaoFiscal != null ? Number(p.precoVendaNaoFiscal).toFixed(2) : '';
+    const pnf = document.getElementById('npr-preco-hiper');
+    if (pnf) pnf.value = p.precoHiper != null ? Number(p.precoHiper).toFixed(2) : '';
 
     // Moeda estrangeira (se produto foi cadastrado com moeda)
     const chkMoeda = document.getElementById('npr-usa-moeda');
@@ -11017,8 +11001,8 @@ https://sistema.glinformatica.com.br
       const _empHiper = JSON.parse(localStorage.getItem('empresa') || '{}').moduloIntegraHiper;
       const camposPrecoDual = {};
       if (_empHiper) {
-        const raw = document.getElementById('npr-preco-venda-nao-fiscal')?.value;
-        camposPrecoDual.precoVendaNaoFiscal = raw ? parseFloat(raw) : null;
+        const raw = document.getElementById('npr-preco-hiper')?.value;
+        camposPrecoDual.precoHiper = raw ? parseFloat(raw) : null;
       }
 
       // ===== MODO EDIÇÃO =====
@@ -12116,11 +12100,8 @@ https://sistema.glinformatica.com.br
   // ====== NOVA VENDA ======
   async function openNovaVenda() {
     document.getElementById('modal-nova-venda').style.display = 'flex';
-    // Garante que o card COM/SEM NOTA aparece pra empresa com módulo INTEGRA HIPER
+    // Garante que qualquer elemento do módulo INTEGRA HIPER dentro do modal fique com o display certo
     if (typeof atualizarVisibilidadeIntegraHiper === 'function') atualizarVisibilidadeIntegraHiper();
-    // Reset do rádio pro default "fiscal" a cada abertura
-    const radioFiscal = document.querySelector('input[name="nv-tipo-nota"][value="fiscal"]');
-    if (radioFiscal) { radioFiscal.checked = true; if (typeof nvTrocarTipoNota === 'function') nvTrocarTipoNota(); }
     const hoje = new Date().toISOString().slice(0,10);
     if(!document.getElementById('nv-data').value) document.getElementById('nv-data').value = hoje;
     const tbody = document.getElementById('tbody-itens-venda');
@@ -12234,6 +12215,18 @@ https://sistema.glinformatica.com.br
     if (!tdEstoque) return;
     const nome = tr.querySelector('.nv-item-produto').value;
     const p = getProduto(nome);
+    // Atualiza também o preço Hiper (info abaixo do input de preço), se módulo INTEGRA HIPER ativo
+    const infoHiper = tr.querySelector('.nv-item-preco-hiper');
+    const empIh = JSON.parse(localStorage.getItem('empresa') || '{}').moduloIntegraHiper;
+    if (infoHiper) {
+      if (empIh && p && p.precoHiper != null && p.precoHiper > 0) {
+        infoHiper.textContent = `🏷️ Preço Hiper: ${formatarBRL(p.precoHiper)}`;
+        infoHiper.style.display = '';
+      } else {
+        infoHiper.textContent = '';
+        infoHiper.style.display = 'none';
+      }
+    }
     if (!p) {
       // Sem produto selecionado ainda
       tdEstoque.innerHTML = '<span style="color:#94a3b8;font-size:12px;">—</span>';
@@ -12256,64 +12249,11 @@ https://sistema.glinformatica.com.br
     tdEstoque.innerHTML = `<span style="display:inline-block;padding:2px 10px;border-radius:10px;background:${bg};color:${cor};font-size:12px;font-weight:700;white-space:nowrap;">${txt}</span>`;
   }
 
-  // Helper: retorna o preço certo do produto baseado no seletor
-  // "COM NOTA" (fiscal) usa precoVenda; "SEM NOTA" (não fiscal) usa precoVendaNaoFiscal.
-  // Se o produto não tem preço não fiscal cadastrado, cai pro fiscal com aviso.
+  // Helper: retorna o preço de venda do produto.
+  // No módulo INTEGRA HIPER, o "preço Hiper" é apenas informativo (não substitui o preço de venda).
   function nvPrecoDoProduto(p) {
     if (!p) return 0;
-    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
-    if (!empresa.moduloIntegraHiper) return Number(p.precoVenda) || 0;
-    const tipoRadio = document.querySelector('input[name="nv-tipo-nota"]:checked');
-    const tipo = tipoRadio ? tipoRadio.value : 'fiscal';
-    if (tipo === 'nao_fiscal') {
-      if (p.precoVendaNaoFiscal != null && p.precoVendaNaoFiscal > 0) {
-        return Number(p.precoVendaNaoFiscal);
-      }
-      // Fallback: usa fiscal (avisa no console pra dona notar)
-      console.warn(`Produto "${p.nome}" sem preço NÃO FISCAL cadastrado — usando preço fiscal.`);
-    }
     return Number(p.precoVenda) || 0;
-  }
-
-  // Recalcula todos os itens da venda quando o rádio muda (Com nota / Sem nota)
-  function nvTrocarTipoNota() {
-    const tipoRadio = document.querySelector('input[name="nv-tipo-nota"]:checked');
-    const tipo = tipoRadio ? tipoRadio.value : 'fiscal';
-    // Atualiza texto de info
-    const info = document.getElementById('nv-tipo-nota-info');
-    if (info) {
-      info.innerHTML = tipo === 'fiscal'
-        ? 'Usará o preço COM NOTA (fiscal) dos produtos.'
-        : '⚠️ Usará o preço SEM NOTA (não fiscal). Produtos sem esse preço cadastrado usam o fiscal.';
-      info.style.color = tipo === 'fiscal' ? '#64748b' : '#b45309';
-    }
-    // Estilo dos labels (destaca o selecionado)
-    document.querySelectorAll('input[name="nv-tipo-nota"]').forEach(r => {
-      const label = r.closest('label');
-      if (!label) return;
-      const cor = r.value === 'fiscal' ? '#16a34a' : '#dc2626';
-      const corTxt = r.value === 'fiscal' ? '#166534' : '#991b1b';
-      if (r.checked) {
-        label.style.border = '2px solid ' + cor;
-        label.style.color = corTxt;
-      } else {
-        label.style.border = '2px solid #e2e8f0';
-        label.style.color = '#64748b';
-      }
-    });
-    // Recalcula preço de cada linha
-    document.querySelectorAll('#tbody-itens-venda tr').forEach(tr => {
-      const inp = tr.querySelector('.nv-item-produto');
-      if (!inp || !inp.value) return;
-      const p = getProduto(inp.value);
-      if (!p) return;
-      const novoPreco = nvPrecoDoProduto(p);
-      const precoInp = tr.querySelector('.nv-item-preco');
-      if (precoInp && novoPreco > 0) {
-        precoInp.value = novoPreco.toFixed(2);
-        recalcularLinhaVenda(tr);
-      }
-    });
   }
 
   function adicionarItemVenda(dados) {
@@ -12327,7 +12267,10 @@ https://sistema.glinformatica.com.br
       </td>
       <td class="nv-item-estoque" style="text-align:center;"><span style="color:#94a3b8;font-size:12px;">—</span></td>
       <td><input type="number" class="nv-item-qtd" min="1" step="1" value="${d.qtd || 1}" required></td>
-      <td><input type="number" class="nv-item-preco" min="0.01" step="0.01" value="${d.preco != null ? d.preco : ''}" placeholder="0,00" required></td>
+      <td>
+        <input type="number" class="nv-item-preco" min="0.01" step="0.01" value="${d.preco != null ? d.preco : ''}" placeholder="0,00" required>
+        <div class="nv-item-preco-hiper" style="font-size:10px;color:#1e40af;margin-top:2px;display:none;"></div>
+      </td>
       <td class="nv-item-subtotal" style="text-align:right;font-weight:700;white-space:nowrap;">R$ 0,00</td>
       <td><button type="button" class="btn-remover-item" onclick="removerItemVenda(this)" title="Remover">&times;</button></td>
     `;
@@ -12360,10 +12303,15 @@ https://sistema.glinformatica.com.br
         sugest.style.display = 'none';
         return;
       }
+      // Info do preço Hiper (apenas visível se módulo INTEGRA HIPER estiver ativo)
+      const _empIh = JSON.parse(localStorage.getItem('empresa') || '{}').moduloIntegraHiper;
       sugest.innerHTML = resultados.map(p => {
         const est = Number(p.estoque) || 0;
         const semEst = est <= 0;
         const precoUsar = nvPrecoDoProduto(p);
+        const infoHiper = (_empIh && p.precoHiper != null && p.precoHiper > 0)
+          ? `<div style="font-size:10px;color:#1e40af;margin-top:2px;">🏷️ Hiper: ${formatarBRL(p.precoHiper)}</div>`
+          : '';
         return `
           <div class="nv-suggest-item" data-nome="${escapeAttr(p.nome)}" data-preco="${precoUsar || 0}"
                style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;${semEst ? 'opacity:0.6;' : ''}"
@@ -12375,8 +12323,11 @@ https://sistema.glinformatica.com.br
                 ${p.referencia ? '<span style="color:#7c3aed;font-weight:600;">Ref: ' + escapeHtml(p.referencia) + '</span> · ' : ''}
                 Estoque: <strong style="color:${semEst ? '#dc2626' : '#16a34a'};">${est}</strong>
               </div>
+              ${infoHiper}
             </div>
-            <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:8px;font-size:13px;">${formatarBRL(precoUsar || 0)}</div>
+            <div style="text-align:right;margin-left:8px;">
+              <div style="font-weight:700;color:#3960f9;white-space:nowrap;font-size:13px;">${formatarBRL(precoUsar || 0)}</div>
+            </div>
           </div>
         `;
       }).join('');
@@ -12687,20 +12638,13 @@ https://sistema.glinformatica.com.br
       }
       const _empPost = JSON.parse(localStorage.getItem('empresa') || '{}');
       const creditoUsar = _empPost.usaAmbientes ? (parseFloat(document.getElementById('nv-credito-usar')?.value) || 0) : 0;
-      // Tipo de nota (só quando módulo INTEGRA HIPER está ativo)
-      let tipoNota = null;
-      if (_empPost.moduloIntegraHiper) {
-        const rd = document.querySelector('input[name="nv-tipo-nota"]:checked');
-        tipoNota = rd ? rd.value : 'fiscal';
-      }
 
       const venda = await api('POST', '/api/vendas', {
         data, cliente, itens, desconto,
         pagamento, parcelamento,
         obs: document.getElementById('nv-obs').value.trim(),
         transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null,
-        creditoUsado: creditoUsar,
-        ...(tipoNota ? { tipoNota } : {})
+        creditoUsado: creditoUsar
       });
       // 💾 Limpa rascunho após salvar
       await finalizarAutoSave('venda');
@@ -24957,21 +24901,15 @@ ${conteudo}
     atualizarVisibilidadeModoSalao();
   }
 
-  // Mostra o menu INTEGRA HIPER apenas para empresas com o módulo ativo.
-  // Também renomeia o label "Preço de Venda" pra deixar claro que é o fiscal.
+  // Mostra o menu INTEGRA HIPER e campos relacionados apenas para empresas
+  // com o módulo ativo. O campo "Preço no Hiper" no cadastro é opcional
+  // e apenas informativo (não afeta o preço de venda praticado no GL).
   function atualizarVisibilidadeIntegraHiper() {
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const ativo = !!empresa.moduloIntegraHiper;
     document.querySelectorAll('.feature-integra-hiper').forEach(el => {
       el.style.display = ativo ? '' : 'none';
     });
-    // Renomeia label do preço padrão pra ficar claro que é o COM NOTA
-    const lblPreco = document.getElementById('npr-preco-venda-label');
-    if (lblPreco) {
-      lblPreco.innerHTML = ativo
-        ? '🧾 Preço Venda COM NOTA (R$)*'
-        : 'Preço de Venda (R$)*';
-    }
   }
 
   // Quando o Módulo Salão está ativo, esconde menus não essenciais pra deixar

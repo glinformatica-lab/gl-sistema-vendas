@@ -56,7 +56,7 @@ router.get('/', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoVendaNaoFiscal: p.preco_venda_nao_fiscal != null ? toNum(p.preco_venda_nao_fiscal) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
     })));
   } catch (err) {
     console.error('[produtos/list]', err);
@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
     // Moeda estrangeira (opcional). Se moedaOrigem for null, produto é Real normal.
     moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData,
     // Preço dual (só usado quando módulo INTEGRA HIPER está ativo)
-    precoVendaNaoFiscal
+    precoHiper
   } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -126,7 +126,7 @@ router.post('/', async (req, res) => {
          ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url,
          descricao_impressao, observacao_interna, referencia, marca, marca_id,
          moeda_origem, preco_custo_origem, cotacao_usada, cotacao_data,
-         preco_venda_nao_fiscal
+         preco_hiper
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, (fornecedor ? fornecedor.trim() : null),
        Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
@@ -147,7 +147,7 @@ router.post('/', async (req, res) => {
        precoCustoOrigem ? Number(precoCustoOrigem) : null,
        cotacaoUsada ? Number(cotacaoUsada) : null,
        cotacaoData || null,
-       precoVendaNaoFiscal ? Number(precoVendaNaoFiscal) : null]
+       precoHiper ? Number(precoHiper) : null]
     );
     const p = ins.rows[0];
 
@@ -175,7 +175,7 @@ router.post('/', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoVendaNaoFiscal: p.preco_venda_nao_fiscal != null ? toNum(p.preco_venda_nao_fiscal) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -200,7 +200,7 @@ router.put('/:id', async (req, res) => {
     // Moeda estrangeira (opcional)
     moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData,
     // Preço dual (só usado quando módulo INTEGRA HIPER está ativo)
-    precoVendaNaoFiscal
+    precoHiper
   } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -238,7 +238,7 @@ router.put('/:id', async (req, res) => {
          descricao_impressao=$14, observacao_interna=$15, referencia=$16,
          marca=$17, marca_id=$18,
          moeda_origem=$19, preco_custo_origem=$20, cotacao_usada=$21, cotacao_data=$22,
-         preco_venda_nao_fiscal=$23
+         preco_hiper=$23
        WHERE id=$24 AND empresa_id=$25 RETURNING *`,
       [nome.trim(), categoria || null, (fornecedor ? fornecedor.trim() : null), Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
@@ -258,7 +258,7 @@ router.put('/:id', async (req, res) => {
        precoCustoOrigem ? Number(precoCustoOrigem) : null,
        cotacaoUsada ? Number(cotacaoUsada) : null,
        cotacaoData || null,
-       precoVendaNaoFiscal ? Number(precoVendaNaoFiscal) : null,
+       precoHiper ? Number(precoHiper) : null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
@@ -268,7 +268,7 @@ router.put('/:id', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoVendaNaoFiscal: p.preco_venda_nao_fiscal != null ? toNum(p.preco_venda_nao_fiscal) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
     });
   } catch (err) {
     if (err.code === '23505') {
