@@ -5619,6 +5619,22 @@
       <h2>Nova Venda</h2>
       <div class="subtitle">Registre uma nova venda. O estoque será descontado automaticamente.</div>
 
+      <!-- Seletor Fiscal / Não Fiscal — só quando módulo INTEGRA HIPER está ativo -->
+      <div class="feature-integra-hiper" style="display:none;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:8px;">📄 TIPO DA VENDA</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:2px solid #16a34a;border-radius:8px;cursor:pointer;font-weight:600;color:#166534;">
+            <input type="radio" name="nv-tipo-nota" value="fiscal" checked onchange="nvTrocarTipoNota()" style="cursor:pointer;">
+            🧾 COM NOTA (fiscal)
+          </label>
+          <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;font-weight:600;color:#64748b;">
+            <input type="radio" name="nv-tipo-nota" value="nao_fiscal" onchange="nvTrocarTipoNota()" style="cursor:pointer;">
+            🚫 SEM NOTA (não fiscal)
+          </label>
+        </div>
+        <div id="nv-tipo-nota-info" style="font-size:11px;color:#64748b;margin-top:8px;">Usará o preço COM NOTA (fiscal) dos produtos.</div>
+      </div>
+
       <!-- Dados da Venda -->
       <div class="form-row">
         <div class="form-field" style="flex:2;">
@@ -10868,6 +10884,8 @@ https://sistema.glinformatica.com.br
   function openNovoProdutoRapido(origem) {
     _origemNovoProduto = origem || 'snf';
     document.getElementById('modal-novo-produto-rapido').style.display = 'flex';
+    // Garante que o campo "Preço SEM NOTA" aparece se módulo INTEGRA HIPER está ativo
+    if (typeof atualizarVisibilidadeIntegraHiper === 'function') atualizarVisibilidadeIntegraHiper();
     // Carrega marcas em background só se módulo iluminação ativo
     const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
     if (_emp.usaAmbientes) {
@@ -11029,7 +11047,8 @@ https://sistema.glinformatica.com.br
         ...camposMarca,
         ...camposFiscais,
         ...camposAmbientes,
-        ...camposMoeda
+        ...camposMoeda,
+        ...camposPrecoDual
       });
       dbProdutos.push(novo);
       renderListaProdutos();
@@ -12097,6 +12116,11 @@ https://sistema.glinformatica.com.br
   // ====== NOVA VENDA ======
   async function openNovaVenda() {
     document.getElementById('modal-nova-venda').style.display = 'flex';
+    // Garante que o card COM/SEM NOTA aparece pra empresa com módulo INTEGRA HIPER
+    if (typeof atualizarVisibilidadeIntegraHiper === 'function') atualizarVisibilidadeIntegraHiper();
+    // Reset do rádio pro default "fiscal" a cada abertura
+    const radioFiscal = document.querySelector('input[name="nv-tipo-nota"][value="fiscal"]');
+    if (radioFiscal) { radioFiscal.checked = true; if (typeof nvTrocarTipoNota === 'function') nvTrocarTipoNota(); }
     const hoje = new Date().toISOString().slice(0,10);
     if(!document.getElementById('nv-data').value) document.getElementById('nv-data').value = hoje;
     const tbody = document.getElementById('tbody-itens-venda');
@@ -12232,6 +12256,66 @@ https://sistema.glinformatica.com.br
     tdEstoque.innerHTML = `<span style="display:inline-block;padding:2px 10px;border-radius:10px;background:${bg};color:${cor};font-size:12px;font-weight:700;white-space:nowrap;">${txt}</span>`;
   }
 
+  // Helper: retorna o preço certo do produto baseado no seletor
+  // "COM NOTA" (fiscal) usa precoVenda; "SEM NOTA" (não fiscal) usa precoVendaNaoFiscal.
+  // Se o produto não tem preço não fiscal cadastrado, cai pro fiscal com aviso.
+  function nvPrecoDoProduto(p) {
+    if (!p) return 0;
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    if (!empresa.moduloIntegraHiper) return Number(p.precoVenda) || 0;
+    const tipoRadio = document.querySelector('input[name="nv-tipo-nota"]:checked');
+    const tipo = tipoRadio ? tipoRadio.value : 'fiscal';
+    if (tipo === 'nao_fiscal') {
+      if (p.precoVendaNaoFiscal != null && p.precoVendaNaoFiscal > 0) {
+        return Number(p.precoVendaNaoFiscal);
+      }
+      // Fallback: usa fiscal (avisa no console pra dona notar)
+      console.warn(`Produto "${p.nome}" sem preço NÃO FISCAL cadastrado — usando preço fiscal.`);
+    }
+    return Number(p.precoVenda) || 0;
+  }
+
+  // Recalcula todos os itens da venda quando o rádio muda (Com nota / Sem nota)
+  function nvTrocarTipoNota() {
+    const tipoRadio = document.querySelector('input[name="nv-tipo-nota"]:checked');
+    const tipo = tipoRadio ? tipoRadio.value : 'fiscal';
+    // Atualiza texto de info
+    const info = document.getElementById('nv-tipo-nota-info');
+    if (info) {
+      info.innerHTML = tipo === 'fiscal'
+        ? 'Usará o preço COM NOTA (fiscal) dos produtos.'
+        : '⚠️ Usará o preço SEM NOTA (não fiscal). Produtos sem esse preço cadastrado usam o fiscal.';
+      info.style.color = tipo === 'fiscal' ? '#64748b' : '#b45309';
+    }
+    // Estilo dos labels (destaca o selecionado)
+    document.querySelectorAll('input[name="nv-tipo-nota"]').forEach(r => {
+      const label = r.closest('label');
+      if (!label) return;
+      const cor = r.value === 'fiscal' ? '#16a34a' : '#dc2626';
+      const corTxt = r.value === 'fiscal' ? '#166534' : '#991b1b';
+      if (r.checked) {
+        label.style.border = '2px solid ' + cor;
+        label.style.color = corTxt;
+      } else {
+        label.style.border = '2px solid #e2e8f0';
+        label.style.color = '#64748b';
+      }
+    });
+    // Recalcula preço de cada linha
+    document.querySelectorAll('#tbody-itens-venda tr').forEach(tr => {
+      const inp = tr.querySelector('.nv-item-produto');
+      if (!inp || !inp.value) return;
+      const p = getProduto(inp.value);
+      if (!p) return;
+      const novoPreco = nvPrecoDoProduto(p);
+      const precoInp = tr.querySelector('.nv-item-preco');
+      if (precoInp && novoPreco > 0) {
+        precoInp.value = novoPreco.toFixed(2);
+        recalcularLinhaVenda(tr);
+      }
+    });
+  }
+
   function adicionarItemVenda(dados) {
     const d = dados || {};
     const tbody = document.getElementById('tbody-itens-venda');
@@ -12279,8 +12363,9 @@ https://sistema.glinformatica.com.br
       sugest.innerHTML = resultados.map(p => {
         const est = Number(p.estoque) || 0;
         const semEst = est <= 0;
+        const precoUsar = nvPrecoDoProduto(p);
         return `
-          <div class="nv-suggest-item" data-nome="${escapeAttr(p.nome)}" data-preco="${p.precoVenda || 0}"
+          <div class="nv-suggest-item" data-nome="${escapeAttr(p.nome)}" data-preco="${precoUsar || 0}"
                style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;${semEst ? 'opacity:0.6;' : ''}"
                onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
             <div style="flex:1;min-width:0;">
@@ -12291,7 +12376,7 @@ https://sistema.glinformatica.com.br
                 Estoque: <strong style="color:${semEst ? '#dc2626' : '#16a34a'};">${est}</strong>
               </div>
             </div>
-            <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:8px;font-size:13px;">${formatarBRL(p.precoVenda || 0)}</div>
+            <div style="font-weight:700;color:#3960f9;white-space:nowrap;margin-left:8px;font-size:13px;">${formatarBRL(precoUsar || 0)}</div>
           </div>
         `;
       }).join('');
@@ -12331,8 +12416,9 @@ https://sistema.glinformatica.com.br
         // Se o valor digitado/selecionado NÃO é exatamente o nome (ex: vem como "código - nome"),
         // normaliza pro nome real do produto
         if (inputProd.value !== p.nome) inputProd.value = p.nome;
-        if (p.precoVenda != null && !tr.querySelector('.nv-item-preco').value) {
-          tr.querySelector('.nv-item-preco').value = p.precoVenda.toFixed(2);
+        const precoAuto = nvPrecoDoProduto(p);
+        if (precoAuto > 0 && !tr.querySelector('.nv-item-preco').value) {
+          tr.querySelector('.nv-item-preco').value = precoAuto.toFixed(2);
           recalcularLinhaVenda(tr);
         }
       }
@@ -12601,13 +12687,20 @@ https://sistema.glinformatica.com.br
       }
       const _empPost = JSON.parse(localStorage.getItem('empresa') || '{}');
       const creditoUsar = _empPost.usaAmbientes ? (parseFloat(document.getElementById('nv-credito-usar')?.value) || 0) : 0;
+      // Tipo de nota (só quando módulo INTEGRA HIPER está ativo)
+      let tipoNota = null;
+      if (_empPost.moduloIntegraHiper) {
+        const rd = document.querySelector('input[name="nv-tipo-nota"]:checked');
+        tipoNota = rd ? rd.value : 'fiscal';
+      }
 
       const venda = await api('POST', '/api/vendas', {
         data, cliente, itens, desconto,
         pagamento, parcelamento,
         obs: document.getElementById('nv-obs').value.trim(),
         transportadora_id: parseInt(document.getElementById('nv-transportadora')?.value) || null,
-        creditoUsado: creditoUsar
+        creditoUsado: creditoUsar,
+        ...(tipoNota ? { tipoNota } : {})
       });
       // 💾 Limpa rascunho após salvar
       await finalizarAutoSave('venda');
