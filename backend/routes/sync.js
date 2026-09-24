@@ -61,6 +61,12 @@ async function pegarColunas(tabela) {
   return colunasCache[tabela];
 }
 
+// Verifica se a tabela é sincronizável (tem sync_uuid + empresa_id + updated_at)
+async function tabelaValida(tabela) {
+  const cols = await pegarColunas(tabela);
+  return cols.includes('sync_uuid') && cols.includes('empresa_id') && cols.includes('updated_at');
+}
+
 // -------------------------------------------
 // Middleware de autenticação
 // -------------------------------------------
@@ -112,10 +118,11 @@ router.get('/pull', async (req, res) => {
 
   const t0 = Date.now();
   try {
-    const cols = await pegarColunas(table);
-    if (!cols.includes('sync_uuid')) {
-      return res.status(400).json({ error: `Tabela ${table} sem sync_uuid` });
+    if (!(await tabelaValida(table))) {
+      // Retorna vazio ao invés de erro (compatibilidade)
+      return res.json({ table, records: [], lastUpdatedAt: since || '1970-01-01', count: 0, hasMore: false });
     }
+    const cols = await pegarColunas(table);
     const sinceStr = since || '1970-01-01';
     const r = await pool.query(
       `SELECT ${cols.map(c => `"${c}"`).join(', ')}
@@ -173,6 +180,10 @@ router.post('/push', async (req, res) => {
   const t0 = Date.now();
   let inseridos = 0, atualizados = 0, ignorados = 0;
   const erros = [];
+
+  if (!(await tabelaValida(table))) {
+    return res.json({ inseridos: 0, atualizados: 0, ignorados: records.length, erros: [] });
+  }
 
   const cols = await pegarColunas(table);
   const semSyncCols = cols.filter(c => c !== 'sync_uuid');
