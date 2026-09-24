@@ -635,6 +635,9 @@
       <button class="menu-btn submenu-item" onclick="showPage('sl-taxas')">&#128179; Taxas de Maquininha</button>
     </div>
 
+    <!-- Integra Hiper (feature-integra-hiper) — só aparece se moduloIntegraHiper=true -->
+    <button class="menu-btn feature-integra-hiper esconde-salao" onclick="showPage('integra-hiper')" type="button" style="display:none;">&#128279; INTEGRA HIPER</button>
+
     <!-- Configurações (admin-only) -->
     <button class="menu-btn menu-grupo admin-only" onclick="toggleGrupoMenu('config')" data-grupo="config" type="button">
       <span>&#9881;&#65039; Configurações</span>
@@ -2146,6 +2149,110 @@
           <tr><td colspan="5" style="text-align:center;color:#889;padding:20px;">Carregando...</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ==========================================
+         INTEGRA HIPER — sincronização com sistema fiscal Hiper
+         Aparece só quando moduloIntegraHiper=true
+         ========================================== -->
+    <div id="page-integra-hiper" style="display:none;">
+      <div class="page-title">🔗 INTEGRA HIPER</div>
+      <p style="color:#668;font-size:14px;margin-bottom:18px;">
+        Sincroniza automaticamente produtos, estoque, clientes e fornecedores do sistema fiscal Hiper.
+      </p>
+
+      <!-- Card STATUS -->
+      <div id="ih-card-status" style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:16px;margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:11px;color:#1e40af;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;">Status da integração</div>
+            <div id="ih-status-texto" style="font-size:16px;font-weight:700;color:#1e3a8a;margin-top:4px;">Carregando...</div>
+            <div id="ih-status-detalhe" style="font-size:12px;color:#475569;margin-top:2px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" onclick="ihCarregar()" style="background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">🔄 Atualizar</button>
+            <button type="button" onclick="ihSincronizarAgora()" id="ih-btn-sync" style="background:#16a34a;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">📥 Sincronizar produtos AGORA</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:18px;">
+        <!-- Config API Hiper -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+          <h3 style="margin:0 0 12px;color:#1e40af;font-size:15px;">☁️ API Hiper (nuvem)</h3>
+          <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+            Chave de segurança obtida em: Vendas → Loja Virtual → Configurações padrões (dentro do Hiper Gestão).
+          </p>
+
+          <label style="font-size:12px;font-weight:600;color:#334155;">Chave da API (64 caracteres)</label>
+          <input type="password" id="ih-chave-api" placeholder="Deixe em branco pra manter a atual"
+                 style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:monospace;margin-top:4px;">
+          <div id="ih-chave-status" style="font-size:11px;margin-top:4px;"></div>
+
+          <label style="display:block;font-size:12px;font-weight:600;color:#334155;margin-top:12px;">Intervalo de sincronização</label>
+          <select id="ih-intervalo" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;margin-top:4px;">
+            <option value="5">A cada 5 minutos</option>
+            <option value="15" selected>A cada 15 minutos (recomendado)</option>
+            <option value="30">A cada 30 minutos</option>
+            <option value="60">A cada 60 minutos</option>
+          </select>
+
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button type="button" onclick="ihTestarChave()" style="flex:1;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;padding:9px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">🧪 Testar chave</button>
+            <button type="button" onclick="ihSalvarConfig()" style="flex:1;background:#3960f9;color:#fff;border:none;padding:9px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">💾 Salvar</button>
+          </div>
+        </div>
+
+        <!-- Agent Local -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+          <h3 style="margin:0 0 12px;color:#1e40af;font-size:15px;">💻 Agent local (SQL Server)</h3>
+          <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+            O agent instalado no PC do cliente lê o banco SQL local do Hiper (clientes/fornecedores) e envia pra cá.
+          </p>
+
+          <label style="font-size:12px;font-weight:600;color:#334155;">Token de autenticação do agent</label>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <input type="text" id="ih-token-agent" readonly placeholder="Salve a config pra gerar o token"
+                   style="flex:1;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:11px;font-family:monospace;background:#f8fafc;">
+            <button type="button" onclick="ihCopiarToken()" title="Copiar" style="background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:0 12px;border-radius:6px;cursor:pointer;">📋</button>
+          </div>
+          <div style="font-size:11px;color:#b45309;margin-top:6px;">⚠️ Este token é único desta empresa. NUNCA compartilhe fora da instalação do agent.</div>
+
+          <div style="margin-top:14px;padding:10px;background:#f1f5f9;border-radius:6px;font-size:11px;color:#475569;line-height:1.5;">
+            <strong>📥 Download do agent:</strong><br>
+            O agent Windows está em desenvolvimento (Parte 3).<br>
+            Assim que ficar pronto, vai aparecer aqui o link de download + instruções.
+          </div>
+        </div>
+      </div>
+
+      <!-- Log de Sincronizações -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;color:#1e40af;font-size:15px;">📋 Log de sincronizações (últimas 30)</h3>
+          <button type="button" onclick="ihCarregarLogs()" style="background:#eceef2;color:#3960f9;border:1px solid #d2d6df;padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">🔄 Atualizar</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:8px;text-align:left;">Data/hora</th>
+                <th style="padding:8px;text-align:left;">Tipo</th>
+                <th style="padding:8px;text-align:left;">Fonte</th>
+                <th style="padding:8px;text-align:center;">Status</th>
+                <th style="padding:8px;text-align:right;">Criados</th>
+                <th style="padding:8px;text-align:right;">Atualizados</th>
+                <th style="padding:8px;text-align:right;">Erros</th>
+                <th style="padding:8px;text-align:right;">Duração</th>
+                <th style="padding:8px;text-align:left;">Mensagem</th>
+              </tr>
+            </thead>
+            <tbody id="ih-tbody-logs">
+              <tr><td colspan="9" style="text-align:center;color:#889;padding:16px;">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Configurações da Empresa -->
@@ -5791,6 +5898,47 @@
       <!-- SEÇÃO: Preços & Estoque -->
       <div class="quick-form-section">
         <div class="quick-form-section-title">💰 Preços & Estoque</div>
+
+        <!-- Bloco Moeda Estrangeira (opcional) -->
+        <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#1e40af;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="npr-usa-moeda" onchange="prodToggleMoeda()">
+            💶 Produto importado (preço em outra moeda)
+          </label>
+          <div id="npr-moeda-box" style="display:none;margin-top:10px;">
+            <div class="form-row" style="margin-bottom:8px;">
+              <div class="form-field" style="margin-bottom:0;">
+                <label>Moeda</label>
+                <select id="npr-moeda-origem" onchange="prodBuscarCotacao()" style="width:100%;">
+                  <option value="EUR">💶 Euro (EUR)</option>
+                  <option value="USD">💵 Dólar Americano (USD)</option>
+                  <option value="GBP">💷 Libra (GBP)</option>
+                  <option value="ARS">🇦🇷 Peso Argentino (ARS)</option>
+                </select>
+              </div>
+              <div class="form-field" style="margin-bottom:0;">
+                <label>Preço na moeda origem *</label>
+                <input type="number" id="npr-preco-origem" min="0.01" step="0.01" placeholder="Ex: 45,00"
+                       oninput="prodCalcularPreco()">
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:0;">
+              <div class="form-field" style="margin-bottom:0;">
+                <label>Cotação atual (R$)
+                  <button type="button" onclick="prodBuscarCotacao()" style="margin-left:6px;background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">🔄 Buscar hoje</button>
+                </label>
+                <input type="number" id="npr-cotacao" min="0.01" step="0.0001" placeholder="Ex: 6,4500"
+                       oninput="prodCalcularPreco()">
+              </div>
+              <div class="form-field" style="margin-bottom:0;">
+                <label>Data da cotação</label>
+                <input type="date" id="npr-cotacao-data">
+              </div>
+            </div>
+            <div id="npr-cotacao-info" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
+          </div>
+        </div>
+
         <div class="form-row" style="margin-bottom:14px;">
           <div class="form-field" style="margin-bottom:0;">
             <label>Preço de Custo (R$)*</label>
@@ -8364,6 +8512,16 @@ https://sistema.glinformatica.com.br
       if (pg === 'sl-vales')         vlEntrar();
       if (pg === 'sl-fechamento')    fechEntrar();
     }
+    if(pg === 'integra-hiper') {
+      const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      if (!_emp.moduloIntegraHiper) {
+        alert('Este recurso está disponível apenas para empresas com Módulo INTEGRA HIPER ativo.');
+        showPage('dashboard');
+        return;
+      }
+      ihCarregar();
+      ihCarregarLogs();
+    }
     if(pg === 'dashboard') {
       const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
       if (_emp.moduloSalao) {
@@ -8504,6 +8662,7 @@ https://sistema.glinformatica.com.br
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
       if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
       if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
+      if (typeof atualizarVisibilidadeIntegraHiper === "function") atualizarVisibilidadeIntegraHiper();
       // Mostra botão "Trocar Empresa" se cliente tem multi-empresa
       if (localStorage.getItem('multiEmpresa') === '1') {
         const btnTrocar = document.getElementById('btn-trocar-empresa');
@@ -8605,6 +8764,7 @@ https://sistema.glinformatica.com.br
       if (typeof atualizarVisibilidadeFiscal === 'function') atualizarVisibilidadeFiscal();
       if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
       if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
+      if (typeof atualizarVisibilidadeIntegraHiper === "function") atualizarVisibilidadeIntegraHiper();
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
     renderGraficosDashboard();
   });
@@ -9381,7 +9541,7 @@ https://sistema.glinformatica.com.br
         <td>${p.categoria || '-'}</td>
         <td>${p.fornecedor || '-'}</td>
         <td>${p.estoque || 0}</td>
-        <td>${formatarBRL(p.precoCusto || 0)}</td>
+        <td>${formatarBRL(p.precoCusto || 0)}${p.moedaOrigem ? ` <span title="Preço originalmente em ${p.moedaOrigem}: ${p.precoCustoOrigem} (cotação R$ ${Number(p.cotacaoUsada || 0).toFixed(4)})" style="display:inline-block;background:#eff6ff;color:#1e40af;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;cursor:help;">💶 ${p.moedaOrigem}</span>` : ''}</td>
         <td>${formatarBRL(p.precoVenda || 0)}</td>
         <td>
           <button class="btn-link" onclick="editarProduto(${idxOriginal})">Editar</button>
@@ -9409,6 +9569,60 @@ https://sistema.glinformatica.com.br
     agendarSalvar();
   }
   let _produtoEditandoIdx = null;
+  // ============================================
+  // MOEDA ESTRANGEIRA (produto importado)
+  // Fluxo: dona marca checkbox → aparece bloco → escolhe moeda +
+  //        digita preço origem → clica "Buscar hoje" (ou digita cotação
+  //        manual) → sistema calcula preço de custo em Real automaticamente
+  // ============================================
+  function prodToggleMoeda() {
+    const box = document.getElementById('npr-moeda-box');
+    const chk = document.getElementById('npr-usa-moeda');
+    if (chk.checked) {
+      box.style.display = 'block';
+      // Preenche data com hoje
+      const hoje = new Date().toISOString().slice(0, 10);
+      const dt = document.getElementById('npr-cotacao-data');
+      if (!dt.value) dt.value = hoje;
+      // Busca cotação automática
+      prodBuscarCotacao();
+    } else {
+      box.style.display = 'none';
+      // Limpa campos pra não enviar
+      document.getElementById('npr-preco-origem').value = '';
+      document.getElementById('npr-cotacao').value = '';
+      document.getElementById('npr-cotacao-info').textContent = '';
+    }
+  }
+
+  async function prodBuscarCotacao() {
+    const moeda = document.getElementById('npr-moeda-origem').value;
+    const info = document.getElementById('npr-cotacao-info');
+    info.textContent = '🔄 Buscando cotação...';
+    try {
+      const r = await api('GET', '/api/cotacao-moeda/' + moeda);
+      document.getElementById('npr-cotacao').value = Number(r.cotacao).toFixed(4);
+      document.getElementById('npr-cotacao-data').value = r.data;
+      const fonteLabel = r.fonte === 'awesomeapi' ? 'AwesomeAPI' :
+                         r.fonte === 'manual' ? 'manual' : (r.fonte || 'cache');
+      info.innerHTML = `✅ Cotação ${moeda}/BRL de ${r.data.split('-').reverse().join('/')}: R$ ${Number(r.cotacao).toFixed(4)} <span style="opacity:0.6;">(${fonteLabel})</span>${r.aviso ? '<br>⚠️ ' + r.aviso : ''}`;
+      info.style.color = r.aviso ? '#b45309' : '#166534';
+      prodCalcularPreco();
+    } catch (err) {
+      info.innerHTML = `⚠️ ${err.message} — digite a cotação manualmente.`;
+      info.style.color = '#b45309';
+    }
+  }
+
+  function prodCalcularPreco() {
+    const precoOrigem = parseFloat(document.getElementById('npr-preco-origem').value) || 0;
+    const cotacao = parseFloat(document.getElementById('npr-cotacao').value) || 0;
+    if (precoOrigem > 0 && cotacao > 0) {
+      const precoReal = precoOrigem * cotacao;
+      document.getElementById('npr-preco-custo').value = precoReal.toFixed(2);
+    }
+  }
+
   function editarProduto(idx) {
     const p = dbProdutos[idx];
     _produtoEditandoIdx = idx;
@@ -9443,6 +9657,31 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-preco-custo').value = (p.precoCusto || 0).toFixed(2);
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
+
+    // Moeda estrangeira (se produto foi cadastrado com moeda)
+    const chkMoeda = document.getElementById('npr-usa-moeda');
+    if (p.moedaOrigem) {
+      chkMoeda.checked = true;
+      document.getElementById('npr-moeda-box').style.display = 'block';
+      document.getElementById('npr-moeda-origem').value = p.moedaOrigem;
+      document.getElementById('npr-preco-origem').value = p.precoCustoOrigem || '';
+      document.getElementById('npr-cotacao').value = p.cotacaoUsada || '';
+      // Ajusta data (pode vir como string ISO ou Date)
+      let dataFmt = '';
+      if (p.cotacaoData) {
+        dataFmt = String(p.cotacaoData).slice(0, 10);
+      }
+      document.getElementById('npr-cotacao-data').value = dataFmt;
+      const info = document.getElementById('npr-cotacao-info');
+      info.innerHTML = `📌 Cotação usada anteriormente: R$ ${Number(p.cotacaoUsada || 0).toFixed(4)}${dataFmt ? ' em ' + dataFmt.split('-').reverse().join('/') : ''}`;
+      info.style.color = '#64748b';
+    } else {
+      chkMoeda.checked = false;
+      document.getElementById('npr-moeda-box').style.display = 'none';
+      document.getElementById('npr-preco-origem').value = '';
+      document.getElementById('npr-cotacao').value = '';
+      document.getElementById('npr-cotacao-info').textContent = '';
+    }
     // Preenche a foto se houver
     preencherFotoEdicao(p.fotoUrl || '');
     // Preenche descrições novas (recurso ambientes)
@@ -10723,6 +10962,21 @@ https://sistema.glinformatica.com.br
         referencia: document.getElementById('npr-referencia')?.value.trim().toUpperCase() || null
       } : {};
 
+      // Moeda estrangeira (opcional). Se checkbox marcado, envia. Senão, envia null pra limpar.
+      const camposMoeda = (() => {
+        const usa = document.getElementById('npr-usa-moeda')?.checked;
+        if (!usa) return { moedaOrigem: null, precoCustoOrigem: null, cotacaoUsada: null, cotacaoData: null };
+        const precoOrigem = parseFloat(document.getElementById('npr-preco-origem').value) || 0;
+        const cotacao = parseFloat(document.getElementById('npr-cotacao').value) || 0;
+        if (precoOrigem <= 0 || cotacao <= 0) return {}; // não envia (validação frontend cuidou)
+        return {
+          moedaOrigem: document.getElementById('npr-moeda-origem').value,
+          precoCustoOrigem: precoOrigem,
+          cotacaoUsada: cotacao,
+          cotacaoData: document.getElementById('npr-cotacao-data').value || null
+        };
+      })();
+
       // ===== MODO EDIÇÃO =====
       if(_produtoEditandoIdx !== null) {
         const p = dbProdutos[_produtoEditandoIdx];
@@ -10731,7 +10985,8 @@ https://sistema.glinformatica.com.br
           fotoUrl,
           ...camposMarca,
           ...camposFiscais,
-          ...camposAmbientes
+          ...camposAmbientes,
+          ...camposMoeda
         });
         dbProdutos[_produtoEditandoIdx] = atualizado;
         renderListaProdutos();
@@ -10746,7 +11001,8 @@ https://sistema.glinformatica.com.br
         fotoUrl,
         ...camposMarca,
         ...camposFiscais,
-        ...camposAmbientes
+        ...camposAmbientes,
+        ...camposMoeda
       });
       dbProdutos.push(novo);
       renderListaProdutos();
@@ -19341,6 +19597,143 @@ ${conteudo}
     }
   }
 
+  // ============================================
+  // INTEGRA HIPER — Frontend do cliente
+  // ============================================
+  let _ihConfig = null;
+
+  async function ihCarregar() {
+    const statusTxt = document.getElementById('ih-status-texto');
+    const statusDet = document.getElementById('ih-status-detalhe');
+    try {
+      _ihConfig = await api('GET', '/api/integra-hiper/config');
+      if (!_ihConfig.configurado) {
+        statusTxt.textContent = '⚙️ Aguardando configuração inicial';
+        statusDet.textContent = 'Cole a chave da API do Hiper abaixo e clique em Salvar.';
+        document.getElementById('ih-token-agent').value = '';
+        document.getElementById('ih-intervalo').value = '15';
+        return;
+      }
+      // Preenche intervalo
+      document.getElementById('ih-intervalo').value = _ihConfig.intervalo_sync_min || 15;
+      // Preenche status
+      if (!_ihConfig.tem_chave) {
+        statusTxt.textContent = '⚠️ Chave da API não cadastrada';
+        statusDet.textContent = 'Cadastre a chave da API pra começar a sincronizar.';
+      } else if (_ihConfig.ultima_sync_produtos) {
+        const dt = new Date(_ihConfig.ultima_sync_produtos);
+        statusTxt.textContent = '✅ Ativo · última sync ' + dt.toLocaleString('pt-BR');
+        statusDet.textContent = `Ponto de sincronização atual: ${_ihConfig.ponto_sync_produtos || 0}`;
+      } else {
+        statusTxt.textContent = '🟡 Chave cadastrada, ainda não sincronizou';
+        statusDet.textContent = 'Clique em "Sincronizar produtos AGORA" pra fazer a primeira carga.';
+      }
+      // Token do agent (só admin)
+      try {
+        const t = await api('GET', '/api/integra-hiper/token-agent');
+        if (t.token) document.getElementById('ih-token-agent').value = t.token;
+      } catch (e) {
+        document.getElementById('ih-token-agent').value = '(apenas admin visualiza)';
+      }
+    } catch (err) {
+      statusTxt.textContent = '❌ Erro ao carregar';
+      statusDet.textContent = err.message;
+    }
+  }
+
+  async function ihTestarChave() {
+    const chave = document.getElementById('ih-chave-api').value.trim();
+    const status = document.getElementById('ih-chave-status');
+    if (!chave) { status.innerHTML = '⚠️ <span style="color:#b45309;">Cole a chave primeiro.</span>'; return; }
+    status.innerHTML = '🔄 <span style="color:#64748b;">Testando com a API do Hiper...</span>';
+    try {
+      const r = await api('POST', '/api/integra-hiper/testar-credenciais', { chaveApi: chave });
+      if (r.ok) {
+        status.innerHTML = '✅ <span style="color:#166534;font-weight:600;">' + r.mensagem + '</span>';
+      } else {
+        status.innerHTML = '❌ <span style="color:#b91c1c;">' + r.mensagem + '</span>';
+      }
+    } catch (err) {
+      status.innerHTML = '❌ <span style="color:#b91c1c;">' + err.message + '</span>';
+    }
+  }
+
+  async function ihSalvarConfig() {
+    const chave = document.getElementById('ih-chave-api').value.trim();
+    const intervalo = Number(document.getElementById('ih-intervalo').value) || 15;
+    try {
+      const body = { intervaloSyncMin: intervalo };
+      if (chave) body.chaveApi = chave;
+      const r = await api('POST', '/api/integra-hiper/config', body);
+      alert('✅ ' + (r.mensagem || 'Configuração salva!'));
+      document.getElementById('ih-chave-api').value = '';
+      document.getElementById('ih-chave-status').innerHTML = '';
+      await ihCarregar();
+    } catch (err) {
+      alert('❌ Erro: ' + err.message);
+    }
+  }
+
+  async function ihSincronizarAgora() {
+    const btn = document.getElementById('ih-btn-sync');
+    const btnTxtOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Sincronizando...';
+    try {
+      const r = await api('POST', '/api/integra-hiper/sync-manual', {});
+      alert(`✅ Sync concluída!\n\nRecebidos: ${r.recebidos}\nCriados: ${r.criados}\nAtualizados: ${r.atualizados}\nErros: ${r.erros}`);
+      await ihCarregar();
+      await ihCarregarLogs();
+    } catch (err) {
+      alert('❌ Erro na sincronização: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btnTxtOriginal;
+    }
+  }
+
+  function ihCopiarToken() {
+    const inp = document.getElementById('ih-token-agent');
+    if (!inp.value || inp.value.startsWith('(')) return;
+    inp.select();
+    navigator.clipboard.writeText(inp.value).then(() => {
+      alert('📋 Token copiado! Cole no arquivo .env do agent instalado no PC do cliente.');
+    }).catch(() => {
+      document.execCommand('copy');
+      alert('📋 Token copiado!');
+    });
+  }
+
+  async function ihCarregarLogs() {
+    const tbody = document.getElementById('ih-tbody-logs');
+    try {
+      const r = await api('GET', '/api/integra-hiper/logs');
+      if (!r.logs || r.logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#889;padding:16px;">Nenhuma sincronização registrada ainda.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = r.logs.map(log => {
+        const dt = new Date(log.executado_em);
+        const statusColor = log.status === 'ok' ? '#166534' :
+                            log.status === 'parcial' ? '#b45309' : '#b91c1c';
+        const statusIcon = log.status === 'ok' ? '✅' : log.status === 'parcial' ? '⚠️' : '❌';
+        return `<tr style="border-top:1px solid #f1f5f9;">
+          <td style="padding:8px;font-size:11px;color:#475569;">${dt.toLocaleString('pt-BR')}</td>
+          <td style="padding:8px;">${log.tipo}</td>
+          <td style="padding:8px;font-size:11px;color:#64748b;">${log.fonte}</td>
+          <td style="padding:8px;text-align:center;color:${statusColor};font-weight:600;">${statusIcon} ${log.status}</td>
+          <td style="padding:8px;text-align:right;color:#166534;">${log.qtd_criados || 0}</td>
+          <td style="padding:8px;text-align:right;color:#1e40af;">${log.qtd_atualizados || 0}</td>
+          <td style="padding:8px;text-align:right;color:${log.qtd_erros > 0 ? '#b91c1c' : '#94a3b8'};">${log.qtd_erros || 0}</td>
+          <td style="padding:8px;text-align:right;font-size:11px;color:#64748b;">${log.duracao_ms ? log.duracao_ms + 'ms' : '—'}</td>
+          <td style="padding:8px;font-size:11px;color:#475569;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(log.mensagem || '').replace(/"/g, '&quot;')}">${log.mensagem || ''}</td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#b91c1c;padding:16px;">Erro: ${err.message}</td></tr>`;
+    }
+  }
+
   // ---------- DASHBOARD SALÃO ----------
 
   function carregarDashboardSalao() {
@@ -24442,6 +24835,15 @@ ${conteudo}
     });
     // Modo Salão: esconde menus não relacionados
     atualizarVisibilidadeModoSalao();
+  }
+
+  // Mostra o menu INTEGRA HIPER apenas para empresas com o módulo ativo
+  function atualizarVisibilidadeIntegraHiper() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const ativo = !!empresa.moduloIntegraHiper;
+    document.querySelectorAll('.feature-integra-hiper').forEach(el => {
+      el.style.display = ativo ? '' : 'none';
+    });
   }
 
   // Quando o Módulo Salão está ativo, esconde menus não essenciais pra deixar
