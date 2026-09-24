@@ -5958,6 +5958,11 @@
                    style="background:#f8fafc;color:#1e293b;font-weight:700;font-size:15px;cursor:not-allowed;border:1px solid #cbd5e1;border-radius:6px;padding:8px;max-width:180px;">
             <div id="npr-preco-hiper-info" style="font-size:11px;color:#64748b;flex:1;min-width:200px;"></div>
           </div>
+          <label style="color:#1e40af;font-weight:600;display:block;margin:10px 0 6px;">Estoque no Hiper (sincronizado)</label>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <input type="number" id="npr-estoque-hiper" readonly disabled style="background:#f8fafc;color:#1e293b;font-weight:700;font-size:15px;cursor:not-allowed;border:1px solid #cbd5e1;border-radius:6px;padding:8px;max-width:180px;">
+            <div id="npr-estoque-hiper-info" style="font-size:11px;color:#64748b;flex:1;min-width:200px;"></div>
+          </div>
           <div style="font-size:11px;color:#94a3b8;margin-top:6px;">
             🔒 Este campo é preenchido automaticamente pelo agent local (INTEGRA HIPER). Não pode ser editado manualmente.
           </div>
@@ -9675,6 +9680,19 @@ https://sistema.glinformatica.com.br
     const pnf = document.getElementById('npr-preco-hiper');
     const pnfInfo = document.getElementById('npr-preco-hiper-info');
     if (pnf) pnf.value = p.precoHiper != null ? Number(p.precoHiper).toFixed(2) : '';
+    const eHi = document.getElementById('npr-estoque-hiper');
+    const eHiInfo = document.getElementById('npr-estoque-hiper-info');
+    if (eHi) eHi.value = p.estoqueHiper != null ? Number(p.estoqueHiper).toFixed(3) : '';
+    if (eHiInfo) {
+      if (p.estoqueHiper != null && p.estoqueHiperSyncEm) {
+        const dtE = new Date(p.estoqueHiperSyncEm);
+        eHiInfo.innerHTML = 'Ultima sync: ' + dtE.toLocaleString('pt-BR');
+        eHiInfo.style.color = '#166534';
+      } else {
+        eHiInfo.innerHTML = 'Aguardando sync do agent Hiper';
+        eHiInfo.style.color = '#b45309';
+      }
+    }
     if (pnfInfo) {
       if (p.precoHiper != null && p.precoHiperSyncEm) {
         const dt = new Date(p.precoHiperSyncEm);

@@ -57,7 +57,9 @@ router.get('/', async (req, res) => {
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
       precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
-      precoHiperSyncEm: p.preco_hiper_sync_em || null
+      precoHiperSyncEm: p.preco_hiper_sync_em || null,
+      estoqueHiper: p.estoque_hiper != null ? toNum(p.estoque_hiper) : null,
+      estoqueHiperSyncEm: p.estoque_hiper_sync_em || null
     })));
   } catch (err) {
     console.error('[produtos/list]', err);
@@ -174,7 +176,9 @@ router.post('/', async (req, res) => {
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
       precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
-      precoHiperSyncEm: p.preco_hiper_sync_em || null
+      precoHiperSyncEm: p.preco_hiper_sync_em || null,
+      estoqueHiper: p.estoque_hiper != null ? toNum(p.estoque_hiper) : null,
+      estoqueHiperSyncEm: p.estoque_hiper_sync_em || null
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -265,7 +269,9 @@ router.put('/:id', async (req, res) => {
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
       precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
-      precoHiperSyncEm: p.preco_hiper_sync_em || null
+      precoHiperSyncEm: p.preco_hiper_sync_em || null,
+      estoqueHiper: p.estoque_hiper != null ? toNum(p.estoque_hiper) : null,
+      estoqueHiperSyncEm: p.estoque_hiper_sync_em || null
     });
   } catch (err) {
     if (err.code === '23505') {
