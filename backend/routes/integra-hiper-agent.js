@@ -91,6 +91,77 @@ router.post('/upload', validarAgent, async (req, res) => {
   }
 });
 
+// POST /produtos-precos — Agent envia preços do Hiper (SQL local)
+// Body: { produtos: [{ codigo: "5476", precoHiper: 130.50 }, ...] }
+// Match: produtos.codigo = codigo do Hiper (mesma empresa)
+// Só ATUALIZA o preco_hiper — nunca cria produto (produto é cadastrado no GL)
+router.post('/produtos-precos', validarAgent, async (req, res) => {
+  const inicio = Date.now();
+  try {
+    const { produtos } = req.body || {};
+    if (!Array.isArray(produtos)) {
+      return res.status(400).json({ error: 'Body inválido. Esperado: { produtos: [{codigo, precoHiper}] }' });
+    }
+
+    let atualizados = 0;
+    let ignorados = 0;   // produto não existe no GL (não cadastrado ainda)
+    let erros = 0;
+    const naoEncontrados = [];
+
+    for (const p of produtos) {
+      try {
+        const codigo = String(p.codigo || '').trim();
+        const preco = Number(p.precoHiper);
+        if (!codigo || !(preco >= 0)) { erros++; continue; }
+        const r = await db.query(
+          `UPDATE produtos
+             SET preco_hiper = $1, preco_hiper_sync_em = NOW()
+           WHERE empresa_id = $2 AND codigo = $3`,
+          [preco, req.empresaId, codigo]
+        );
+        if (r.rowCount > 0) {
+          atualizados++;
+        } else {
+          ignorados++;
+          if (naoEncontrados.length < 20) naoEncontrados.push(codigo);
+        }
+      } catch (e) {
+        erros++;
+      }
+    }
+
+    await db.query(
+      `INSERT INTO hiper_log_sync
+       (empresa_id, tipo, fonte, status, qtd_atualizados, qtd_erros, duracao_ms, mensagem)
+       VALUES ($1, 'produtos_precos', 'sql_local', $2, $3, $4, $5, $6)`,
+      [
+        req.empresaId,
+        erros === 0 ? 'ok' : 'parcial',
+        atualizados, erros,
+        Date.now() - inicio,
+        `${produtos.length} recebidos, ${atualizados} atualizados, ${ignorados} ignorados (código não existe no GL), ${erros} erros`
+        + (naoEncontrados.length > 0 ? ` · não encontrados: ${naoEncontrados.slice(0, 10).join(', ')}${naoEncontrados.length > 10 ? '...' : ''}` : '')
+      ]
+    );
+
+    res.json({
+      ok: true,
+      recebidos: produtos.length,
+      atualizados, ignorados, erros,
+      naoEncontrados: naoEncontrados.slice(0, 10)
+    });
+  } catch (e) {
+    console.error('[integra-hiper-agent] produtos-precos:', e);
+    await db.query(
+      `INSERT INTO hiper_log_sync
+       (empresa_id, tipo, fonte, status, qtd_erros, duracao_ms, mensagem)
+       VALUES ($1, 'produtos_precos', 'sql_local', 'erro', 1, $2, $3)`,
+      [req.empresaId, Date.now() - inicio, e.message]
+    ).catch(() => {});
+    res.status(500).json({ error: 'Erro: ' + e.message });
+  }
+});
+
 // POST /schema — agent envia o schema descoberto do SQL local
 // Útil pra você descobrir os nomes das tabelas de clientes/fornecedores
 router.post('/schema', validarAgent, async (req, res) => {

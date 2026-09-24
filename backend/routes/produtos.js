@@ -56,7 +56,8 @@ router.get('/', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
+      precoHiperSyncEm: p.preco_hiper_sync_em || null
     })));
   } catch (err) {
     console.error('[produtos/list]', err);
@@ -72,9 +73,8 @@ router.post('/', async (req, res) => {
     fotoUrl, descricaoImpressao, observacaoInterna, referencia,
     marca, marcaId,
     // Moeda estrangeira (opcional). Se moedaOrigem for null, produto é Real normal.
-    moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData,
-    // Preço dual (só usado quando módulo INTEGRA HIPER está ativo)
-    precoHiper
+    moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData
+    // NOTA: preco_hiper NÃO é aceito aqui — vem apenas do agent local (INTEGRA HIPER)
   } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -125,9 +125,8 @@ router.post('/', async (req, res) => {
          empresa_id, codigo, nome, categoria, fornecedor, estoque, preco_custo, preco_venda,
          ncm, cest, cfop_padrao, origem_mercadoria, csosn, cst, unidade_tributavel, foto_url,
          descricao_impressao, observacao_interna, referencia, marca, marca_id,
-         moeda_origem, preco_custo_origem, cotacao_usada, cotacao_data,
-         preco_hiper
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
+         moeda_origem, preco_custo_origem, cotacao_usada, cotacao_data
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING *`,
       [req.user.empresaId, codigoFinal, nome.trim(), categoria || null, (fornecedor ? fornecedor.trim() : null),
        Number(estoque) || 0, Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
@@ -146,8 +145,7 @@ router.post('/', async (req, res) => {
        moedaOrigem || null,
        precoCustoOrigem ? Number(precoCustoOrigem) : null,
        cotacaoUsada ? Number(cotacaoUsada) : null,
-       cotacaoData || null,
-       precoHiper ? Number(precoHiper) : null]
+       cotacaoData || null]
     );
     const p = ins.rows[0];
 
@@ -175,7 +173,8 @@ router.post('/', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
+      precoHiperSyncEm: p.preco_hiper_sync_em || null
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -198,9 +197,8 @@ router.put('/:id', async (req, res) => {
     fotoUrl, descricaoImpressao, observacaoInterna, referencia,
     marca, marcaId,
     // Moeda estrangeira (opcional)
-    moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData,
-    // Preço dual (só usado quando módulo INTEGRA HIPER está ativo)
-    precoHiper
+    moedaOrigem, precoCustoOrigem, cotacaoUsada, cotacaoData
+    // NOTA: preco_hiper NÃO é aceito aqui — vem apenas do agent local (INTEGRA HIPER)
   } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
   if (!precoCusto || precoCusto <= 0) return res.status(400).json({ error: 'Preço de custo deve ser maior que zero.' });
@@ -237,9 +235,8 @@ router.put('/:id', async (req, res) => {
          csosn=$10, cst=$11, unidade_tributavel=$12, foto_url=$13,
          descricao_impressao=$14, observacao_interna=$15, referencia=$16,
          marca=$17, marca_id=$18,
-         moeda_origem=$19, preco_custo_origem=$20, cotacao_usada=$21, cotacao_data=$22,
-         preco_hiper=$23
-       WHERE id=$24 AND empresa_id=$25 RETURNING *`,
+         moeda_origem=$19, preco_custo_origem=$20, cotacao_usada=$21, cotacao_data=$22
+       WHERE id=$23 AND empresa_id=$24 RETURNING *`,
       [nome.trim(), categoria || null, (fornecedor ? fornecedor.trim() : null), Number(precoCusto), Number(precoVenda),
        ncm ? String(ncm).replace(/\D/g, '') : null,
        cest ? String(cest).replace(/\D/g, '') : null,
@@ -258,7 +255,6 @@ router.put('/:id', async (req, res) => {
        precoCustoOrigem ? Number(precoCustoOrigem) : null,
        cotacaoUsada ? Number(cotacaoUsada) : null,
        cotacaoData || null,
-       precoHiper ? Number(precoHiper) : null,
        req.params.id, req.user.empresaId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
@@ -268,7 +264,8 @@ router.put('/:id', async (req, res) => {
       estoque: toNum(p.estoque),
       precoCusto: toNum(p.preco_custo),
       precoVenda: toNum(p.preco_venda),
-      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null
+      precoHiper: p.preco_hiper != null ? toNum(p.preco_hiper) : null,
+      precoHiperSyncEm: p.preco_hiper_sync_em || null
     });
   } catch (err) {
     if (err.code === '23505') {
