@@ -52,6 +52,7 @@ app.use('/api/integra-hiper',     autenticar, verificarAcesso, require('./routes
 
 // Módulo INTEGRA HIPER — endpoint pro agent local (autenticação via x-agent-token, NÃO JWT)
 app.use('/api/integra-hiper-agent', require('./routes/integra-hiper-agent'));
+app.use('/api/sync', require('./routes/sync'));
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
 app.use('/api/master/uso-sistema', autenticarMaster, require('./routes/uso-sistema'));
