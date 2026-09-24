@@ -68,7 +68,9 @@ router.get('/', async (req, res) => {
 
 // Criar venda — transação: dá baixa no estoque, cria movimentações, gera contas a receber
 router.post('/', async (req, res) => {
-  const { data, cliente, itens, desconto, pagamento, parcelamento, obs, transportadora_id, creditoUsado } = req.body || {};
+  const { data, cliente, itens, desconto, pagamento, parcelamento, obs, transportadora_id, creditoUsado, tipoNota } = req.body || {};
+  // tipoNota: 'fiscal' (com nota) ou 'nao_fiscal' (sem nota) — só ativo no módulo INTEGRA HIPER
+  const tipoNotaFinal = tipoNota === 'nao_fiscal' ? 'nao_fiscal' : 'fiscal';
   if (!cliente) return res.status(400).json({ error: 'Cliente é obrigatório.' });
   if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'Adicione ao menos um item.' });
@@ -165,9 +167,9 @@ router.post('/', async (req, res) => {
 
     // Cria a venda
     const vendaIns = await client.query(
-      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs, criado_por, transportadora_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null, req.user.userId, transportadora_id || null]
+      `INSERT INTO vendas (empresa_id, data, cliente, itens, subtotal, desconto, total, pagamento, parcelas, obs, criado_por, transportadora_id, tipo_nota)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [req.user.empresaId, data, cliente, JSON.stringify(itens), subtotal, desc, total, pagamento, JSON.stringify(parcelas), obs || null, req.user.userId, transportadora_id || null, tipoNotaFinal]
     );
     const venda = vendaIns.rows[0];
 

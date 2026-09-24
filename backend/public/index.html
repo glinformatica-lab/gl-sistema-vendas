@@ -5945,10 +5945,25 @@
             <input type="number" id="npr-preco-custo" min="0.01" step="0.01" placeholder="0,00" required>
           </div>
           <div class="form-field" style="margin-bottom:0;">
-            <label>Preço de Venda (R$)*</label>
+            <label id="npr-preco-venda-label">Preço de Venda (R$)*</label>
             <input type="number" id="npr-preco-venda" min="0.01" step="0.01" placeholder="0,00" required>
           </div>
         </div>
+
+        <!-- Preço NÃO FISCAL — só aparece quando módulo INTEGRA HIPER está ativo -->
+        <div class="form-row feature-integra-hiper" style="margin-bottom:14px;display:none;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label style="color:#b45309;">🚫 Preço Venda SEM NOTA (R$)</label>
+            <input type="number" id="npr-preco-venda-nao-fiscal" min="0" step="0.01" placeholder="0,00">
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Preço usado quando a venda for marcada como "sem nota fiscal"</div>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <div style="font-size:11px;color:#64748b;padding-top:22px;">
+              💡 O campo "Preço de Venda" acima é usado como preço FISCAL (com nota fiscal).
+            </div>
+          </div>
+        </div>
+
         <div class="form-field" style="margin-bottom:0;">
           <label>Estoque Inicial</label>
           <input type="number" id="npr-estoque" min="0" step="1" value="0" style="max-width:150px;">
@@ -9657,6 +9672,9 @@ https://sistema.glinformatica.com.br
     document.getElementById('npr-preco-custo').value = (p.precoCusto || 0).toFixed(2);
     document.getElementById('npr-preco-venda').value = (p.precoVenda || 0).toFixed(2);
     document.getElementById('npr-estoque').value    = p.estoque || 0;
+    // Preço não fiscal (só se módulo INTEGRA HIPER ativo — campo pode estar oculto)
+    const pnf = document.getElementById('npr-preco-venda-nao-fiscal');
+    if (pnf) pnf.value = p.precoVendaNaoFiscal != null ? Number(p.precoVendaNaoFiscal).toFixed(2) : '';
 
     // Moeda estrangeira (se produto foi cadastrado com moeda)
     const chkMoeda = document.getElementById('npr-usa-moeda');
@@ -10977,6 +10995,14 @@ https://sistema.glinformatica.com.br
         };
       })();
 
+      // Preço dual (só envia se módulo INTEGRA HIPER estiver ativo — senão o campo está oculto)
+      const _empHiper = JSON.parse(localStorage.getItem('empresa') || '{}').moduloIntegraHiper;
+      const camposPrecoDual = {};
+      if (_empHiper) {
+        const raw = document.getElementById('npr-preco-venda-nao-fiscal')?.value;
+        camposPrecoDual.precoVendaNaoFiscal = raw ? parseFloat(raw) : null;
+      }
+
       // ===== MODO EDIÇÃO =====
       if(_produtoEditandoIdx !== null) {
         const p = dbProdutos[_produtoEditandoIdx];
@@ -10986,7 +11012,8 @@ https://sistema.glinformatica.com.br
           ...camposMarca,
           ...camposFiscais,
           ...camposAmbientes,
-          ...camposMoeda
+          ...camposMoeda,
+          ...camposPrecoDual
         });
         dbProdutos[_produtoEditandoIdx] = atualizado;
         renderListaProdutos();
@@ -24837,13 +24864,21 @@ ${conteudo}
     atualizarVisibilidadeModoSalao();
   }
 
-  // Mostra o menu INTEGRA HIPER apenas para empresas com o módulo ativo
+  // Mostra o menu INTEGRA HIPER apenas para empresas com o módulo ativo.
+  // Também renomeia o label "Preço de Venda" pra deixar claro que é o fiscal.
   function atualizarVisibilidadeIntegraHiper() {
     const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
     const ativo = !!empresa.moduloIntegraHiper;
     document.querySelectorAll('.feature-integra-hiper').forEach(el => {
       el.style.display = ativo ? '' : 'none';
     });
+    // Renomeia label do preço padrão pra ficar claro que é o COM NOTA
+    const lblPreco = document.getElementById('npr-preco-venda-label');
+    if (lblPreco) {
+      lblPreco.innerHTML = ativo
+        ? '🧾 Preço Venda COM NOTA (R$)*'
+        : 'Preço de Venda (R$)*';
+    }
   }
 
   // Quando o Módulo Salão está ativo, esconde menus não essenciais pra deixar
