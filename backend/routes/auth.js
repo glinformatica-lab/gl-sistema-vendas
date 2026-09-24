@@ -85,7 +85,10 @@ router.post('/registrar-empresa', async (req, res) => {
         id: novaEmpresa.id, nome: novaEmpresa.nome,
         status: novaEmpresa.status, plano: novaEmpresa.plano,
         dataVencimento: vencIso,
-        moduloFiscalAtivo: false
+        moduloFiscalAtivo: false,
+        usaAmbientes: false,
+        moduloSalao: false,
+        moduloIntegraHiper: false
       }
     });
   } catch (err) {
@@ -107,7 +110,10 @@ router.post('/login', async (req, res) => {
     const resultTodos = await db.query(
       `SELECT u.*, e.id AS emp_id, e.nome AS empresa_nome, e.status AS empresa_status,
               e.plano, e.data_vencimento,
-              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo,
+              COALESCE(e.usa_ambientes, false) AS usa_ambientes,
+              COALESCE(e.modulo_salao, false) AS modulo_salao,
+              COALESCE(e.modulo_integra_hiper, false) AS modulo_integra_hiper
        FROM usuarios u
        JOIN empresas e ON e.id = u.empresa_id
        WHERE LOWER(u.email) = $1
@@ -136,7 +142,10 @@ router.post('/login', async (req, res) => {
           nome: u.empresa_nome,
           plano: u.plano,
           status: u.empresa_status,
-          moduloFiscalAtivo: !!u.modulo_fiscal_ativo
+          moduloFiscalAtivo: !!u.modulo_fiscal_ativo,
+          usaAmbientes: !!u.usa_ambientes,
+          moduloSalao: !!u.modulo_salao,
+          moduloIntegraHiper: !!u.modulo_integra_hiper
         }))
       });
     }
@@ -171,7 +180,10 @@ router.post('/login', async (req, res) => {
         id: usuario.empresa_id, nome: usuario.empresa_nome,
         status: usuario.empresa_status, plano: usuario.plano,
         dataVencimento: venc,
-        moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo
+        moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo,
+        usaAmbientes: !!usuario.usa_ambientes,
+        moduloSalao: !!usuario.modulo_salao,
+        moduloIntegraHiper: !!usuario.modulo_integra_hiper
       },
       // Informa se o cliente tem outras empresas (pra mostrar botão "Trocar Empresa")
       temMultiEmpresa: empresasAtivas.length > 1
@@ -217,7 +229,10 @@ router.get('/me', autenticar, async (req, res) => {
               e.id AS empresa_id, e.nome AS empresa_nome,
               e.status AS empresa_status, e.plano, e.data_vencimento,
               COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo,
-              e.modulo_fiscal_ativado_em
+              e.modulo_fiscal_ativado_em,
+              COALESCE(e.usa_ambientes, false) AS usa_ambientes,
+              COALESCE(e.modulo_salao, false) AS modulo_salao,
+              COALESCE(e.modulo_integra_hiper, false) AS modulo_integra_hiper
        FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
        WHERE u.id = $1 LIMIT 1`,
       [req.user.userId]
@@ -238,7 +253,10 @@ router.get('/me', autenticar, async (req, res) => {
         plano: u.plano,
         dataVencimento: venc,
         moduloFiscalAtivo: !!u.modulo_fiscal_ativo,
-        moduloFiscalAtivadoEm: u.modulo_fiscal_ativado_em
+        moduloFiscalAtivadoEm: u.modulo_fiscal_ativado_em,
+        usaAmbientes: !!u.usa_ambientes,
+        moduloSalao: !!u.modulo_salao,
+        moduloIntegraHiper: !!u.modulo_integra_hiper
       }
     });
   } catch (err) {
@@ -278,7 +296,10 @@ router.get('/minhas-empresas', autenticar, async (req, res) => {
       `SELECT u.id AS usuario_id, u.papel,
               e.id AS empresa_id, e.nome AS empresa_nome,
               e.status AS empresa_status, e.plano,
-              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo,
+              COALESCE(e.usa_ambientes, false) AS usa_ambientes,
+              COALESCE(e.modulo_salao, false) AS modulo_salao,
+              COALESCE(e.modulo_integra_hiper, false) AS modulo_integra_hiper
        FROM usuarios u
        JOIN empresas e ON e.id = u.empresa_id
        WHERE LOWER(u.email) = LOWER($1)
@@ -294,7 +315,10 @@ router.get('/minhas-empresas', autenticar, async (req, res) => {
         plano: r.plano,
         status: r.empresa_status,
         papel: r.papel,
-        moduloFiscalAtivo: !!r.modulo_fiscal_ativo
+        moduloFiscalAtivo: !!r.modulo_fiscal_ativo,
+        usaAmbientes: !!r.usa_ambientes,
+        moduloSalao: !!r.modulo_salao,
+        moduloIntegraHiper: !!r.modulo_integra_hiper
       }))
     });
   } catch (err) {
@@ -317,7 +341,10 @@ router.post('/trocar-empresa', autenticar, async (req, res) => {
     const r = await db.query(
       `SELECT u.*, e.id AS emp_id, e.nome AS empresa_nome, e.status AS empresa_status,
               e.plano, e.data_vencimento,
-              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo
+              COALESCE(e.modulo_fiscal_ativo, false) AS modulo_fiscal_ativo,
+              COALESCE(e.usa_ambientes, false) AS usa_ambientes,
+              COALESCE(e.modulo_salao, false) AS modulo_salao,
+              COALESCE(e.modulo_integra_hiper, false) AS modulo_integra_hiper
        FROM usuarios u
        JOIN empresas e ON e.id = u.empresa_id
        WHERE LOWER(u.email) = LOWER($1) AND u.empresa_id = $2 LIMIT 1`,
@@ -346,7 +373,10 @@ router.post('/trocar-empresa', autenticar, async (req, res) => {
         id: usuario.empresa_id, nome: usuario.empresa_nome,
         status: usuario.empresa_status, plano: usuario.plano,
         dataVencimento: venc,
-        moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo
+        moduloFiscalAtivo: !!usuario.modulo_fiscal_ativo,
+        usaAmbientes: !!usuario.usa_ambientes,
+        moduloSalao: !!usuario.modulo_salao,
+        moduloIntegraHiper: !!usuario.modulo_integra_hiper
       },
       temMultiEmpresa: true
     });

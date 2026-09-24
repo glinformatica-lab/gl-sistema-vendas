@@ -45,6 +45,13 @@ app.use('/api/agendamentos',      autenticar, verificarAcesso, require('./routes
 app.use('/api/atendimentos',      autenticar, verificarAcesso, require('./routes/atendimentos'));
 app.use('/api/vales',             autenticar, verificarAcesso, require('./routes/vales'));
 app.use('/api/fechamentos',       autenticar, verificarAcesso, require('./routes/fechamentos'));
+app.use('/api/cotacao-moeda',     autenticar, verificarAcesso, require('./routes/cotacao-moeda'));
+
+// Módulo INTEGRA HIPER — tela config + logs + sync manual (autenticado JWT)
+app.use('/api/integra-hiper',     autenticar, verificarAcesso, require('./routes/integra-hiper'));
+
+// Módulo INTEGRA HIPER — endpoint pro agent local (autenticação via x-agent-token, NÃO JWT)
+app.use('/api/integra-hiper-agent', require('./routes/integra-hiper-agent'));
 // Rotas Master (token Master)
 app.use('/api/master', autenticarMaster, require('./routes/master'));
 app.use('/api/master/uso-sistema', autenticarMaster, require('./routes/uso-sistema'));

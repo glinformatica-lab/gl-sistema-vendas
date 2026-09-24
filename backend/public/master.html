@@ -403,6 +403,20 @@
         </p>
       </div>
 
+      <div style="background:#dbeafe;border:1px solid #60a5fa;border-radius:8px;padding:14px;margin:12px 0;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="checkbox" id="me-modulo-integra-hiper" style="width:20px;height:20px;cursor:pointer;">
+          <label for="me-modulo-integra-hiper" style="margin:0;font-weight:600;color:#1e40af;cursor:pointer;font-size:14px;">
+            🔗 Ativar Módulo INTEGRA HIPER
+          </label>
+        </div>
+        <p style="margin:6px 0 0 32px;font-size:12px;color:#557;line-height:1.4;">
+          Sincroniza automaticamente produtos, estoque, clientes e fornecedores do sistema fiscal Hiper.<br>
+          Precisa: chave da API do Hiper (nuvem) e agent instalado no PC do cliente (SQL local).<br>
+          <strong style="color:#1e40af;">Só clientes que usam Hiper devem ativar.</strong>
+        </p>
+      </div>
+
       <label>Observações</label>
       <textarea id="me-observacao" rows="3"></textarea>
 
@@ -722,7 +736,7 @@
                   <tr style="border-top:1px solid #f1f5f9;">
                     <td style="padding:6px 8px;"><strong>${escapeHtml(e.nome)}</strong> <span style="color:#94a3b8;font-size:10px;">#${e.id}</span></td>
                     <td style="padding:6px 8px;text-align:center;"><span style="background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700;">${escapeHtml(e.plano || '—')}</span></td>
-                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : ''}${e.moduloSalao ? ' 💇' : ''}${!e.usaAmbientes && !e.moduloSalao ? '—' : ''}</td>
+                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : ''}${e.moduloSalao ? ' 💇' : ''}${e.moduloIntegraHiper ? ' 🔗' : ''}${!e.usaAmbientes && !e.moduloSalao && !e.moduloIntegraHiper ? '—' : ''}</td>
                     <td style="padding:6px 8px;text-align:right;font-weight:600;">${e.totalProdutos}</td>
                     <td style="padding:6px 8px;text-align:right;color:#0891b2;">${e.totalFotos}</td>
                     <td style="padding:6px 8px;text-align:right;">${e.totalClientes}</td>
@@ -981,6 +995,7 @@
     document.getElementById('me-usa-ambientes').checked = !!(e.usaAmbientes);
     // Salão
     document.getElementById('me-modulo-salao').checked = !!(e.moduloSalao);
+    document.getElementById('me-modulo-integra-hiper').checked = !!(e.moduloIntegraHiper);
     document.getElementById('me-erro').style.display = 'none';
     document.getElementById('modal-editar').classList.add('show');
   }
@@ -1028,7 +1043,8 @@
         observacao: document.getElementById('me-observacao').value.trim(),
         moduloFiscalAtivo: document.getElementById('me-modulo-fiscal').checked,
         usaAmbientes: document.getElementById('me-usa-ambientes').checked,
-        moduloSalao: document.getElementById('me-modulo-salao').checked
+        moduloSalao: document.getElementById('me-modulo-salao').checked,
+        moduloIntegraHiper: document.getElementById('me-modulo-integra-hiper').checked
       });
       closeEditar();
       await Promise.all([carregarDashboard(), carregarEmpresas()]);
