@@ -19744,7 +19744,50 @@ ${conteudo}
     setTimeout(function(){ try { w.focus(); } catch(e){} }, 100);
   }
 
-    function fechRenderContent(p, calc, jaFechado, fech) {
+    // v60.5: impressao a partir de calc (preview - sem fechamento gravado)
+  function fechImprimirProfPreview() {
+    _fechImprimirPreview(false);
+  }
+  function fechImprimirSalaoPreview() {
+    _fechImprimirPreview(true);
+  }
+  function _fechImprimirPreview(visaoSalao) {
+    var calc = window._fechPreviewCalc;
+    var p = window._fechPreviewProf;
+    if (!calc || !p) { alert("Dados do preview nao disponiveis. Feche e reabra o detalhe."); return; }
+    // Constroi um "fake fechamento" no shape que _fechImprimir espera
+    var fakeF = {
+      id: 0,
+      mes: _fechMes,
+      ano: _fechAno,
+      status: "preview",
+      fechadoEm: new Date().toISOString(),
+      profissionalNome: p.nome,
+      profissionalPix: p.pix || null,
+      qtdAtendimentos: calc.qtdAtendimentos,
+      totalBruto: calc.totalBruto || 0,
+      totalServicos: calc.totalServicos,
+      totalComissaoServicos: calc.totalComissaoServicos || 0,
+      totalComissaoProdutos: calc.totalComissaoProdutos,
+      totalTaxaEspaco: calc.totalTaxaEspaco,
+      totalCustoOperacionalServicos: calc.totalCustoOperacionalServicos || 0,
+      totalCustoProdutosUsados: calc.totalCustoProdutosUsados || 0,
+      totalTaxasMaquininha: calc.totalTaxasMaquininha || 0,
+      totalLucroSalao: calc.totalLucroSalao || 0,
+      totalVales: calc.totalVales,
+      valorLiquido: calc.valorLiquido
+    };
+    _fechImprimir({
+      fechamento: fakeF,
+      atendimentos: calc.atendimentos || [],
+      vales: calc.vales || []
+    }, visaoSalao);
+  }
+
+  function fechRenderContent(p, calc, jaFechado, fech) {
+    // v60.5: guarda calc e p em global pra preview de impressao
+    window._fechPreviewCalc = calc;
+    window._fechPreviewProf = p;
     const nomeMes = FECH_MESES[_fechMes - 1];
     const atsHtml = (calc.atendimentos || []).map(a => {
       const servs = (a.servicos || []).map(s => s.nome).join(', ');
@@ -19781,7 +19824,7 @@ ${conteudo}
     let acoes = '';
     if (!jaFechado) {
       acoes = `
-        ${fech ? `<button onclick="fechImprimirProfissional(${fech.id})" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalao(${fech.id})" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>` : `<button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>`}
+        ${fech ? `<button onclick="fechImprimirProfissional(${fech.id})" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalao(${fech.id})" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>` : `<button onclick="fechImprimirProfPreview()" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalaoPreview()" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>`}
         <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
                 style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
       `;
@@ -19797,7 +19840,7 @@ ${conteudo}
       `;
     } else {
       acoes = `
-        ${fech ? `<button onclick="fechImprimirProfissional(${fech.id})" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalao(${fech.id})" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>` : `<button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>`}
+        ${fech ? `<button onclick="fechImprimirProfissional(${fech.id})" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalao(${fech.id})" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>` : `<button onclick="fechImprimirProfPreview()" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fechImprimirSalaoPreview()" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>`}
         <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
                 style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
       `;
