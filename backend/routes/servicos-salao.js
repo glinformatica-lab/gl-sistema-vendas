@@ -1,6 +1,7 @@
 // ============================================
 // SERVIÇOS DO SALÃO (catálogo)
-// v55: + custo_operacional, comissao_padrao_pct, comissao_padrao_valor
+// v56: mantém custo_operacional. Removidos comissao_padrao_pct e comissao_padrao_valor
+//      (comissão fica no cadastro da profissional via percentual_espaco)
 // ============================================
 
 const express = require('express');
@@ -78,15 +79,15 @@ router.post('/', async (req, res) => {
   try {
     const {
       nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo,
-      custoOperacional, comissaoPadraoPct, comissaoPadraoValor
+      custoOperacional
     } = req.body;
     if (!nome || !nome.trim()) return res.status(400).json({ error: 'Nome é obrigatório.' });
 
     const r = await db.query(
       `INSERT INTO servicos_salao
         (empresa_id, nome, preco_padrao, duracao_padrao_min, produtos_receita, categoria, ativo,
-         custo_operacional, comissao_padrao_pct, comissao_padrao_valor)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+         custo_operacional)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         req.user.empresaId,
         nome.trim(),
@@ -95,9 +96,7 @@ router.post('/', async (req, res) => {
         JSON.stringify(produtosReceita || []),
         categoria || null,
         ativo === false ? false : true,
-        Number(custoOperacional) || 0,
-        Number(comissaoPadraoPct) || 0,
-        Number(comissaoPadraoValor) || 0
+        Number(custoOperacional) || 0
       ]
     );
     const s = r.rows[0];
@@ -118,7 +117,7 @@ router.put('/:id', async (req, res) => {
 
     const {
       nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo,
-      custoOperacional, comissaoPadraoPct, comissaoPadraoValor
+      custoOperacional
     } = req.body;
     if (!nome || !nome.trim()) return res.status(400).json({ error: 'Nome é obrigatório.' });
 
@@ -126,8 +125,8 @@ router.put('/:id', async (req, res) => {
       `UPDATE servicos_salao
          SET nome=$1, preco_padrao=$2, duracao_padrao_min=$3,
              produtos_receita=$4, categoria=$5, ativo=$6,
-             custo_operacional=$7, comissao_padrao_pct=$8, comissao_padrao_valor=$9
-       WHERE id=$10 AND empresa_id=$11 RETURNING *`,
+             custo_operacional=$7
+       WHERE id=$8 AND empresa_id=$9 RETURNING *`,
       [
         nome.trim(),
         Number(precoPadrao) || 0,
@@ -136,8 +135,6 @@ router.put('/:id', async (req, res) => {
         categoria || null,
         ativo === false ? false : true,
         Number(custoOperacional) || 0,
-        Number(comissaoPadraoPct) || 0,
-        Number(comissaoPadraoValor) || 0,
         id,
         req.user.empresaId
       ]

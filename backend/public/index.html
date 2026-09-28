@@ -3265,18 +3265,6 @@
                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
               <div style="font-size:11px;color:#64748b;margin-top:2px;">Energia, agua, descartaveis nao rastreados.</div>
             </div>
-            <div>
-              <label style="font-size:12px;color:#334155;font-weight:600;">Comissao profissional (%)</label>
-              <input type="number" id="sl-serv-comissao-pct" step="0.01" value="0" min="0" max="100"
-                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
-              <div style="font-size:11px;color:#64748b;margin-top:2px;">Se pagar por %.</div>
-            </div>
-            <div style="grid-column:1/-1;">
-              <label style="font-size:12px;color:#334155;font-weight:600;">Ou comissao fixa (R$)</label>
-              <input type="number" id="sl-serv-comissao-valor" step="0.01" value="0" min="0"
-                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
-              <div style="font-size:11px;color:#64748b;margin-top:2px;">Alternativa a %. Use 0 se paga so por %.</div>
-            </div>
             <div style="grid-column:1/-1;">
               <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
                 <input type="checkbox" id="sl-serv-ativo" checked> Ativo
@@ -20111,8 +20099,6 @@ ${conteudo}
     document.getElementById('form-sl-servico').reset();
     document.getElementById('sl-serv-preco').value = 0;
     document.getElementById('sl-serv-custo-op').value = 0;
-    document.getElementById('sl-serv-comissao-pct').value = 0;
-    document.getElementById('sl-serv-comissao-valor').value = 0;
     document.getElementById('sl-serv-ativo').checked = true;
     document.getElementById('modal-sl-servico').style.display = 'flex';
     setTimeout(() => document.getElementById('sl-serv-nome').focus(), 100);
@@ -20128,8 +20114,6 @@ ${conteudo}
     document.getElementById('sl-serv-preco').value = s.precoPadrao || 0;
     document.getElementById('sl-serv-duracao').value = s.duracaoPadraoMin || '';
     document.getElementById('sl-serv-custo-op').value = s.custoOperacional || 0;
-    document.getElementById('sl-serv-comissao-pct').value = s.comissaoPadraoPct || 0;
-    document.getElementById('sl-serv-comissao-valor').value = s.comissaoPadraoValor || 0;
     document.getElementById('sl-serv-ativo').checked = !!s.ativo;
     document.getElementById('modal-sl-servico').style.display = 'flex';
   }
@@ -20146,8 +20130,6 @@ ${conteudo}
       precoPadrao: parseFloat(document.getElementById('sl-serv-preco').value) || 0,
       duracaoPadraoMin: parseInt(document.getElementById('sl-serv-duracao').value) || null,
       custoOperacional: parseFloat(document.getElementById('sl-serv-custo-op').value) || 0,
-      comissaoPadraoPct: parseFloat(document.getElementById('sl-serv-comissao-pct').value) || 0,
-      comissaoPadraoValor: parseFloat(document.getElementById('sl-serv-comissao-valor').value) || 0,
       ativo: document.getElementById('sl-serv-ativo').checked,
       produtosReceita: [] // por enquanto vazio; Fase 3 adicionará UI
     };
