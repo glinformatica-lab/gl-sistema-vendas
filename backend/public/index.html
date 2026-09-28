@@ -19550,7 +19550,7 @@ ${conteudo}
   }
   function _fechImprimir(dados, visaoSalao) {
     var f = dados.fechamento;
-    var fmt = function(v) { return "R" + "$ " + Number(v || 0).toFixed(2).replace(".", ","); };
+    var fmt = function(v) { var n = Number(v || 0); return "R" + "$ " + n.toFixed(2).replace(".", ","); };
     var esc = (typeof escapeHtml === "function") ? escapeHtml : function(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
     var mesNome = FECH_MESES[f.mes - 1];
     var nomeProf = f.profissionalNome || "";
@@ -19559,97 +19559,183 @@ ${conteudo}
     var totalLucro = Number(f.totalLucroSalao || 0);
     var margemPct = totalBruto > 0 ? (totalLucro / totalBruto * 100) : 0;
 
+    // Cores e labels por visao
+    var corPrincipal, corSecundaria, tituloTipo, iconeTipo, subtituloTipo;
+    if (visaoSalao) {
+      corPrincipal = "#7c3aed";
+      corSecundaria = "#e0e7ff";
+      tituloTipo = "RELATORIO SALAO";
+      iconeTipo = "&#127970;"; // predio
+      subtituloTipo = "Visao interna da dona (com lucro do salao)";
+    } else {
+      corPrincipal = "#16a34a";
+      corSecundaria = "#dcfce7";
+      tituloTipo = "RELATORIO PROFISSIONAL";
+      iconeTipo = "&#9986;&#65039;"; // tesoura
+      subtituloTipo = "O que voce (profissional) tem a receber";
+    }
+
+    // Monta linhas dos atendimentos
     var atsHtml = "";
+    var totBrutoTab = 0, totComServ = 0, totComProd = 0, totEspaco = 0, totCustoOp = 0, totCustoProd = 0, totTaxaMaq = 0, totLiqProf = 0, totLiqSalao = 0;
+
     (dados.atendimentos || []).forEach(function(a){
       var servs = (a.servicos || []).map(function(s){ return s.nome; }).join(", ");
-      atsHtml += "<tr>" +
-        "<td>" + a.data.split("-").reverse().join("/") + " " + a.hora + "</td>" +
-        "<td>" + esc(a.clienteNome) + "<br><small>" + esc(servs) + "</small></td>" +
-        "<td class=\"r\">" + fmt(a.subtotalServicos) + "</td>" +
-        "<td class=\"r\">" + fmt(a.valorComissaoProfissional) + "</td>" +
-        "<td class=\"r\">" + fmt(a.valorLiquidoProfissional) + "</td>" +
-        "</tr>";
-    });
-    if (!atsHtml) atsHtml = "<tr><td colspan=\"5\" style=\"text-align:center;color:#94a3b8;padding:12px;\">Nenhum atendimento.</td></tr>";
+      var bruto = Number(a.totalBruto || (Number(a.subtotalServicos||0) + Number(a.subtotalProdutos||0)));
+      var comServico = Number(a.valorLiquidoProfissional || 0) - Number(a.valorComissaoProfissional || 0);
+      var comProduto = Number(a.valorComissaoProfissional || 0);
+      var espaco = Number(a.valorEspacoSalao || 0);
+      var custoOp = Number(a.custoOperacionalServicos || 0);
+      var custoProd = Number(a.custoProdutosUsados || 0);
+      var taxaMaq = Number(a.totalTaxasMaquininha || 0);
+      var liqProf = Number(a.valorLiquidoProfissional || 0);
+      var liqSalao = Number(a.valorLiquidoSalao || 0);
 
+      totBrutoTab += bruto; totComServ += comServico; totComProd += comProduto;
+      totEspaco += espaco; totCustoOp += custoOp; totCustoProd += custoProd;
+       totTaxaMaq += taxaMaq; totLiqProf += liqProf; totLiqSalao += liqSalao;
+
+      var dataFmt = a.data.split("-").reverse().join("/") + " " + a.hora;
+
+      if (visaoSalao) {
+        atsHtml += "<tr>" +
+          "<td>" + dataFmt + "</td>" +
+          "<td>" + esc(a.clienteNome) + "<br><small style=\"color:#64748b;\">" + esc(servs) + "</small></td>" +
+          "<td class=\"r\">" + fmt(bruto) + "</td>" +
+          "<td class=\"r pos\">+" + fmt(espaco) + "</td>" +
+          "<td class=\"r neg\">-" + fmt(comServico) + "</td>" +
+          "<td class=\"r neg\">-" + fmt(comProduto) + "</td>" +
+          "<td class=\"r neg\">-" + fmt(custoOp) + "</td>" +
+          "<td class=\"r neg\">-" + fmt(custoProd) + "</td>" +
+          "<td class=\"r neg\">-" + fmt(taxaMaq) + "</td>" +
+          "<td class=\"r liq\">" + fmt(liqSalao) + "</td>" +
+          "</tr>";
+      } else {
+        atsHtml += "<tr>" +
+          "<td>" + dataFmt + "</td>" +
+          "<td>" + esc(a.clienteNome) + "<br><small style=\"color:#64748b;\">" + esc(servs) + "</small></td>" +
+          "<td class=\"r\">" + fmt(bruto) + "</td>" +
+          "<td class=\"r pos\">+" + fmt(comServico) + "</td>" +
+          "<td class=\"r pos\">+" + fmt(comProduto) + "</td>" +
+          "<td class=\"r liq\">" + fmt(liqProf) + "</td>" +
+          "</tr>";
+      }
+    });
+
+    // Linha de TOTAL
+    var totLinha;
+    if (visaoSalao) {
+      totLinha = "<tr class=\"tot\">" +
+        "<td colspan=\"2\"><b>TOTAL</b></td>" +
+        "<td class=\"r\"><b>" + fmt(totBrutoTab) + "</b></td>" +
+        "<td class=\"r pos\"><b>+" + fmt(totEspaco) + "</b></td>" +
+        "<td class=\"r neg\"><b>-" + fmt(totComServ) + "</b></td>" +
+        "<td class=\"r neg\"><b>-" + fmt(totComProd) + "</b></td>" +
+        "<td class=\"r neg\"><b>-" + fmt(totCustoOp) + "</b></td>" +
+        "<td class=\"r neg\"><b>-" + fmt(totCustoProd) + "</b></td>" +
+        "<td class=\"r neg\"><b>-" + fmt(totTaxaMaq) + "</b></td>" +
+        "<td class=\"r liq\"><b>" + fmt(totLiqSalao) + "</b></td>" +
+        "</tr>";
+    } else {
+      totLinha = "<tr class=\"tot\">" +
+        "<td colspan=\"2\"><b>TOTAL</b></td>" +
+        "<td class=\"r\"><b>" + fmt(totBrutoTab) + "</b></td>" +
+        "<td class=\"r pos\"><b>+" + fmt(totComServ) + "</b></td>" +
+        "<td class=\"r pos\"><b>+" + fmt(totComProd) + "</b></td>" +
+        "<td class=\"r liq\"><b>" + fmt(totLiqProf) + "</b></td>" +
+        "</tr>";
+    }
+
+    // Cabecalhos da tabela
+    var thead;
+    if (visaoSalao) {
+      thead = "<thead><tr>" +
+        "<th>Data</th><th>Cliente / Servicos</th>" +
+        "<th class=\"r\">Bruto</th>" +
+        "<th class=\"r\">+ Espaco</th>" +
+        "<th class=\"r\">- Com. Servico</th>" +
+        "<th class=\"r\">- Com. Produto</th>" +
+        "<th class=\"r\">- Custo Op.</th>" +
+        "<th class=\"r\">- Prod. Usados</th>" +
+        "<th class=\"r\">- Taxa Maq.</th>" +
+        "<th class=\"r\">= Liquido Salao</th>" +
+        "</tr></thead>";
+    } else {
+      thead = "<thead><tr>" +
+        "<th>Data</th><th>Cliente / Servicos</th>" +
+        "<th class=\"r\">Bruto</th>" +
+        "<th class=\"r\">+ Com. Servico</th>" +
+        "<th class=\"r\">+ Com. Produto</th>" +
+        "<th class=\"r\">= Liquido</th>" +
+        "</tr></thead>";
+    }
+
+    // Vales (so aparece pro profissional)
     var valesHtml = "";
     (dados.vales || []).forEach(function(v){
       valesHtml += "<tr>" +
         "<td>" + v.data.split("-").reverse().join("/") + "</td>" +
         "<td>" + esc(v.observacao || "-") + "</td>" +
-        "<td class=\"r\">" + fmt(v.valor) + "</td>" +
+        "<td class=\"r neg\">-" + fmt(v.valor) + "</td>" +
         "</tr>";
     });
 
-    var blocoSalao = "";
+    // Bloco de resultado final (diferente entre visoes)
+    var blocoResultado;
     if (visaoSalao) {
-      blocoSalao = "<h3>&#128176; Resultado do Salao (interno)</h3>" +
-        "<table class=\"resumo\">" +
-        "<tr><td>Faturamento bruto</td><td class=\"r\">" + fmt(totalBruto) + "</td></tr>" +
-        "<tr><td>(-) Comissao servicos (profissional)</td><td class=\"r\">" + fmt(f.totalComissaoServicos) + "</td></tr>" +
-        "<tr><td>(-) Comissao produtos (profissional)</td><td class=\"r\">" + fmt(f.totalComissaoProdutos) + "</td></tr>" +
-        "<tr><td>(-) Custo operacional</td><td class=\"r\">" + fmt(f.totalCustoOperacionalServicos) + "</td></tr>" +
-        "<tr><td>(-) Custo produtos usados</td><td class=\"r\">" + fmt(f.totalCustoProdutosUsados) + "</td></tr>" +
-        "<tr><td>(-) Taxas maquininha</td><td class=\"r\">" + fmt(f.totalTaxasMaquininha) + "</td></tr>" +
-        "<tr class=\"tot\"><td><b>LUCRO DO SALAO</b></td><td class=\"r\"><b>" + fmt(totalLucro) + "</b></td></tr>" +
-        "<tr><td>Margem</td><td class=\"r\">" + margemPct.toFixed(2).replace(".", ",") + "%</td></tr>" +
-        "</table>";
+      blocoResultado = "<div class=\"destaque\" style=\"background:" + corPrincipal + ";\">" +
+        "<div style=\"font-size:12px;opacity:0.85;\">&#128176; LUCRO DO SALAO NO MES</div>" +
+        "<div style=\"font-size:32px;font-weight:700;margin-top:4px;\">" + fmt(totalLucro) + "</div>" +
+        "<div style=\"font-size:13px;opacity:0.85;margin-top:6px;\">Faturamento bruto: " + fmt(totalBruto) + " &middot; Margem: " + margemPct.toFixed(2).replace(".", ",") + "%</div>" +
+        "</div>";
+    } else {
+      blocoResultado = "<div class=\"destaque\" style=\"background:" + corPrincipal + ";\">" +
+        "<div style=\"font-size:12px;opacity:0.85;\">&#128176; VALOR A RECEBER</div>" +
+        "<div style=\"font-size:32px;font-weight:700;margin-top:4px;\">" + fmt(f.valorLiquido) + "</div>" +
+        "<div style=\"font-size:13px;opacity:0.85;margin-top:6px;\">Comissoes: " + fmt(totLiqProf) + " &middot; Vales: -" + fmt(f.totalVales) + "</div>" +
+        "</div>";
     }
 
-    var titulo = visaoSalao ? "Fechamento (Visao Salao)" : "Fechamento (Profissional)";
     var dataFechada = f.fechadoEm ? new Date(f.fechadoEm).toLocaleDateString("pt-BR") : "-";
+    var titulo = tituloTipo + " - " + esc(nomeProf) + " - " + mesNome + "/" + f.ano;
 
     var w = window.open("", "_blank");
-    var htmlDoc = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>" + titulo + " - " + esc(nomeProf) + " - " + mesNome + "/" + f.ano + "</title>" +
+    var htmlDoc = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>" + titulo + "</title>" +
       "<style>" +
-        "body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;color:#111;}" +
-        "h1{color:#7c3aed;border-bottom:2px solid #7c3aed;padding-bottom:8px;margin:0 0 6px;}" +
+        "body{font-family:Arial,sans-serif;padding:20px;max-width:1100px;margin:0 auto;color:#111;}" +
+        "h1{color:" + corPrincipal + ";border-bottom:3px solid " + corPrincipal + ";padding-bottom:8px;margin:0 0 6px;}" +
         "h3{color:#334155;margin-top:24px;border-bottom:1px solid #cbd5e1;padding-bottom:4px;}" +
+        ".tipo{background:" + corSecundaria + ";color:" + corPrincipal + ";padding:6px 12px;border-radius:6px;display:inline-block;font-weight:700;font-size:12px;margin-bottom:8px;}" +
         ".header{margin-bottom:20px;}" +
         "table{width:100%;border-collapse:collapse;margin-top:6px;}" +
-        "table.resumo td{padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:14px;}" +
-        "table.resumo tr.tot td{border-top:2px solid #333;border-bottom:none;font-size:16px;background:#f8fafc;}" +
-        "table.ats th, table.ats td{padding:6px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left;}" +
-        "table.ats th{background:#f1f5f9;}" +
+        "table.ats th, table.ats td{padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:left;vertical-align:top;}" +
+        "table.ats th{background:#f1f5f9;color:#334155;font-weight:700;}" +
+        "table.ats tr.tot td{background:" + corSecundaria + ";border-top:2px solid " + corPrincipal + ";border-bottom:2px solid " + corPrincipal + ";font-size:13px;}" +
+        "table.vales td{padding:6px;border-bottom:1px solid #e2e8f0;font-size:12px;}" +
         ".r{text-align:right;}" +
-        ".destaque{background:#7c3aed;color:#fff;padding:14px;border-radius:8px;margin:20px 0;font-size:18px;text-align:center;}" +
+        ".pos{color:#166534;}" +
+        ".neg{color:#b91c1c;}" +
+        ".liq{color:" + corPrincipal + ";font-weight:700;}" +
+        ".destaque{color:#fff;padding:18px;border-radius:10px;margin:20px 0;text-align:center;}" +
         ".footer{margin-top:30px;font-size:11px;color:#64748b;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px;}" +
-        "@media print { .no-print{display:none;} body{padding:8px;} }" +
+        "@media print { .no-print{display:none;} body{padding:8px;} table.ats th, table.ats td{font-size:10px;} }" +
       "</style>" +
       "</head><body>" +
       "<div class=\"no-print\" style=\"text-align:right;margin-bottom:8px;\">" +
-        "<button onclick=\"window.print()\" style=\"padding:8px 16px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;\">&#128424; Imprimir</button> " +
+        "<button onclick=\"window.print()\" style=\"padding:8px 16px;background:" + corPrincipal + ";color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;\">&#128424; Imprimir</button> " +
         "<button onclick=\"window.close()\" style=\"padding:8px 16px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;\">Fechar</button>" +
       "</div>" +
       "<div class=\"header\">" +
-        "<h1>&#128202; Fechamento Mensal - " + mesNome + " " + f.ano + "</h1>" +
+        "<div class=\"tipo\">" + iconeTipo + " " + tituloTipo + "</div>" +
+        "<h1>Fechamento Mensal - " + mesNome + " " + f.ano + "</h1>" +
         "<div style=\"font-size:15px;margin-top:6px;\"><b>" + esc(nomeProf) + "</b>" + pix + "</div>" +
-        "<div style=\"font-size:12px;color:#64748b;\">Status: " + String(f.status).toUpperCase() + " &middot; Fechado em " + dataFechada + "</div>" +
+        "<div style=\"font-size:12px;color:#64748b;margin-top:2px;\">" + subtituloTipo + "</div>" +
+        "<div style=\"font-size:11px;color:#64748b;margin-top:2px;\">Status: " + String(f.status).toUpperCase() + " &middot; Fechado em " + dataFechada + "</div>" +
       "</div>" +
-      "<div class=\"destaque\">" +
-        "<div style=\"font-size:12px;opacity:0.85;\">VALOR A RECEBER (PROFISSIONAL)</div>" +
-        "<div style=\"font-size:32px;font-weight:700;margin-top:4px;\">" + fmt(f.valorLiquido) + "</div>" +
-      "</div>" +
-      "<h3>&#128203; Resumo</h3>" +
-      "<table class=\"resumo\">" +
-        "<tr><td>Qtd atendimentos</td><td class=\"r\">" + f.qtdAtendimentos + "</td></tr>" +
-        "<tr><td>Servicos (bruto)</td><td class=\"r\">" + fmt(f.totalServicos) + "</td></tr>" +
-        "<tr><td>+ Comissao servicos</td><td class=\"r\">" + fmt(f.totalComissaoServicos) + "</td></tr>" +
-        "<tr><td>+ Comissao produtos</td><td class=\"r\">" + fmt(f.totalComissaoProdutos) + "</td></tr>" +
-        "<tr><td>- Taxa espaco (dona)</td><td class=\"r\">" + fmt(f.totalTaxaEspaco) + "</td></tr>" +
-        "<tr><td>- Custo operacional</td><td class=\"r\">" + fmt(f.totalCustoOperacionalServicos) + "</td></tr>" +
-        "<tr><td>- Custo produtos usados</td><td class=\"r\">" + fmt(f.totalCustoProdutosUsados) + "</td></tr>" +
-        "<tr><td>- Taxas maquininha</td><td class=\"r\">" + fmt(f.totalTaxasMaquininha) + "</td></tr>" +
-        "<tr><td>- Vales adiantados</td><td class=\"r\">" + fmt(f.totalVales) + "</td></tr>" +
-        "<tr class=\"tot\"><td><b>VALOR LIQUIDO A RECEBER</b></td><td class=\"r\"><b>" + fmt(f.valorLiquido) + "</b></td></tr>" +
-      "</table>" +
-      blocoSalao +
+      blocoResultado +
       "<h3>&#128203; Atendimentos (" + f.qtdAtendimentos + ")</h3>" +
-      "<table class=\"ats\">" +
-        "<thead><tr><th>Data</th><th>Cliente / Servicos</th><th class=\"r\">Bruto</th><th class=\"r\">Com. Prod</th><th class=\"r\">Liquido</th></tr></thead>" +
-        "<tbody>" + atsHtml + "</tbody>" +
-      "</table>" +
-      (valesHtml ? ("<h3>&#128181; Vales adiantados</h3><table class=\"ats\"><thead><tr><th>Data</th><th>Observacao</th><th class=\"r\">Valor</th></tr></thead><tbody>" + valesHtml + "</tbody></table>") : "") +
+      "<table class=\"ats\">" + thead + "<tbody>" + (atsHtml || "<tr><td colspan=\"10\" style=\"text-align:center;color:#94a3b8;padding:12px;\">Nenhum atendimento.</td></tr>") + totLinha + "</tbody></table>" +
+      (valesHtml && !visaoSalao ? ("<h3>&#128181; Vales adiantados</h3><table class=\"vales\"><thead><tr><th>Data</th><th>Observacao</th><th class=\"r\">Valor</th></tr></thead><tbody>" + valesHtml + "<tr class=\"tot\"><td colspan=\"2\"><b>TOTAL VALES</b></td><td class=\"r neg\"><b>-" + fmt(f.totalVales) + "</b></td></tr></tbody></table>") : "") +
       "<div class=\"footer\">Emitido em " + new Date().toLocaleString("pt-BR") + " &middot; GL Sistema de Vendas</div>" +
       "</body></html>";
 
@@ -19658,7 +19744,7 @@ ${conteudo}
     setTimeout(function(){ try { w.focus(); } catch(e){} }, 100);
   }
 
-  function fechRenderContent(p, calc, jaFechado, fech) {
+    function fechRenderContent(p, calc, jaFechado, fech) {
     const nomeMes = FECH_MESES[_fechMes - 1];
     const atsHtml = (calc.atendimentos || []).map(a => {
       const servs = (a.servicos || []).map(s => s.nome).join(', ');
