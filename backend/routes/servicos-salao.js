@@ -1,5 +1,6 @@
 // ============================================
 // SERVIÇOS DO SALÃO (catálogo)
+// v55: + custo_operacional, comissao_padrao_pct, comissao_padrao_valor
 // ============================================
 
 const express = require('express');
@@ -75,13 +76,17 @@ router.get('/:id', async (req, res) => {
 // ==========================================
 router.post('/', async (req, res) => {
   try {
-    const { nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo } = req.body;
+    const {
+      nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo,
+      custoOperacional, comissaoPadraoPct, comissaoPadraoValor
+    } = req.body;
     if (!nome || !nome.trim()) return res.status(400).json({ error: 'Nome é obrigatório.' });
 
     const r = await db.query(
       `INSERT INTO servicos_salao
-        (empresa_id, nome, preco_padrao, duracao_padrao_min, produtos_receita, categoria, ativo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        (empresa_id, nome, preco_padrao, duracao_padrao_min, produtos_receita, categoria, ativo,
+         custo_operacional, comissao_padrao_pct, comissao_padrao_valor)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         req.user.empresaId,
         nome.trim(),
@@ -89,7 +94,10 @@ router.post('/', async (req, res) => {
         duracaoPadraoMin ? Number(duracaoPadraoMin) : null,
         JSON.stringify(produtosReceita || []),
         categoria || null,
-        ativo === false ? false : true
+        ativo === false ? false : true,
+        Number(custoOperacional) || 0,
+        Number(comissaoPadraoPct) || 0,
+        Number(comissaoPadraoValor) || 0
       ]
     );
     const s = r.rows[0];
@@ -108,14 +116,18 @@ router.put('/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido.' });
 
-    const { nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo } = req.body;
+    const {
+      nome, precoPadrao, duracaoPadraoMin, produtosReceita, categoria, ativo,
+      custoOperacional, comissaoPadraoPct, comissaoPadraoValor
+    } = req.body;
     if (!nome || !nome.trim()) return res.status(400).json({ error: 'Nome é obrigatório.' });
 
     const r = await db.query(
       `UPDATE servicos_salao
          SET nome=$1, preco_padrao=$2, duracao_padrao_min=$3,
-             produtos_receita=$4, categoria=$5, ativo=$6
-       WHERE id=$7 AND empresa_id=$8 RETURNING *`,
+             produtos_receita=$4, categoria=$5, ativo=$6,
+             custo_operacional=$7, comissao_padrao_pct=$8, comissao_padrao_valor=$9
+       WHERE id=$10 AND empresa_id=$11 RETURNING *`,
       [
         nome.trim(),
         Number(precoPadrao) || 0,
@@ -123,6 +135,9 @@ router.put('/:id', async (req, res) => {
         JSON.stringify(produtosReceita || []),
         categoria || null,
         ativo === false ? false : true,
+        Number(custoOperacional) || 0,
+        Number(comissaoPadraoPct) || 0,
+        Number(comissaoPadraoValor) || 0,
         id,
         req.user.empresaId
       ]
