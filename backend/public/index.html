@@ -3171,6 +3171,11 @@
               <div style="font-size:11px;color:#64748b;margin-top:2px;">% do serviço que ela paga ao salão</div>
             </div>
             <div>
+              <label style="font-size:12px;color:#334155;font-weight:600;">% Comissão Serviço (que ela ganha)</label>
+              <input type="number" id="sl-prof-pct-comissao-servico" step="0.01" value="0" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">% que ela ganha em cada serviço executado</div>
+            </div>
+            <div>
               <label style="font-size:12px;color:#334155;font-weight:600;">% Comissão Produto (que ela ganha)</label>
               <input type="number" id="sl-prof-pct-comissao" step="0.01" value="0" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
               <div style="font-size:11px;color:#64748b;margin-top:2px;">% que ela ganha em produtos vendidos</div>
@@ -3259,17 +3264,18 @@
                      style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
               <div style="font-size:11px;color:#64748b;margin-top:2px;">Opcional. Ajuda no agendamento.</div>
             </div>
-            <div>
-              <label style="font-size:12px;color:#334155;font-weight:600;">Custo operacional (R$)</label>
-              <input type="number" id="sl-serv-custo-op" step="0.01" value="0" min="0"
-                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
-              <div style="font-size:11px;color:#64748b;margin-top:2px;">Energia, agua, descartaveis nao rastreados.</div>
-            </div>
-            <div>
-              <label style="font-size:12px;color:#334155;font-weight:600;">Custo operacional (%)</label>
-              <input type="number" id="sl-serv-custo-op-pct" step="0.01" value="0" min="0" max="100"
-                     style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
-              <div style="font-size:11px;color:#64748b;margin-top:2px;">% sobre o preco (ex: taxa de gateway). Soma com o R$ acima.</div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:12px;color:#334155;font-weight:600;">Custo operacional</label>
+              <div style="display:flex;gap:6px;">
+                <input type="number" id="sl-serv-custo-op-valor" step="0.01" value="0" min="0"
+                       style="flex:1;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+                <select id="sl-serv-custo-op-tipo"
+                        style="width:75px;padding:9px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;">
+                  <option value="R$">R$</option>
+                  <option value="%">%</option>
+                </select>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">Escolha R$ (fixo por atendimento) ou % (sobre o preço do serviço).</div>
             </div>
             <div style="grid-column:1/-1;">
               <label style="font-size:13px;color:#334155;display:flex;align-items:center;gap:6px;">
@@ -19980,6 +19986,7 @@ ${conteudo}
     document.getElementById('sl-prof-id').value = '';
     document.getElementById('form-sl-profissional').reset();
     document.getElementById('sl-prof-pct-espaco').value = 10;
+    document.getElementById('sl-prof-pct-comissao-servico').value = 0;
     document.getElementById('sl-prof-pct-comissao').value = 0;
     document.getElementById('sl-prof-ativo').checked = true;
     document.getElementById('modal-sl-profissional').style.display = 'flex';
@@ -19997,6 +20004,7 @@ ${conteudo}
     document.getElementById('sl-prof-pix').value = p.pix || '';
     document.getElementById('sl-prof-data-inicio').value = p.dataInicio ? String(p.dataInicio).slice(0, 10) : '';
     document.getElementById('sl-prof-pct-espaco').value = p.percentualEspaco || 0;
+    document.getElementById('sl-prof-pct-comissao-servico').value = p.percentualComissaoServico || 0;
     document.getElementById('sl-prof-pct-comissao').value = p.percentualComissaoProduto || 0;
     document.getElementById('sl-prof-obs').value = p.observacoes || '';
     document.getElementById('sl-prof-ativo').checked = !!p.ativo;
@@ -20016,6 +20024,7 @@ ${conteudo}
       pix: document.getElementById('sl-prof-pix').value.trim(),
       dataInicio: document.getElementById('sl-prof-data-inicio').value || null,
       percentualEspaco: parseFloat(document.getElementById('sl-prof-pct-espaco').value) || 0,
+      percentualComissaoServico: parseFloat(document.getElementById('sl-prof-pct-comissao-servico').value) || 0,
       percentualComissaoProduto: parseFloat(document.getElementById('sl-prof-pct-comissao').value) || 0,
       observacoes: document.getElementById('sl-prof-obs').value.trim(),
       ativo: document.getElementById('sl-prof-ativo').checked
@@ -20104,8 +20113,8 @@ ${conteudo}
     document.getElementById('sl-serv-id').value = '';
     document.getElementById('form-sl-servico').reset();
     document.getElementById('sl-serv-preco').value = 0;
-    document.getElementById('sl-serv-custo-op').value = 0;
-    document.getElementById('sl-serv-custo-op-pct').value = 0;
+    document.getElementById('sl-serv-custo-op-valor').value = 0;
+    document.getElementById('sl-serv-custo-op-tipo').value = 'R$';
     document.getElementById('sl-serv-ativo').checked = true;
     document.getElementById('modal-sl-servico').style.display = 'flex';
     setTimeout(() => document.getElementById('sl-serv-nome').focus(), 100);
@@ -20120,8 +20129,13 @@ ${conteudo}
     document.getElementById('sl-serv-categoria').value = s.categoria || '';
     document.getElementById('sl-serv-preco').value = s.precoPadrao || 0;
     document.getElementById('sl-serv-duracao').value = s.duracaoPadraoMin || '';
-    document.getElementById('sl-serv-custo-op').value = s.custoOperacional || 0;
-    document.getElementById('sl-serv-custo-op-pct').value = s.custoOperacionalPct || 0;
+    if (Number(s.custoOperacionalPct) > 0) {
+      document.getElementById('sl-serv-custo-op-valor').value = s.custoOperacionalPct;
+      document.getElementById('sl-serv-custo-op-tipo').value = '%';
+    } else {
+      document.getElementById('sl-serv-custo-op-valor').value = s.custoOperacional || 0;
+      document.getElementById('sl-serv-custo-op-tipo').value = 'R$';
+    }
     document.getElementById('sl-serv-ativo').checked = !!s.ativo;
     document.getElementById('modal-sl-servico').style.display = 'flex';
   }
@@ -20137,8 +20151,8 @@ ${conteudo}
       categoria: document.getElementById('sl-serv-categoria').value.trim(),
       precoPadrao: parseFloat(document.getElementById('sl-serv-preco').value) || 0,
       duracaoPadraoMin: parseInt(document.getElementById('sl-serv-duracao').value) || null,
-      custoOperacional: parseFloat(document.getElementById('sl-serv-custo-op').value) || 0,
-      custoOperacionalPct: parseFloat(document.getElementById('sl-serv-custo-op-pct').value) || 0,
+      custoOperacional: (document.getElementById('sl-serv-custo-op-tipo').value === 'R$') ? (parseFloat(document.getElementById('sl-serv-custo-op-valor').value) || 0) : 0,
+      custoOperacionalPct: (document.getElementById('sl-serv-custo-op-tipo').value === '%') ? (parseFloat(document.getElementById('sl-serv-custo-op-valor').value) || 0) : 0,
       ativo: document.getElementById('sl-serv-ativo').checked,
       produtosReceita: [] // por enquanto vazio; Fase 3 adicionará UI
     };
