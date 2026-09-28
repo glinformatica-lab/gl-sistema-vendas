@@ -19565,17 +19565,17 @@ ${conteudo}
       corPrincipal = "#7c3aed";
       corSecundaria = "#e0e7ff";
       tituloTipo = "RELATORIO SALAO";
-      iconeTipo = "&#127970;"; // predio
+      iconeTipo = "&#127970;";
       subtituloTipo = "Visao interna da dona (com lucro do salao)";
     } else {
       corPrincipal = "#16a34a";
       corSecundaria = "#dcfce7";
       tituloTipo = "RELATORIO PROFISSIONAL";
-      iconeTipo = "&#9986;&#65039;"; // tesoura
-      subtituloTipo = "O que voce (profissional) tem a receber";
+      iconeTipo = "&#9986;&#65039;";
+      subtituloTipo = "Detalhamento completo (que voce tem a receber)";
     }
 
-    // Monta linhas dos atendimentos
+    // Monta linhas dos atendimentos - MESMO layout pros dois
     var atsHtml = "";
     var totBrutoTab = 0, totComServ = 0, totComProd = 0, totEspaco = 0, totCustoOp = 0, totCustoProd = 0, totTaxaMaq = 0, totLiqProf = 0, totLiqSalao = 0;
 
@@ -19596,79 +19596,49 @@ ${conteudo}
        totTaxaMaq += taxaMaq; totLiqProf += liqProf; totLiqSalao += liqSalao;
 
       var dataFmt = a.data.split("-").reverse().join("/") + " " + a.hora;
+      var liqFinal = visaoSalao ? liqSalao : liqProf;
 
-      if (visaoSalao) {
-        atsHtml += "<tr>" +
-          "<td>" + dataFmt + "</td>" +
-          "<td>" + esc(a.clienteNome) + "<br><small style=\"color:#64748b;\">" + esc(servs) + "</small></td>" +
-          "<td class=\"r\">" + fmt(bruto) + "</td>" +
-          "<td class=\"r pos\">+" + fmt(espaco) + "</td>" +
-          "<td class=\"r neg\">-" + fmt(comServico) + "</td>" +
-          "<td class=\"r neg\">-" + fmt(comProduto) + "</td>" +
-          "<td class=\"r neg\">-" + fmt(custoOp) + "</td>" +
-          "<td class=\"r neg\">-" + fmt(custoProd) + "</td>" +
-          "<td class=\"r neg\">-" + fmt(taxaMaq) + "</td>" +
-          "<td class=\"r liq\">" + fmt(liqSalao) + "</td>" +
-          "</tr>";
-      } else {
-        atsHtml += "<tr>" +
-          "<td>" + dataFmt + "</td>" +
-          "<td>" + esc(a.clienteNome) + "<br><small style=\"color:#64748b;\">" + esc(servs) + "</small></td>" +
-          "<td class=\"r\">" + fmt(bruto) + "</td>" +
-          "<td class=\"r pos\">+" + fmt(comServico) + "</td>" +
-          "<td class=\"r pos\">+" + fmt(comProduto) + "</td>" +
-          "<td class=\"r liq\">" + fmt(liqProf) + "</td>" +
-          "</tr>";
-      }
+      // MESMAS COLUNAS pros dois relatorios
+      atsHtml += "<tr>" +
+        "<td>" + dataFmt + "</td>" +
+        "<td>" + esc(a.clienteNome) + "<br><small style=\"color:#64748b;\">" + esc(servs) + "</small></td>" +
+        "<td class=\"r\">" + fmt(bruto) + "</td>" +
+        "<td class=\"r neg\">-" + fmt(espaco) + "</td>" +
+        "<td class=\"r neg\">-" + fmt(custoOp) + "</td>" +
+        "<td class=\"r neg\">-" + fmt(custoProd) + "</td>" +
+        "<td class=\"r neg\">-" + fmt(taxaMaq) + "</td>" +
+        "<td class=\"r pos\">+" + fmt(comServico) + "</td>" +
+        "<td class=\"r pos\">+" + fmt(comProduto) + "</td>" +
+        "<td class=\"r liq\">" + fmt(liqFinal) + "</td>" +
+        "</tr>";
     });
 
-    // Linha de TOTAL
-    var totLinha;
-    if (visaoSalao) {
-      totLinha = "<tr class=\"tot\">" +
-        "<td colspan=\"2\"><b>TOTAL</b></td>" +
-        "<td class=\"r\"><b>" + fmt(totBrutoTab) + "</b></td>" +
-        "<td class=\"r pos\"><b>+" + fmt(totEspaco) + "</b></td>" +
-        "<td class=\"r neg\"><b>-" + fmt(totComServ) + "</b></td>" +
-        "<td class=\"r neg\"><b>-" + fmt(totComProd) + "</b></td>" +
-        "<td class=\"r neg\"><b>-" + fmt(totCustoOp) + "</b></td>" +
-        "<td class=\"r neg\"><b>-" + fmt(totCustoProd) + "</b></td>" +
-        "<td class=\"r neg\"><b>-" + fmt(totTaxaMaq) + "</b></td>" +
-        "<td class=\"r liq\"><b>" + fmt(totLiqSalao) + "</b></td>" +
-        "</tr>";
-    } else {
-      totLinha = "<tr class=\"tot\">" +
-        "<td colspan=\"2\"><b>TOTAL</b></td>" +
-        "<td class=\"r\"><b>" + fmt(totBrutoTab) + "</b></td>" +
-        "<td class=\"r pos\"><b>+" + fmt(totComServ) + "</b></td>" +
-        "<td class=\"r pos\"><b>+" + fmt(totComProd) + "</b></td>" +
-        "<td class=\"r liq\"><b>" + fmt(totLiqProf) + "</b></td>" +
-        "</tr>";
-    }
+    // Total (mesmas colunas)
+    var totFinal = visaoSalao ? totLiqSalao : totLiqProf;
+    var totLinha = "<tr class=\"tot\">" +
+      "<td colspan=\"2\"><b>TOTAL</b></td>" +
+      "<td class=\"r\"><b>" + fmt(totBrutoTab) + "</b></td>" +
+      "<td class=\"r neg\"><b>-" + fmt(totEspaco) + "</b></td>" +
+      "<td class=\"r neg\"><b>-" + fmt(totCustoOp) + "</b></td>" +
+      "<td class=\"r neg\"><b>-" + fmt(totCustoProd) + "</b></td>" +
+      "<td class=\"r neg\"><b>-" + fmt(totTaxaMaq) + "</b></td>" +
+      "<td class=\"r pos\"><b>+" + fmt(totComServ) + "</b></td>" +
+      "<td class=\"r pos\"><b>+" + fmt(totComProd) + "</b></td>" +
+      "<td class=\"r liq\"><b>" + fmt(totFinal) + "</b></td>" +
+      "</tr>";
 
-    // Cabecalhos da tabela
-    var thead;
-    if (visaoSalao) {
-      thead = "<thead><tr>" +
-        "<th>Data</th><th>Cliente / Servicos</th>" +
-        "<th class=\"r\">Bruto</th>" +
-        "<th class=\"r\">+ Espaco</th>" +
-        "<th class=\"r\">- Com. Servico</th>" +
-        "<th class=\"r\">- Com. Produto</th>" +
-        "<th class=\"r\">- Custo Op.</th>" +
-        "<th class=\"r\">- Prod. Usados</th>" +
-        "<th class=\"r\">- Taxa Maq.</th>" +
-        "<th class=\"r\">= Liquido Salao</th>" +
-        "</tr></thead>";
-    } else {
-      thead = "<thead><tr>" +
-        "<th>Data</th><th>Cliente / Servicos</th>" +
-        "<th class=\"r\">Bruto</th>" +
-        "<th class=\"r\">+ Com. Servico</th>" +
-        "<th class=\"r\">+ Com. Produto</th>" +
-        "<th class=\"r\">= Liquido</th>" +
-        "</tr></thead>";
-    }
+    // Header da tabela - mesmo pros 2
+    var thead = "<thead><tr>" +
+      "<th>Data</th><th>Cliente / Servicos</th>" +
+      "<th class=\"r\">Bruto</th>" +
+      "<th class=\"r\">- Espaco</th>" +
+      "<th class=\"r\">- Custo Op.</th>" +
+      "<th class=\"r\">- Prod. Usados</th>" +
+      "<th class=\"r\">- Taxa Maq.</th>" +
+      "<th class=\"r\">+ Com. Serv.</th>" +
+      "<th class=\"r\">+ Com. Prod.</th>" +
+      "<th class=\"r\">= " + (visaoSalao ? "Liq. Salao" : "Liq. Prof.") + "</th>" +
+      "</tr></thead>";
 
     // Vales (so aparece pro profissional)
     var valesHtml = "";
@@ -19680,7 +19650,7 @@ ${conteudo}
         "</tr>";
     });
 
-    // Bloco de resultado final (diferente entre visoes)
+    // Bloco de resultado final - diferente entre visoes
     var blocoResultado;
     if (visaoSalao) {
       blocoResultado = "<div class=\"destaque\" style=\"background:" + corPrincipal + ";\">" +
@@ -19702,7 +19672,7 @@ ${conteudo}
     var w = window.open("", "_blank");
     var htmlDoc = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>" + titulo + "</title>" +
       "<style>" +
-        "body{font-family:Arial,sans-serif;padding:20px;max-width:1100px;margin:0 auto;color:#111;}" +
+        "body{font-family:Arial,sans-serif;padding:20px;max-width:1200px;margin:0 auto;color:#111;}" +
         "h1{color:" + corPrincipal + ";border-bottom:3px solid " + corPrincipal + ";padding-bottom:8px;margin:0 0 6px;}" +
         "h3{color:#334155;margin-top:24px;border-bottom:1px solid #cbd5e1;padding-bottom:4px;}" +
         ".tipo{background:" + corSecundaria + ";color:" + corPrincipal + ";padding:6px 12px;border-radius:6px;display:inline-block;font-weight:700;font-size:12px;margin-bottom:8px;}" +
@@ -19718,7 +19688,7 @@ ${conteudo}
         ".liq{color:" + corPrincipal + ";font-weight:700;}" +
         ".destaque{color:#fff;padding:18px;border-radius:10px;margin:20px 0;text-align:center;}" +
         ".footer{margin-top:30px;font-size:11px;color:#64748b;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px;}" +
-        "@media print { .no-print{display:none;} body{padding:8px;} table.ats th, table.ats td{font-size:10px;} }" +
+        "@media print { .no-print{display:none;} body{padding:8px;} table.ats th, table.ats td{font-size:9px;padding:4px;} }" +
       "</style>" +
       "</head><body>" +
       "<div class=\"no-print\" style=\"text-align:right;margin-bottom:8px;\">" +
