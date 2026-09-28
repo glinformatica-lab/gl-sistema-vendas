@@ -19513,17 +19513,149 @@ ${conteudo}
     // Adapta pra shape do calcular
     const adaptado = {
       qtdAtendimentos: f.qtdAtendimentos,
+      totalBruto: Number(f.totalBruto || 0),
       totalServicos: Number(f.totalServicos),
       totalComissaoProdutos: Number(f.totalComissaoProdutos),
+      totalComissaoServicos: Number(f.totalComissaoServicos || 0),
       totalTaxaEspaco: Number(f.totalTaxaEspaco),
+      totalCustoOperacionalServicos: Number(f.totalCustoOperacionalServicos || 0),
+      totalCustoProdutosUsados: Number(f.totalCustoProdutosUsados || 0),
+      totalTaxasMaquininha: Number(f.totalTaxasMaquininha || 0),
+      totalLucroSalao: Number(f.totalLucroSalao || 0),
       totalVales: Number(f.totalVales),
       valorLiquido: Number(f.valorLiquido),
       atendimentos: dados.atendimentos,
-      vales: dados.vales
+      vales: dados.vales,
+      fechId: f.id
     };
     const p = { id: f.profissionalId, nome: f.profissionalNome, pix: f.profissionalPix };
     cont.innerHTML = fechRenderContent(p, adaptado, true, f);
     modal.style.display = 'flex';
+  }
+
+  // ==========================================
+  // v60: IMPRESSAO DO FECHAMENTO (2 versoes)
+  // ==========================================
+  async function fechImprimirProfissional(fechId) {
+    try {
+      const dados = await api("GET", "/api/fechamentos/" + fechId);
+      _fechImprimir(dados, false);
+    } catch (err) { alert("Erro ao imprimir: " + err.message); }
+  }
+  async function fechImprimirSalao(fechId) {
+    try {
+      const dados = await api("GET", "/api/fechamentos/" + fechId);
+      _fechImprimir(dados, true);
+    } catch (err) { alert("Erro ao imprimir: " + err.message); }
+  }
+  function _fechImprimir(dados, visaoSalao) {
+    var f = dados.fechamento;
+    var fmt = function(v) { return "R" + "$ " + Number(v || 0).toFixed(2).replace(".", ","); };
+    var esc = (typeof escapeHtml === "function") ? escapeHtml : function(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+    var mesNome = FECH_MESES[f.mes - 1];
+    var nomeProf = f.profissionalNome || "";
+    var pix = f.profissionalPix ? (" &middot; PIX: " + esc(f.profissionalPix)) : "";
+    var totalBruto = Number(f.totalBruto || 0);
+    var totalLucro = Number(f.totalLucroSalao || 0);
+    var margemPct = totalBruto > 0 ? (totalLucro / totalBruto * 100) : 0;
+
+    var atsHtml = "";
+    (dados.atendimentos || []).forEach(function(a){
+      var servs = (a.servicos || []).map(function(s){ return s.nome; }).join(", ");
+      atsHtml += "<tr>" +
+        "<td>" + a.data.split("-").reverse().join("/") + " " + a.hora + "</td>" +
+        "<td>" + esc(a.clienteNome) + "<br><small>" + esc(servs) + "</small></td>" +
+        "<td class=\"r\">" + fmt(a.subtotalServicos) + "</td>" +
+        "<td class=\"r\">" + fmt(a.valorComissaoProfissional) + "</td>" +
+        "<td class=\"r\">" + fmt(a.valorLiquidoProfissional) + "</td>" +
+        "</tr>";
+    });
+    if (!atsHtml) atsHtml = "<tr><td colspan=\"5\" style=\"text-align:center;color:#94a3b8;padding:12px;\">Nenhum atendimento.</td></tr>";
+
+    var valesHtml = "";
+    (dados.vales || []).forEach(function(v){
+      valesHtml += "<tr>" +
+        "<td>" + v.data.split("-").reverse().join("/") + "</td>" +
+        "<td>" + esc(v.observacao || "-") + "</td>" +
+        "<td class=\"r\">" + fmt(v.valor) + "</td>" +
+        "</tr>";
+    });
+
+    var blocoSalao = "";
+    if (visaoSalao) {
+      blocoSalao = "<h3>&#128176; Resultado do Salao (interno)</h3>" +
+        "<table class=\"resumo\">" +
+        "<tr><td>Faturamento bruto</td><td class=\"r\">" + fmt(totalBruto) + "</td></tr>" +
+        "<tr><td>(-) Comissao servicos (profissional)</td><td class=\"r\">" + fmt(f.totalComissaoServicos) + "</td></tr>" +
+        "<tr><td>(-) Comissao produtos (profissional)</td><td class=\"r\">" + fmt(f.totalComissaoProdutos) + "</td></tr>" +
+        "<tr><td>(-) Custo operacional</td><td class=\"r\">" + fmt(f.totalCustoOperacionalServicos) + "</td></tr>" +
+        "<tr><td>(-) Custo produtos usados</td><td class=\"r\">" + fmt(f.totalCustoProdutosUsados) + "</td></tr>" +
+        "<tr><td>(-) Taxas maquininha</td><td class=\"r\">" + fmt(f.totalTaxasMaquininha) + "</td></tr>" +
+        "<tr class=\"tot\"><td><b>LUCRO DO SALAO</b></td><td class=\"r\"><b>" + fmt(totalLucro) + "</b></td></tr>" +
+        "<tr><td>Margem</td><td class=\"r\">" + margemPct.toFixed(2).replace(".", ",") + "%</td></tr>" +
+        "</table>";
+    }
+
+    var titulo = visaoSalao ? "Fechamento (Visao Salao)" : "Fechamento (Profissional)";
+    var dataFechada = f.fechadoEm ? new Date(f.fechadoEm).toLocaleDateString("pt-BR") : "-";
+
+    var w = window.open("", "_blank");
+    var htmlDoc = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>" + titulo + " - " + esc(nomeProf) + " - " + mesNome + "/" + f.ano + "</title>" +
+      "<style>" +
+        "body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;color:#111;}" +
+        "h1{color:#7c3aed;border-bottom:2px solid #7c3aed;padding-bottom:8px;margin:0 0 6px;}" +
+        "h3{color:#334155;margin-top:24px;border-bottom:1px solid #cbd5e1;padding-bottom:4px;}" +
+        ".header{margin-bottom:20px;}" +
+        "table{width:100%;border-collapse:collapse;margin-top:6px;}" +
+        "table.resumo td{padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:14px;}" +
+        "table.resumo tr.tot td{border-top:2px solid #333;border-bottom:none;font-size:16px;background:#f8fafc;}" +
+        "table.ats th, table.ats td{padding:6px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left;}" +
+        "table.ats th{background:#f1f5f9;}" +
+        ".r{text-align:right;}" +
+        ".destaque{background:#7c3aed;color:#fff;padding:14px;border-radius:8px;margin:20px 0;font-size:18px;text-align:center;}" +
+        ".footer{margin-top:30px;font-size:11px;color:#64748b;text-align:center;border-top:1px solid #e2e8f0;padding-top:10px;}" +
+        "@media print { .no-print{display:none;} body{padding:8px;} }" +
+      "</style>" +
+      "</head><body>" +
+      "<div class=\"no-print\" style=\"text-align:right;margin-bottom:8px;\">" +
+        "<button onclick=\"window.print()\" style=\"padding:8px 16px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;\">&#128424; Imprimir</button> " +
+        "<button onclick=\"window.close()\" style=\"padding:8px 16px;background:#eceef2;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;\">Fechar</button>" +
+      "</div>" +
+      "<div class=\"header\">" +
+        "<h1>&#128202; Fechamento Mensal - " + mesNome + " " + f.ano + "</h1>" +
+        "<div style=\"font-size:15px;margin-top:6px;\"><b>" + esc(nomeProf) + "</b>" + pix + "</div>" +
+        "<div style=\"font-size:12px;color:#64748b;\">Status: " + String(f.status).toUpperCase() + " &middot; Fechado em " + dataFechada + "</div>" +
+      "</div>" +
+      "<div class=\"destaque\">" +
+        "<div style=\"font-size:12px;opacity:0.85;\">VALOR A RECEBER (PROFISSIONAL)</div>" +
+        "<div style=\"font-size:32px;font-weight:700;margin-top:4px;\">" + fmt(f.valorLiquido) + "</div>" +
+      "</div>" +
+      "<h3>&#128203; Resumo</h3>" +
+      "<table class=\"resumo\">" +
+        "<tr><td>Qtd atendimentos</td><td class=\"r\">" + f.qtdAtendimentos + "</td></tr>" +
+        "<tr><td>Servicos (bruto)</td><td class=\"r\">" + fmt(f.totalServicos) + "</td></tr>" +
+        "<tr><td>+ Comissao servicos</td><td class=\"r\">" + fmt(f.totalComissaoServicos) + "</td></tr>" +
+        "<tr><td>+ Comissao produtos</td><td class=\"r\">" + fmt(f.totalComissaoProdutos) + "</td></tr>" +
+        "<tr><td>- Taxa espaco (dona)</td><td class=\"r\">" + fmt(f.totalTaxaEspaco) + "</td></tr>" +
+        "<tr><td>- Custo operacional</td><td class=\"r\">" + fmt(f.totalCustoOperacionalServicos) + "</td></tr>" +
+        "<tr><td>- Custo produtos usados</td><td class=\"r\">" + fmt(f.totalCustoProdutosUsados) + "</td></tr>" +
+        "<tr><td>- Taxas maquininha</td><td class=\"r\">" + fmt(f.totalTaxasMaquininha) + "</td></tr>" +
+        "<tr><td>- Vales adiantados</td><td class=\"r\">" + fmt(f.totalVales) + "</td></tr>" +
+        "<tr class=\"tot\"><td><b>VALOR LIQUIDO A RECEBER</b></td><td class=\"r\"><b>" + fmt(f.valorLiquido) + "</b></td></tr>" +
+      "</table>" +
+      blocoSalao +
+      "<h3>&#128203; Atendimentos (" + f.qtdAtendimentos + ")</h3>" +
+      "<table class=\"ats\">" +
+        "<thead><tr><th>Data</th><th>Cliente / Servicos</th><th class=\"r\">Bruto</th><th class=\"r\">Com. Prod</th><th class=\"r\">Liquido</th></tr></thead>" +
+        "<tbody>" + atsHtml + "</tbody>" +
+      "</table>" +
+      (valesHtml ? ("<h3>&#128181; Vales adiantados</h3><table class=\"ats\"><thead><tr><th>Data</th><th>Observacao</th><th class=\"r\">Valor</th></tr></thead><tbody>" + valesHtml + "</tbody></table>") : "") +
+      "<div class=\"footer\">Emitido em " + new Date().toLocaleString("pt-BR") + " &middot; GL Sistema de Vendas</div>" +
+      "</body></html>";
+
+    w.document.write(htmlDoc);
+    w.document.close();
+    setTimeout(function(){ try { w.focus(); } catch(e){} }, 100);
   }
 
   function fechRenderContent(p, calc, jaFechado, fech) {
@@ -19563,13 +19695,14 @@ ${conteudo}
     let acoes = '';
     if (!jaFechado) {
       acoes = `
-        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="fech ? fechImprimirProfissional(fech.id) : window.print()" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fech ? fechImprimirSalao(fech.id) : window.print()" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>
         <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
                 style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
       `;
     } else if (fech && fech.status === 'fechado') {
       acoes = `
-        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="fechImprimirProfissional(${fech.id})" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button>
+        <button onclick="fechImprimirSalao(${fech.id})" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>
         <button onclick="fechReabrir(${fech.id})" style="padding:9px 14px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;border-radius:6px;cursor:pointer;font-weight:600;">↩️ Reabrir</button>
         <button onclick="mpAbrir(${fech.id}, '${escapeHtml(p.nome)}', ${calc.valorLiquido})"
                 style="padding:9px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;">💰 Marcar Pago</button>
@@ -19578,7 +19711,7 @@ ${conteudo}
       `;
     } else {
       acoes = `
-        <button onclick="window.print()" style="padding:9px 14px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Imprimir</button>
+        <button onclick="fech ? fechImprimirProfissional(fech.id) : window.print()" style="padding:9px 14px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Prof.</button> <button onclick="fech ? fechImprimirSalao(fech.id) : window.print()" style="padding:9px 14px;background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:6px;cursor:pointer;font-weight:600;">🖨️ Salão</button>
         <button onclick="document.getElementById('modal-sl-fechamento').style.display='none'"
                 style="padding:9px 14px;background:#eceef2;color:#334155;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Fechar</button>
       `;
@@ -19603,20 +19736,40 @@ ${conteudo}
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;">
         <div style="background:#f0fdf4;border-radius:6px;padding:10px;font-size:12px;">
-          <div style="color:#64748b;">Serviços</div>
+          <div style="color:#64748b;">Servicos (bruto)</div>
           <div style="font-weight:700;color:#166534;font-size:15px;">R$ ${calc.totalServicos.toFixed(2).replace('.', ',')}</div>
         </div>
+        <div style="background:#dcfce7;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">+ Comissao servicos</div>
+          <div style="font-weight:700;color:#166534;font-size:15px;">R$ ${(calc.totalComissaoServicos || 0).toFixed(2).replace('.', ',')}</div>
+        </div>
         <div style="background:#dbeafe;border-radius:6px;padding:10px;font-size:12px;">
-          <div style="color:#64748b;">+ Comissão produtos</div>
+          <div style="color:#64748b;">+ Comissao produtos</div>
           <div style="font-weight:700;color:#1e40af;font-size:15px;">R$ ${calc.totalComissaoProdutos.toFixed(2).replace('.', ',')}</div>
         </div>
         <div style="background:#fef2f2;border-radius:6px;padding:10px;font-size:12px;">
-          <div style="color:#64748b;">− Taxa espaço</div>
+          <div style="color:#64748b;">− Taxa espaco (dona)</div>
           <div style="font-weight:700;color:#b91c1c;font-size:15px;">R$ ${calc.totalTaxaEspaco.toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">− Custo operacional</div>
+          <div style="font-weight:700;color:#b91c1c;font-size:15px;">R$ ${(calc.totalCustoOperacionalServicos || 0).toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">− Custo prod. usados</div>
+          <div style="font-weight:700;color:#b91c1c;font-size:15px;">R$ ${(calc.totalCustoProdutosUsados || 0).toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:6px;padding:10px;font-size:12px;">
+          <div style="color:#64748b;">− Taxas maquininha</div>
+          <div style="font-weight:700;color:#b91c1c;font-size:15px;">R$ ${(calc.totalTaxasMaquininha || 0).toFixed(2).replace('.', ',')}</div>
         </div>
         <div style="background:#fef3c7;border-radius:6px;padding:10px;font-size:12px;">
           <div style="color:#64748b;">− Vales</div>
           <div style="font-weight:700;color:#92400e;font-size:15px;">R$ ${calc.totalVales.toFixed(2).replace('.', ',')}</div>
+        </div>
+        <div style="background:#eef2ff;border-radius:6px;padding:10px;font-size:12px;grid-column:span 2;">
+          <div style="color:#64748b;">💰 Lucro do salão</div>
+          <div style="font-weight:700;color:#4338ca;font-size:15px;">R$ ${(calc.totalLucroSalao || 0).toFixed(2).replace('.', ',')}</div>
         </div>
       </div>
 
