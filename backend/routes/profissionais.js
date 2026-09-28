@@ -1,13 +1,12 @@
 // ============================================
 // PROFISSIONAIS DO SALÃO (cabeleireiras parceiras)
-// Feature: só módulo salão
+// v58: + percentual_comissao_servico (% que ela ganha sobre servico)
 // ============================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Middleware: requer módulo salão ativo
 async function requerSalao(req, res, next) {
   try {
     const r = await db.query('SELECT modulo_salao FROM empresas WHERE id=$1', [req.user.empresaId]);
@@ -21,7 +20,6 @@ async function requerSalao(req, res, next) {
 }
 router.use(requerSalao);
 
-// Helper: converte snake_case do banco pra camelCase pro frontend
 function camelizar(row) {
   const out = {};
   for (const k in row) {
@@ -32,7 +30,7 @@ function camelizar(row) {
 }
 
 // ==========================================
-// GET / — Lista profissionais da empresa
+// GET /
 // ==========================================
 router.get('/', async (req, res) => {
   try {
@@ -51,7 +49,7 @@ router.get('/', async (req, res) => {
 });
 
 // ==========================================
-// GET /:id — Detalhe de uma profissional
+// GET /:id
 // ==========================================
 router.get('/:id', async (req, res) => {
   try {
@@ -70,13 +68,13 @@ router.get('/:id', async (req, res) => {
 });
 
 // ==========================================
-// POST / — Cadastrar nova profissional
+// POST /
 // ==========================================
 router.post('/', async (req, res) => {
   try {
     const {
       nome, telefone, cpf, pix, dataInicio,
-      percentualEspaco, percentualComissaoProduto,
+      percentualEspaco, percentualComissaoProduto, percentualComissaoServico,
       observacoes, ativo
     } = req.body;
 
@@ -87,8 +85,9 @@ router.post('/', async (req, res) => {
     const r = await db.query(
       `INSERT INTO profissionais
         (empresa_id, nome, telefone, cpf, pix, data_inicio,
-         percentual_espaco, percentual_comissao_produto, observacoes, ativo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         percentual_espaco, percentual_comissao_produto, percentual_comissao_servico,
+         observacoes, ativo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         req.user.empresaId,
@@ -99,6 +98,7 @@ router.post('/', async (req, res) => {
         dataInicio || null,
         Number(percentualEspaco) || 10,
         Number(percentualComissaoProduto) || 0,
+        Number(percentualComissaoServico) || 0,
         observacoes || null,
         ativo === false ? false : true
       ]
@@ -111,7 +111,7 @@ router.post('/', async (req, res) => {
 });
 
 // ==========================================
-// PUT /:id — Atualizar profissional
+// PUT /:id
 // ==========================================
 router.put('/:id', async (req, res) => {
   try {
@@ -120,7 +120,7 @@ router.put('/:id', async (req, res) => {
 
     const {
       nome, telefone, cpf, pix, dataInicio,
-      percentualEspaco, percentualComissaoProduto,
+      percentualEspaco, percentualComissaoProduto, percentualComissaoServico,
       observacoes, ativo
     } = req.body;
 
@@ -131,9 +131,9 @@ router.put('/:id', async (req, res) => {
     const r = await db.query(
       `UPDATE profissionais
          SET nome=$1, telefone=$2, cpf=$3, pix=$4, data_inicio=$5,
-             percentual_espaco=$6, percentual_comissao_produto=$7,
-             observacoes=$8, ativo=$9
-       WHERE id=$10 AND empresa_id=$11
+             percentual_espaco=$6, percentual_comissao_produto=$7, percentual_comissao_servico=$8,
+             observacoes=$9, ativo=$10
+       WHERE id=$11 AND empresa_id=$12
        RETURNING *`,
       [
         nome.trim(),
@@ -143,6 +143,7 @@ router.put('/:id', async (req, res) => {
         dataInicio || null,
         Number(percentualEspaco) || 10,
         Number(percentualComissaoProduto) || 0,
+        Number(percentualComissaoServico) || 0,
         observacoes || null,
         ativo === false ? false : true,
         id,
@@ -158,9 +159,8 @@ router.put('/:id', async (req, res) => {
 });
 
 // ==========================================
-// DELETE /:id — Inativa (soft delete)
+// DELETE /:id (soft delete)
 // ==========================================
-// Não apaga porque profissional pode ter atendimentos/vales no histórico
 router.delete('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
