@@ -160,7 +160,7 @@ router.post('/', async (req, res) => {
 
     // Busca % da profissional
     const profQ = await client.query(
-      'SELECT percentual_espaco, percentual_comissao_produto FROM profissionais WHERE id=$1 AND empresa_id=$2',
+      'SELECT percentual_espaco, percentual_comissao_produto, percentual_comissao_servico FROM profissionais WHERE id=$1 AND empresa_id=$2',
       [profissionalId, req.user.empresaId]
     );
     if (profQ.rows.length === 0) {
@@ -169,6 +169,7 @@ router.post('/', async (req, res) => {
     }
     const pctEspaco = num(profQ.rows[0].percentual_espaco);
     const pctComissaoPadrao = num(profQ.rows[0].percentual_comissao_produto);
+    const pctComissaoServico = num(profQ.rows[0].percentual_comissao_servico);
 
     // Busca taxas configuradas
     const taxasQ = await client.query(
@@ -184,9 +185,17 @@ router.post('/', async (req, res) => {
     const servicosLimpos = listaServ.map(s => ({
       servicoId: s.servicoId || null,
       nome: s.nome || '',
-      preco: round2(s.preco)
+      preco: round2(s.preco),
+      custoOperacional: round2(s.custoOperacional),
+      custoOperacionalPct: num(s.custoOperacionalPct)
     }));
     const subtotalServicos = round2(servicosLimpos.reduce((sum, s) => sum + s.preco, 0));
+    // Custo operacional total dos servicos (R$ fixo + % sobre preco)
+    const custoOperacionalServicos = round2(servicosLimpos.reduce((sum, s) => {
+      const custoFixo = num(s.custoOperacional);
+      const custoPct = num(s.custoOperacionalPct);
+      return sum + custoFixo + (s.preco * custoPct / 100);
+    }, 0));
 
     // Produtos vendidos (calcula comissão da profissional por item)
     const produtosVendidosLimpos = listaProdV.map(p => {
@@ -256,9 +265,21 @@ router.post('/', async (req, res) => {
     // Profissional ganha: serviços - taxa espaço + comissão de produtos vendidos
     // Salão fica com: taxa espaço + (produtos - comissão prof) - taxas maquininha
     // (nesta versão simples, taxa maquininha é integralmente do salão)
+    // ===== DIVISAO SALAO x PROFISSIONAL (v59: comissao sobre o LUCRO) =====
+    // 1. Custo salao = % espaco * subtotal servicos
+    // 2. Lucro servicos = subtotal - custo salao - custo operacional
+    // 3. Comissao profissional (servicos) = lucro * % comissao servico
+    // 4. Profissional recebe: comissao servicos + comissao produtos vendidos
+    // 5. Dona recebe: custo salao + (lucro - comissao) + produtos - comissao produtos - taxas - desconto
     const valorEspacoSalao = round2(subtotalServicos * pctEspaco / 100);
-    const valorLiquidoProf = round2(subtotalServicos - valorEspacoSalao + valorComissaoProf);
-    const valorLiquidoSalao = round2(valorEspacoSalao + subtotalProdutos - valorComissaoProf - totalTaxas - descontoNum);
+    const lucroServicos = round2(subtotalServicos - valorEspacoSalao - custoOperacionalServicos);
+    const valorComissaoServico = round2(lucroServicos * pctComissaoServico / 100);
+    const valorLiquidoProf = round2(valorComissaoServico + valorComissaoProf);
+    const valorLiquidoSalao = round2(
+      valorEspacoSalao + (lucroServicos - valorComissaoServico) +
+      subtotalProdutos - valorComissaoProf -
+      totalTaxas - descontoNum
+    );
 
     // ===== INSERE NO BANCO =====
 
@@ -270,12 +291,13 @@ router.post('/', async (req, res) => {
          servicos, subtotal_servicos,
          produtos_vendidos, subtotal_produtos,
          produtos_usados, custo_produtos_usados,
+         custo_operacional_servicos,
          desconto, total_bruto,
          pagamentos, total_taxas_maquininha, total_liquido,
          valor_espaco_salao, valor_comissao_profissional,
          valor_liquido_profissional, valor_liquido_salao,
          observacoes, criado_por)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
        RETURNING *`,
       [
         req.user.empresaId,
@@ -292,6 +314,7 @@ router.post('/', async (req, res) => {
         subtotalProdutos,
         JSON.stringify(produtosUsadosLimpos),
         custoProdUsados,
+        custoOperacionalServicos,
         descontoNum,
         totalBruto,
         JSON.stringify(pagamentosLimpos),

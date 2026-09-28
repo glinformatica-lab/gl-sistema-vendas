@@ -18616,7 +18616,7 @@ ${conteudo}
     const selP = document.getElementById('at-profissional');
     selP.innerHTML = '<option value="">Selecione...</option>' +
       _atProfissionais.filter(p => p.ativo).map(p =>
-        `<option value="${p.id}" data-comissao="${p.percentualComissaoProduto || 0}" data-espaco="${p.percentualEspaco || 0}">${escapeHtml(p.nome)}</option>`
+        `<option value="${p.id}" data-comissao="${p.percentualComissaoProduto || 0}" data-espaco="${p.percentualEspaco || 0}" data-comissao-servico="${p.percentualComissaoServico || 0}">${escapeHtml(p.nome)}</option>`
       ).join('');
 
     // Cliente cadastrado por padrão
@@ -18692,7 +18692,7 @@ ${conteudo}
       if (a.servicoId) {
         const serv = _atServicos.find(s => s.id === a.servicoId);
         if (serv) {
-          _atServ.push({ servicoId: serv.id, nome: serv.nome, preco: Number(serv.precoPadrao) || 0 });
+          _atServ.push({ servicoId: serv.id, nome: serv.nome, preco: Number(serv.precoPadrao) || 0, custoOperacional: Number(serv.custoOperacional) || 0, custoOperacionalPct: Number(serv.custoOperacionalPct) || 0 });
           atRenderServicos();
           atRecalcular();
         }
@@ -18751,7 +18751,7 @@ ${conteudo}
   // ---------- SERVIÇOS ----------
 
   function atAddServico() {
-    _atServ.push({ servicoId: null, nome: '', preco: 0 });
+    _atServ.push({ servicoId: null, nome: '', preco: 0, custoOperacional: 0, custoOperacionalPct: 0 });
     atRenderServicos();
   }
 
@@ -18804,6 +18804,8 @@ ${conteudo}
       _atServ[idx].servicoId = serv.id;
       _atServ[idx].nome = serv.nome;
       _atServ[idx].preco = Number(serv.precoPadrao) || 0;
+      _atServ[idx].custoOperacional = Number(serv.custoOperacional) || 0;
+      _atServ[idx].custoOperacionalPct = Number(serv.custoOperacionalPct) || 0;
     } else {
       _atServ[idx].servicoId = null;
     }
@@ -19011,8 +19013,14 @@ ${conteudo}
   // ---------- RECALCULAR ----------
 
   function atRecalcular() {
-    // Sub serviços
+    // Sub servicos
     const subServ = _atServ.reduce((s, x) => s + (Number(x.preco) || 0), 0);
+    // Custo operacional total dos servicos (R$ fixo + % sobre preco)
+    const custoOpTotal = _atServ.reduce((s, x) => {
+      const custoFixo = Number(x.custoOperacional) || 0;
+      const custoPct = Number(x.custoOperacionalPct) || 0;
+      return s + custoFixo + ((Number(x.preco) || 0) * custoPct / 100);
+    }, 0);
     // Sub produtos
     const subProd = _atProdV.reduce((s, x) => s + (Number(x.qtd) * Number(x.precoUnit)), 0);
     const desc = Number(document.getElementById('at-desconto').value) || 0;
@@ -19029,12 +19037,15 @@ ${conteudo}
     const selP = document.getElementById('at-profissional');
     const opt = selP.options[selP.selectedIndex];
     const pctEspaco = Number(opt?.dataset?.espaco) || 0;
+    const pctComissaoServico = Number(opt?.dataset?.comissaoServico) || 0;
     const valorEspaco = subServ * pctEspaco / 100;
+    const lucroServicos = subServ - valorEspaco - custoOpTotal;
+    const valorComissaoServico = lucroServicos * pctComissaoServico / 100;
     const valorComissaoProf = _atProdV.reduce((s, p) => {
       return s + (Number(p.qtd) * Number(p.precoUnit)) * (Number(p.comissaoPct) || 0) / 100;
     }, 0);
-    const valorProf = subServ - valorEspaco + valorComissaoProf;
-    const valorSal = valorEspaco + subProd - valorComissaoProf - totTax - desc;
+    const valorProf = valorComissaoServico + valorComissaoProf;
+    const valorSal = valorEspaco + (lucroServicos - valorComissaoServico) + subProd - valorComissaoProf - totTax - desc;
 
     // Atualiza tela
     document.getElementById('at-r-serv').textContent = atFmtBRL(subServ);
