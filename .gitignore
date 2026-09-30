@@ -1,0 +1,5 @@
+
+# === Adicionado em 30/09/2026: backups e scripts temporarios ===
+*.backup-*
+patch-*.js
+fix-*.js

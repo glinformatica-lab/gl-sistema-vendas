@@ -1,185 +1,330 @@
 // ============================================
-// ROTAS DO AGENT LOCAL (SQL Server no PC do cliente)
-// Autenticação: header "x-agent-token" (NÃO usa JWT do usuário)
-// Chamada apenas pelo agent Node.js instalado no PC do cliente.
+// Rotas do Agent Local do Hiper (autenticadas via x-agent-token)
+// v52 — cria + ATUALIZA cadastros + transportadoras + estoque
+// OBS: transportadoras usa `cnpj` (não `doc`) e tem endereço completo
 // ============================================
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const { pool } = require('../db');
 
-// Middleware: valida x-agent-token e injeta req.empresaId
-async function validarAgent(req, res, next) {
+// -------------------------------------------
+// Middleware de autenticação por token
+// -------------------------------------------
+router.use(async (req, res, next) => {
+  const token = req.headers['x-agent-token'];
+  if (!token) return res.status(401).json({ error: 'x-agent-token ausente' });
   try {
-    const token = req.headers['x-agent-token'];
-    if (!token) return res.status(401).json({ error: 'Token do agent obrigatório (header x-agent-token).' });
-    const r = await db.query(
-      'SELECT empresa_id FROM hiper_config WHERE token_agent=$1 AND ativo=TRUE',
+    const r = await pool.query(
+      `SELECT e.id FROM empresas e
+       INNER JOIN hiper_config hc ON hc.empresa_id = e.id
+       WHERE hc.token_agent = $1 AND hc.ativo = true`,
       [token]
     );
-    if (r.rows.length === 0) return res.status(403).json({ error: 'Token do agent inválido ou inativo.' });
-    req.empresaId = r.rows[0].empresa_id;
+    if (!r.rowCount) return res.status(401).json({ error: 'Token inválido ou módulo desativado' });
+    req.empresaId = r.rows[0].id;
     next();
-  } catch (e) {
-    res.status(500).json({ error: 'Erro: ' + e.message });
-  }
-}
-
-// GET /ping — agent testa se está tudo ok e obtém a config
-router.get('/ping', validarAgent, async (req, res) => {
-  try {
-    const r = await db.query(
-      `SELECT intervalo_sync_min, ativo, ultima_sync_clientes, ultima_sync_fornec
-       FROM hiper_config WHERE empresa_id=$1`,
-      [req.empresaId]
-    );
-    res.json({
-      ok: true,
-      empresaId: req.empresaId,
-      config: r.rows[0] || {},
-      servidor: {
-        versao: '1.0.0',
-        agora: new Date().toISOString()
-      }
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Erro: ' + e.message });
+  } catch (err) {
+    console.error('[hiper-agent] auth error:', err.message);
+    res.status(500).json({ error: 'Erro de autenticação' });
   }
 });
 
-// POST /upload — recebe dados do SQL local
-// Body: { tipo: 'clientes'|'fornecedores', dados: [...] }
-router.post('/upload', validarAgent, async (req, res) => {
-  const inicio = Date.now();
-  try {
-    const { tipo, dados } = req.body || {};
-    if (!['clientes', 'fornecedores'].includes(tipo)) {
-      return res.status(400).json({ error: 'Tipo inválido. Aceito: clientes | fornecedores' });
-    }
-    if (!Array.isArray(dados)) {
-      return res.status(400).json({ error: 'dados deve ser array' });
-    }
-
-    // FASE 1: só loga. Upsert real virá quando você me mandar schema do SQL local Hiper.
-    // Isso já valida a arquitetura ponta-a-ponta (agent → nuvem) sem risco de gravar
-    // dado errado no banco antes de conhecer o formato real.
-    await db.query(
-      `INSERT INTO hiper_log_sync
-       (empresa_id, tipo, fonte, status, qtd_criados, duracao_ms, mensagem)
-       VALUES ($1, $2, 'sql_local', 'ok', $3, $4, $5)`,
-      [
-        req.empresaId,
-        tipo,
-        dados.length,
-        Date.now() - inicio,
-        `Agent enviou ${dados.length} registros de ${tipo} (FASE 1: só log, upsert virá com schema)`
-      ]
-    );
-
-    res.json({
-      ok: true,
-      recebidos: dados.length,
-      mensagem: 'Dados recebidos. Upsert real será feito quando o schema do Hiper for mapeado (Fase 2).'
-    });
-  } catch (e) {
-    await db.query(
-      `INSERT INTO hiper_log_sync
-       (empresa_id, tipo, fonte, status, qtd_erros, duracao_ms, mensagem)
-       VALUES ($1, $2, 'sql_local', 'erro', 1, $3, $4)`,
-      [req.empresaId, req.body?.tipo || 'desconhecido', Date.now() - inicio, e.message]
-    ).catch(() => {});
-    res.status(500).json({ error: 'Erro: ' + e.message });
-  }
+// -------------------------------------------
+// GET /ping — teste de conexão
+// -------------------------------------------
+router.get('/ping', (req, res) => {
+  res.json({ ok: true, empresaId: req.empresaId, ts: new Date().toISOString() });
 });
 
-// POST /produtos-precos — Agent envia preços do Hiper (SQL local)
-// Body: { produtos: [{ codigo: "5476", precoHiper: 130.50 }, ...] }
-// Match: produtos.codigo = codigo do Hiper (mesma empresa)
-// Só ATUALIZA o preco_hiper — nunca cria produto (produto é cadastrado no GL)
-router.post('/produtos-precos', validarAgent, async (req, res) => {
-  const inicio = Date.now();
-  try {
-    const { produtos } = req.body || {};
-    if (!Array.isArray(produtos)) {
-      return res.status(400).json({ error: 'Body inválido. Esperado: { produtos: [{codigo, precoHiper}] }' });
-    }
+// -------------------------------------------
+// POST /produtos-completos
+// Cria produtos novos e ATUALIZA existentes (nome, ncm, custo, peso)
+// NUNCA sobrescreve preço de venda (esse é o preço fiscal do GL)
+// SEMPRE atualiza preco_hiper (informativo)
+// -------------------------------------------
+router.post('/produtos-completos', async (req, res) => {
+  const { produtos = [] } = req.body || {};
+  const empresaId = req.empresaId;
+  let criados = 0, atualizados = 0, erros = 0;
+  const errosDetalhes = [];
 
-    let atualizados = 0;
-    let ignorados = 0;   // produto não existe no GL (não cadastrado ainda)
-    let erros = 0;
-    const naoEncontrados = [];
-
-    for (const p of produtos) {
-      try {
-        const codigo = String(p.codigo || '').trim();
-        const preco = Number(p.precoHiper);
-        if (!codigo || !(preco >= 0)) { erros++; continue; }
-        const r = await db.query(
-          `UPDATE produtos
-             SET preco_hiper = $1, preco_hiper_sync_em = NOW()
-           WHERE empresa_id = $2 AND codigo = $3`,
-          [preco, req.empresaId, codigo]
-        );
-        if (r.rowCount > 0) {
-          atualizados++;
-        } else {
-          ignorados++;
-          if (naoEncontrados.length < 20) naoEncontrados.push(codigo);
-        }
-      } catch (e) {
+  for (const p of produtos) {
+    try {
+      if (!p.codigo || !p.nome) {
         erros++;
+        errosDetalhes.push({ codigo: p.codigo, err: 'codigo ou nome faltando' });
+        continue;
       }
+      const codigo = String(p.codigo);
+      const precoCusto = Number(p.precoCusto) || 0;
+      const precoVenda = Number(p.precoVenda) || 0;
+      const peso = Number(p.peso) || 0;
+      const precoHiper = precoVenda;
+
+      const existe = await pool.query(
+        'SELECT id FROM produtos WHERE empresa_id=$1 AND codigo=$2',
+        [empresaId, codigo]
+      );
+
+      if (existe.rowCount) {
+        // UPDATE (menos preco_venda que fica intacto no GL)
+        await pool.query(`
+          UPDATE produtos SET
+            nome            = $2,
+            ncm             = COALESCE(NULLIF($3,''), ncm),
+            preco_custo     = $4,
+            preco_hiper     = $5,
+            preco_hiper_sync_em = NOW()
+          WHERE empresa_id  = $1 AND codigo = $6
+        `, [empresaId, p.nome, p.ncm || '', precoCusto, precoHiper, codigo]);
+        atualizados++;
+      } else {
+        // INSERT (primeiro sync — usa preço Hiper como preço venda inicial)
+        await pool.query(`
+          INSERT INTO produtos
+            (empresa_id, codigo, nome, ncm, preco_custo, preco_venda, preco_hiper, preco_hiper_sync_em)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `, [empresaId, codigo, p.nome, p.ncm || null, precoCusto, precoVenda, precoHiper]);
+        criados++;
+      }
+    } catch (err) {
+      erros++;
+      errosDetalhes.push({ codigo: p.codigo, err: err.message });
     }
-
-    await db.query(
-      `INSERT INTO hiper_log_sync
-       (empresa_id, tipo, fonte, status, qtd_atualizados, qtd_erros, duracao_ms, mensagem)
-       VALUES ($1, 'produtos_precos', 'sql_local', $2, $3, $4, $5, $6)`,
-      [
-        req.empresaId,
-        erros === 0 ? 'ok' : 'parcial',
-        atualizados, erros,
-        Date.now() - inicio,
-        `${produtos.length} recebidos, ${atualizados} atualizados, ${ignorados} ignorados (código não existe no GL), ${erros} erros`
-        + (naoEncontrados.length > 0 ? ` · não encontrados: ${naoEncontrados.slice(0, 10).join(', ')}${naoEncontrados.length > 10 ? '...' : ''}` : '')
-      ]
-    );
-
-    res.json({
-      ok: true,
-      recebidos: produtos.length,
-      atualizados, ignorados, erros,
-      naoEncontrados: naoEncontrados.slice(0, 10)
-    });
-  } catch (e) {
-    console.error('[integra-hiper-agent] produtos-precos:', e);
-    await db.query(
-      `INSERT INTO hiper_log_sync
-       (empresa_id, tipo, fonte, status, qtd_erros, duracao_ms, mensagem)
-       VALUES ($1, 'produtos_precos', 'sql_local', 'erro', 1, $2, $3)`,
-      [req.empresaId, Date.now() - inicio, e.message]
-    ).catch(() => {});
-    res.status(500).json({ error: 'Erro: ' + e.message });
   }
+
+  // Registra no log
+  try {
+    await pool.query(
+      `INSERT INTO hiper_log_sync (empresa_id, tipo, fonte, status, qtd_criados, qtd_atualizados, qtd_erros, mensagem, executado_em)
+       VALUES ($1, 'produtos', 'agent', $2, $3, $4, $5, $6, NOW())`,
+      [empresaId, erros === 0 ? 'ok' : 'erro', criados, atualizados, erros,
+       `${criados} criados, ${atualizados} atualizados, ${erros} erros`]
+    );
+  } catch (logErr) { console.error('[hiper-agent] log produtos:', logErr.message); }
+
+  res.json({ criados, atualizados, erros, errosDetalhes: errosDetalhes.slice(0, 20) });
 });
 
-// POST /schema — agent envia o schema descoberto do SQL local
-// Útil pra você descobrir os nomes das tabelas de clientes/fornecedores
-router.post('/schema', validarAgent, async (req, res) => {
-  try {
-    const { tabelas } = req.body || {};
-    if (!Array.isArray(tabelas)) {
-      return res.status(400).json({ error: 'tabelas deve ser array' });
+// -------------------------------------------
+// POST /entidades-completas
+// Cria + ATUALIZA clientes, fornecedores e transportadoras
+// -------------------------------------------
+router.post('/entidades-completas', async (req, res) => {
+  const { entidades = [] } = req.body || {};
+  const empresaId = req.empresaId;
+  const stats = {
+    clientesCriados: 0, clientesAtualizados: 0,
+    fornecedoresCriados: 0, fornecedoresAtualizados: 0,
+    transportadorasCriadas: 0, transportadorasAtualizadas: 0,
+    erros: 0,
+    errosDetalhes: []
+  };
+
+  // Helper: acha id na tabela por hiper_id_entidade OU por documento
+  async function acharExistente(tabela, colDoc, empresaId, hiperId, doc) {
+    // 1) prioridade: match por hiper_id_entidade
+    if (hiperId) {
+      const r = await pool.query(
+        `SELECT id FROM ${tabela} WHERE empresa_id=$1 AND hiper_id_entidade=$2`,
+        [empresaId, hiperId]
+      );
+      if (r.rowCount) return r.rows[0].id;
     }
-    await db.query(
-      `INSERT INTO hiper_log_sync
-       (empresa_id, tipo, fonte, status, mensagem)
-       VALUES ($1, 'schema_discovery', 'sql_local', 'ok', $2)`,
-      [req.empresaId, JSON.stringify(tabelas).slice(0, 4000)]
-    );
-    res.json({ ok: true, tabelasRecebidas: tabelas.length });
-  } catch (e) {
-    res.status(500).json({ error: 'Erro: ' + e.message });
+    // 2) fallback: match por documento (registros antigos sem hiper_id preenchido)
+    if (doc) {
+      const r = await pool.query(
+        `SELECT id FROM ${tabela} WHERE empresa_id=$1 AND ${colDoc}=$2 AND (hiper_id_entidade IS NULL OR hiper_id_entidade=$3)`,
+        [empresaId, doc, hiperId || null]
+      );
+      if (r.rowCount) return r.rows[0].id;
+    }
+    return null;
   }
+
+  for (const e of entidades) {
+    try {
+      if (!e.nome) {
+        stats.erros++;
+        stats.errosDetalhes.push({ nome: '(sem nome)', err: 'nome faltando' });
+        continue;
+      }
+      const doc = e.doc ? String(e.doc).replace(/\D/g, '') : null;
+      const hiperId = e.hiperId ? parseInt(e.hiperId) : null;
+
+      // Precisa ter pelo menos hiperId OU doc pra fazer match confiável
+      if (!hiperId && !doc) continue;
+
+      // -------- CLIENTE --------
+      if (e.eCliente) {
+        const id = await acharExistente('clientes', 'doc', empresaId, hiperId, doc);
+        if (id) {
+          await pool.query(`
+            UPDATE clientes SET
+              nome                = $2,
+              doc                 = COALESCE(NULLIF($3,''), doc),
+              telefone            = COALESCE(NULLIF($4,''), telefone),
+              cep                 = COALESCE(NULLIF($5,''), cep),
+              endereco            = COALESCE(NULLIF($6,''), endereco),
+              bairro              = COALESCE(NULLIF($7,''), bairro),
+              cidade              = COALESCE(NULLIF($8,''), cidade),
+              uf                  = COALESCE(NULLIF($9,''), uf),
+              e_tambem_fornecedor = $10,
+              hiper_id_entidade   = COALESCE(hiper_id_entidade, $11)
+            WHERE id = $1
+          `, [id, e.nome, doc || '', e.telefone || '', e.cep || '', e.endereco || '',
+              e.bairro || '', e.cidade || '', e.uf || '', !!e.eFornecedor, hiperId]);
+          stats.clientesAtualizados++;
+        } else {
+          await pool.query(`
+            INSERT INTO clientes
+              (empresa_id, nome, doc, telefone, cep, endereco, bairro, cidade, uf, e_tambem_fornecedor, hiper_id_entidade)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `, [empresaId, e.nome, doc || null, e.telefone || null, e.cep || null,
+              e.endereco || null, e.bairro || null, e.cidade || null, e.uf || null,
+              !!e.eFornecedor, hiperId]);
+          stats.clientesCriados++;
+        }
+      }
+
+      // -------- FORNECEDOR --------
+      if (e.eFornecedor) {
+        const id = await acharExistente('fornecedores', 'doc', empresaId, hiperId, doc);
+        if (id) {
+          await pool.query(`
+            UPDATE fornecedores SET
+              nome               = $2,
+              doc                = COALESCE(NULLIF($3,''), doc),
+              telefone           = COALESCE(NULLIF($4,''), telefone),
+              cidade             = COALESCE(NULLIF($5,''), cidade),
+              email              = COALESCE(NULLIF($6,''), email),
+              inscricao_estadual = COALESCE(NULLIF($7,''), inscricao_estadual),
+              hiper_id_entidade  = COALESCE(hiper_id_entidade, $8)
+            WHERE id = $1
+          `, [id, e.nome, doc || '', e.telefone || '', e.cidade || '',
+              e.email || '', e.inscricaoEstadual || '', hiperId]);
+          stats.fornecedoresAtualizados++;
+        } else {
+          await pool.query(`
+            INSERT INTO fornecedores
+              (empresa_id, nome, doc, telefone, cidade, email, inscricao_estadual, hiper_id_entidade)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `, [empresaId, e.nome, doc || null, e.telefone || null, e.cidade || null,
+              e.email || null, e.inscricaoEstadual || null, hiperId]);
+          stats.fornecedoresCriados++;
+        }
+      }
+
+      // -------- TRANSPORTADORA --------
+      if (e.eTransportadora) {
+        const id = await acharExistente('transportadoras', 'cnpj', empresaId, hiperId, doc);
+        if (id) {
+          await pool.query(`
+            UPDATE transportadoras SET
+              nome               = $2,
+              cnpj               = COALESCE(NULLIF($3,''), cnpj),
+              telefone           = COALESCE(NULLIF($4,''), telefone),
+              email              = COALESCE(NULLIF($5,''), email),
+              endereco           = COALESCE(NULLIF($6,''), endereco),
+              bairro             = COALESCE(NULLIF($7,''), bairro),
+              cidade             = COALESCE(NULLIF($8,''), cidade),
+              uf                 = COALESCE(NULLIF($9,''), uf),
+              cep                = COALESCE(NULLIF($10,''), cep),
+              inscricao_estadual = COALESCE(NULLIF($11,''), inscricao_estadual),
+              hiper_id_entidade  = COALESCE(hiper_id_entidade, $12),
+              atualizado_em      = NOW()
+            WHERE id = $1
+          `, [id, e.nome, doc || '', e.telefone || '', e.email || '',
+              e.endereco || '', e.bairro || '', e.cidade || '', e.uf || '',
+              e.cep || '', e.inscricaoEstadual || '', hiperId]);
+          stats.transportadorasAtualizadas++;
+        } else {
+          await pool.query(`
+            INSERT INTO transportadoras
+              (empresa_id, nome, cnpj, telefone, email, endereco, bairro, cidade, uf, cep, inscricao_estadual, hiper_id_entidade, ativo)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true)
+          `, [empresaId, e.nome, doc || null, e.telefone || null, e.email || null,
+              e.endereco || null, e.bairro || null, e.cidade || null,
+              e.uf || null, e.cep || null, e.inscricaoEstadual || null, hiperId]);
+          stats.transportadorasCriadas++;
+        }
+      }
+    } catch (err) {
+      stats.erros++;
+      stats.errosDetalhes.push({ nome: e.nome, err: err.message });
+    }
+  }
+
+  // Registra no log
+  const msg =
+    `Cli: ${stats.clientesCriados}c/${stats.clientesAtualizados}u, ` +
+    `Forn: ${stats.fornecedoresCriados}c/${stats.fornecedoresAtualizados}u, ` +
+    `Transp: ${stats.transportadorasCriadas}c/${stats.transportadorasAtualizadas}u, ` +
+    `Err: ${stats.erros}`;
+  const totalCriados = stats.clientesCriados + stats.fornecedoresCriados + stats.transportadorasCriadas;
+  const totalAtualizados = stats.clientesAtualizados + stats.fornecedoresAtualizados + stats.transportadorasAtualizadas;
+  try {
+    await pool.query(
+      `INSERT INTO hiper_log_sync (empresa_id, tipo, fonte, status, qtd_criados, qtd_atualizados, qtd_erros, mensagem, executado_em)
+       VALUES ($1, 'entidades', 'agent', $2, $3, $4, $5, $6, NOW())`,
+      [empresaId, stats.erros === 0 ? 'ok' : 'erro', totalCriados, totalAtualizados, stats.erros, msg]
+    );
+  } catch (logErr) { console.error('[hiper-agent] log entidades:', logErr.message); }
+
+  stats.errosDetalhes = stats.errosDetalhes.slice(0, 20);
+  res.json(stats);
+});
+
+// -------------------------------------------
+// POST /estoque
+// Recebe [{codigo, quantidade}] e atualiza SOMENTE estoque_hiper
+// -------------------------------------------
+router.post('/estoque', async (req, res) => {
+  const { estoque = [] } = req.body || {};
+  const empresaId = req.empresaId;
+  let atualizados = 0, ignorados = 0;
+
+  for (const item of estoque) {
+    try {
+      const codigo = String(item.codigo);
+      const qtd = Number(item.quantidade) || 0;
+      const r = await pool.query(`
+        UPDATE produtos
+        SET estoque_hiper = $1, estoque_hiper_sync_em = NOW()
+        WHERE empresa_id = $2 AND codigo = $3
+      `, [qtd, empresaId, codigo]);
+      if (r.rowCount) atualizados++;
+      else ignorados++;
+    } catch (err) {
+      ignorados++;
+    }
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO hiper_log_sync (empresa_id, tipo, fonte, status, qtd_criados, qtd_atualizados, qtd_erros, mensagem, executado_em)
+       VALUES ($1, 'estoque', 'agent', 'ok', 0, $2, $3, $4, NOW())`,
+      [empresaId, atualizados, ignorados, `${atualizados} atualizados, ${ignorados} sem match`]
+    );
+  } catch (logErr) { console.error('[hiper-agent] log estoque:', logErr.message); }
+
+  res.json({ atualizados, ignorados });
+});
+
+// -------------------------------------------
+// POST /schema — recebe schema descoberto pelo agent (opcional)
+// -------------------------------------------
+router.post('/schema', async (req, res) => {
+  console.log(`[hiper-agent] schema recebido de empresa ${req.empresaId}`);
+  res.json({ ok: true });
+});
+
+// -------------------------------------------
+// POST /upload — legado (compatibilidade)
+// -------------------------------------------
+router.post('/upload', async (req, res) => {
+  res.json({ ok: true, note: 'Use /produtos-completos, /entidades-completas ou /estoque' });
 });
 
 module.exports = router;
