@@ -30,10 +30,46 @@ router.use(async (req, res, next) => {
 });
 
 // -------------------------------------------
-// GET /ping — teste de conexão
+// GET /ping — teste de conexao + sinaliza forcar sync
 // -------------------------------------------
-router.get('/ping', (req, res) => {
-  res.json({ ok: true, empresaId: req.empresaId, ts: new Date().toISOString() });
+router.get('/ping', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE hiper_config SET ultimo_ping_agent = NOW() WHERE empresa_id = $1',
+      [req.empresaId]
+    );
+    const r = await pool.query(
+      `SELECT forcar_sync_em FROM hiper_config
+       WHERE empresa_id = $1
+         AND forcar_sync_em IS NOT NULL
+         AND forcar_sync_em > NOW() - INTERVAL '1 hour'`,
+      [req.empresaId]
+    );
+    res.json({
+      ok: true,
+      empresaId: req.empresaId,
+      ts: new Date().toISOString(),
+      forcarSync: r.rowCount > 0
+    });
+  } catch (err) {
+    console.error('[hiper-agent] ping error:', err.message);
+    res.json({ ok: true, empresaId: req.empresaId, ts: new Date().toISOString(), forcarSync: false });
+  }
+});
+
+// -------------------------------------------
+// POST /confirmar-sync - agent limpa flag forcar_sync_em depois de rodar
+// -------------------------------------------
+router.post('/confirmar-sync', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE hiper_config SET forcar_sync_em = NULL WHERE empresa_id = $1',
+      [req.empresaId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // -------------------------------------------

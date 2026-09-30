@@ -525,4 +525,90 @@ router.get('/empresas/:id/grupo', async (req, res) => {
   }
 });
 
+
+// ============================================
+// PAINEL INTEGRA HIPER (monitoramento)
+// ============================================
+
+// GET /api/master/hiper/status - lista empresas Hiper + info do painel
+router.get('/hiper/status', async (req, res) => {
+  try {
+    const r = await db.query(`
+      SELECT
+        e.id AS empresa_id,
+        e.nome AS empresa_nome,
+        e.status AS empresa_status,
+        e.modulo_integra_hiper,
+        hc.ativo AS hiper_ativo,
+        hc.intervalo_sync_min,
+        hc.ultima_sync_produtos,
+        hc.ultima_sync_estoque,
+        hc.ultima_sync_clientes,
+        hc.ultima_sync_fornec,
+        hc.ultimo_ping_agent,
+        hc.forcar_sync_em,
+        (hc.chave_api IS NOT NULL AND LENGTH(hc.chave_api) > 0) AS tem_chave_api,
+        (hc.token_agent IS NOT NULL AND LENGTH(hc.token_agent) > 0) AS tem_token_agent,
+        (SELECT executado_em FROM hiper_log_sync
+         WHERE empresa_id = e.id AND status = 'erro'
+         ORDER BY executado_em DESC LIMIT 1) AS ultimo_erro_em,
+        (SELECT mensagem FROM hiper_log_sync
+         WHERE empresa_id = e.id AND status = 'erro'
+         ORDER BY executado_em DESC LIMIT 1) AS ultimo_erro_msg
+      FROM empresas e
+      LEFT JOIN hiper_config hc ON hc.empresa_id = e.id
+      WHERE e.modulo_integra_hiper = TRUE
+      ORDER BY e.nome
+    `);
+    const agora = Date.now();
+    const OFFLINE_MS = 15 * 60 * 1000; // 15 min
+    res.json(r.rows.map(row => {
+      const pingMs = row.ultimo_ping_agent ? new Date(row.ultimo_ping_agent).getTime() : 0;
+      const agentOnline = pingMs > 0 && (agora - pingMs) < OFFLINE_MS;
+      return { ...camelizar(row), agentOnline };
+    }));
+  } catch (err) {
+    console.error('[master/hiper/status]', err);
+    res.status(500).json({ error: 'Erro ao carregar status Hiper.' });
+  }
+});
+
+// GET /api/master/hiper/logs/:empresaId - ultimos 20 logs
+router.get('/hiper/logs/:empresaId', async (req, res) => {
+  const empresaId = parseInt(req.params.empresaId);
+  if (!empresaId) return res.status(400).json({ error: 'ID invalido.' });
+  try {
+    const r = await db.query(`
+      SELECT id, tipo, fonte, status, qtd_criados, qtd_atualizados, qtd_erros,
+             duracao_ms, mensagem, executado_em
+      FROM hiper_log_sync
+      WHERE empresa_id = $1
+      ORDER BY executado_em DESC
+      LIMIT 20
+    `, [empresaId]);
+    res.json(r.rows.map(camelizar));
+  } catch (err) {
+    console.error('[master/hiper/logs]', err);
+    res.status(500).json({ error: 'Erro ao buscar logs.' });
+  }
+});
+
+// POST /api/master/hiper/forcar-sync/:empresaId - agenda sync imediato
+router.post('/hiper/forcar-sync/:empresaId', async (req, res) => {
+  const empresaId = parseInt(req.params.empresaId);
+  if (!empresaId) return res.status(400).json({ error: 'ID invalido.' });
+  try {
+    const r = await db.query(
+      `UPDATE hiper_config SET forcar_sync_em = NOW()
+       WHERE empresa_id = $1 RETURNING id, forcar_sync_em`,
+      [empresaId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Empresa nao tem config Hiper.' });
+    res.json({ ok: true, agendadoEm: r.rows[0].forcar_sync_em });
+  } catch (err) {
+    console.error('[master/hiper/forcar-sync]', err);
+    res.status(500).json({ error: 'Erro ao agendar sync.' });
+  }
+});
+
 module.exports = router;

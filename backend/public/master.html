@@ -151,6 +151,7 @@
       <button class="tab-btn" data-tab="empresas" onclick="trocarAba('empresas')">🏢 Empresas</button>
       <button class="tab-btn" data-tab="revendedores" onclick="trocarAba('revendedores')">🤝 Revendedores</button>
       <button class="tab-btn" data-tab="uso-sistema" onclick="trocarAba('uso-sistema')">📊 Uso do Sistema</button>
+      <button class="tab-btn" data-tab="hiper" onclick="trocarAba('hiper')">🔗 Integra Hiper</button>
     </div>
 
     <!-- ================ ABA: VISÃO GERAL ================ -->
@@ -245,6 +246,20 @@
       </h2>
       <div id="uso-content">
         <div style="text-align:center;padding:40px;color:#94a3b8;">Clique em "🔄 Recarregar" para consultar os dados.</div>
+      </div>
+    </div>
+
+    <!-- ================ ABA: INTEGRA HIPER (monitoramento) ================ -->
+    <div class="tab-panel" id="tab-hiper">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🔗 Integra Hiper - Monitoramento</span>
+        <div>
+          <span id="hiper-last-refresh" style="font-size:12px;color:#94a3b8;margin-right:12px;"></span>
+          <button onclick="carregarHiperStatus()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">🔄 Recarregar</button>
+        </div>
+      </h2>
+      <div id="hiper-content">
+        <div style="text-align:center;padding:40px;color:#94a3b8;">Carregando...</div>
       </div>
     </div>
   </main>
@@ -536,6 +551,18 @@
   </div>
 </div>
 
+
+<!-- Modal: Logs do Agent Hiper (drill-down) -->
+<div class="modal" id="modal-hiper-logs">
+  <div class="modal-card" style="max-width:900px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h2 id="hl-titulo" style="margin:0;color:var(--azul);">Logs do Agent Hiper</h2>
+      <button onclick="fecharLogsHiper()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;">&times;</button>
+    </div>
+    <div id="hl-conteudo" style="max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <script>
   const API = '';
   function getToken() { return localStorage.getItem('master-token'); }
@@ -556,6 +583,8 @@
     if (panel) panel.classList.add('active');
     // Carregamento sob demanda
     if (nome === 'uso-sistema') carregarUsoSistema();
+    if (nome === 'hiper') { carregarHiperStatus(); iniciarHiperAutoRefresh(); }
+    else { pararHiperAutoRefresh(); }
   }
 
   // ====== USO DO SISTEMA ======
@@ -1473,6 +1502,153 @@
       await Promise.all([carregarComissoes(), carregarVendedores()]);
     } catch (e) { alert('Erro: ' + e.message); }
   }
+
+  // ======================================================
+  // INTEGRA HIPER - PAINEL DE MONITORAMENTO
+  // ======================================================
+  let _hiperRefreshTimer = null;
+
+  function iniciarHiperAutoRefresh() {
+    pararHiperAutoRefresh();
+    _hiperRefreshTimer = setInterval(carregarHiperStatus, 30000); // 30s
+  }
+  function pararHiperAutoRefresh() {
+    if (_hiperRefreshTimer) { clearInterval(_hiperRefreshTimer); _hiperRefreshTimer = null; }
+  }
+
+  function fmtDataHora(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d)) return "—";
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const hh = String(d.getHours()).padStart(2,"0");
+    const mi = String(d.getMinutes()).padStart(2,"0");
+    return dd + "/" + mm + " " + hh + ":" + mi;
+  }
+
+  function tempoAtras(iso) {
+    if (!iso) return "nunca";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms)) return "nunca";
+    const s = Math.floor(ms/1000);
+    if (s < 60) return s + "s atras";
+    const m = Math.floor(s/60);
+    if (m < 60) return m + "min atras";
+    const h = Math.floor(m/60);
+    if (h < 24) return h + "h atras";
+    const d = Math.floor(h/24);
+    return d + "d atras";
+  }
+
+  async function carregarHiperStatus() {
+    const el = document.getElementById("hiper-content");
+    try {
+      const dados = await api("GET", "/api/master/hiper/status");
+      const refreshEl = document.getElementById("hiper-last-refresh");
+      if (refreshEl) refreshEl.textContent = "Atualizado: " + new Date().toLocaleTimeString();
+
+      if (!Array.isArray(dados) || dados.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Nenhuma empresa com módulo Integra Hiper ativo.</div>';
+        return;
+      }
+
+      let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">';
+      html += '<thead style="background:#f1f5f9;"><tr>';
+      html += '<th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;">Empresa</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Agent</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Último Ping</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Produtos</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Clientes</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Fornec.</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Estoque</th>';
+      html += '<th style="text-align:center;padding:10px;border-bottom:2px solid #e2e8f0;">Ações</th>';
+      html += '</tr></thead><tbody>';
+
+      for (const e of dados) {
+        const online = e.agentOnline;
+        const badge = online
+          ? '<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;">● ONLINE</span>'
+          : '<span style="background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;">● OFFLINE</span>';
+        const temErro = e.ultimoErroEm ? '<div style="font-size:10px;color:#dc2626;margin-top:4px;">⚠ Erro recente: ' + fmtDataHora(e.ultimoErroEm) + '</div>' : '';
+        const forcarPending = e.forcarSyncEm ? '<span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:8px;font-size:10px;margin-left:6px;">sync pendente</span>' : '';
+
+        html += '<tr style="border-bottom:1px solid #e2e8f0;">';
+        html += '<td style="padding:10px;font-weight:600;">' + escapeHtml(e.empresaNome || "?") + ' <span style="color:#94a3b8;font-weight:normal;font-size:11px;">#' + e.empresaId + '</span>' + temErro + '</td>';
+        html += '<td style="padding:10px;text-align:center;">' + badge + forcarPending + '</td>';
+        html += '<td style="padding:10px;text-align:center;font-size:12px;">' + tempoAtras(e.ultimoPingAgent) + '</td>';
+        html += '<td style="padding:10px;text-align:center;font-size:12px;">' + tempoAtras(e.ultimaSyncProdutos) + '</td>';
+        html += '<td style="padding:10px;text-align:center;font-size:12px;">' + tempoAtras(e.ultimaSyncClientes) + '</td>';
+        html += '<td style="padding:10px;text-align:center;font-size:12px;">' + tempoAtras(e.ultimaSyncFornec) + '</td>';
+        html += '<td style="padding:10px;text-align:center;font-size:12px;">' + tempoAtras(e.ultimaSyncEstoque) + '</td>';
+        html += '<td style="padding:10px;text-align:center;white-space:nowrap;">';
+        html += '<button onclick="abrirLogsHiper(' + e.empresaId + ', \'' + escapeAttr(e.empresaNome || "") + '\')" style="background:#0891b2;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">📄 Logs</button>';
+        html += '<button onclick="forcarSyncHiper(' + e.empresaId + ', \'' + escapeAttr(e.empresaNome || "") + '\')" style="background:#16a34a;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;">🔄 Forçar Sync</button>';
+        html += '</td></tr>';
+      }
+
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+    } catch (err) {
+      el.innerHTML = '<div style="color:#dc2626;padding:20px;">Erro: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function abrirLogsHiper(empresaId, empresaNome) {
+    const modal = document.getElementById("modal-hiper-logs");
+    document.getElementById("hl-titulo").textContent = "📄 Logs - " + empresaNome;
+    document.getElementById("hl-conteudo").innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Carregando...</div>';
+    modal.classList.add("show");
+    try {
+      const logs = await api("GET", "/api/master/hiper/logs/" + empresaId);
+      if (!Array.isArray(logs) || logs.length === 0) {
+        document.getElementById("hl-conteudo").innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Nenhum log ainda.</div>';
+        return;
+      }
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<thead style="background:#f1f5f9;"><tr>';
+      html += '<th style="text-align:left;padding:8px;">Quando</th>';
+      html += '<th style="text-align:left;padding:8px;">Tipo</th>';
+      html += '<th style="text-align:center;padding:8px;">Status</th>';
+      html += '<th style="text-align:center;padding:8px;">Criados</th>';
+      html += '<th style="text-align:center;padding:8px;">Atualizados</th>';
+      html += '<th style="text-align:center;padding:8px;">Erros</th>';
+      html += '<th style="text-align:left;padding:8px;">Mensagem</th>';
+      html += '</tr></thead><tbody>';
+      for (const l of logs) {
+        const corStatus = l.status === "ok" ? "#16a34a" : (l.status === "erro" ? "#dc2626" : "#f59e0b");
+        html += '<tr style="border-bottom:1px solid #e2e8f0;">';
+        html += '<td style="padding:8px;white-space:nowrap;">' + fmtDataHora(l.executadoEm) + '</td>';
+        html += '<td style="padding:8px;">' + escapeHtml(l.tipo || "-") + '</td>';
+        html += '<td style="padding:8px;text-align:center;color:' + corStatus + ';font-weight:600;">' + escapeHtml(l.status || "-") + '</td>';
+        html += '<td style="padding:8px;text-align:center;">' + (l.qtdCriados || 0) + '</td>';
+        html += '<td style="padding:8px;text-align:center;">' + (l.qtdAtualizados || 0) + '</td>';
+        html += '<td style="padding:8px;text-align:center;color:' + (l.qtdErros > 0 ? "#dc2626" : "#94a3b8") + ';">' + (l.qtdErros || 0) + '</td>';
+        html += '<td style="padding:8px;font-size:11px;color:#64748b;max-width:300px;">' + escapeHtml(l.mensagem || "") + '</td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById("hl-conteudo").innerHTML = html;
+    } catch (err) {
+      document.getElementById("hl-conteudo").innerHTML = '<div style="color:#dc2626;padding:20px;">Erro: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  function fecharLogsHiper() {
+    document.getElementById("modal-hiper-logs").classList.remove("show");
+  }
+
+  async function forcarSyncHiper(empresaId, empresaNome) {
+    if (!confirm("Forçar sync imediato do agent de " + empresaNome + "?\n\nO agent vai receber essa ordem no próximo ping (até 5 min).")) return;
+    try {
+      await api("POST", "/api/master/hiper/forcar-sync/" + empresaId);
+      alert("✅ Sync agendado. O agent vai executar no próximo ping.");
+      carregarHiperStatus();
+    } catch (err) {
+      alert("Erro: " + err.message);
+    }
+  }
+
 </script>
 </body>
 </html>
