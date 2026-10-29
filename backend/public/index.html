@@ -1317,6 +1317,89 @@
       </div>
     </div>
 
+    <!-- ========== LAB CAIXA (atendimentos particulares) ========== -->
+    <div id="page-lab-caixa" style="display:none;">
+      <div class="page-title">💵 Caixa - Novo Atendimento</div>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <form id="form-lab-atendimento" onsubmit="event.preventDefault(); salvarLabAtendimento();">
+          <!-- Dados do atendimento -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+            <div>
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Data</label>
+              <input type="date" id="lcx-data" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Nome do Paciente</label>
+              <input type="text" id="lcx-paciente" placeholder="Nome do paciente" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">CPF/RG (opcional)</label>
+              <input type="text" id="lcx-doc" placeholder="000.000.000-00" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Telefone (opcional)</label>
+              <input type="text" id="lcx-tel" placeholder="(00) 00000-0000" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Forma de Pagamento</label>
+              <select id="lcx-forma" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="PIX">PIX</option>
+                <option value="Débito">Débito</option>
+                <option value="Crédito">Crédito</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Itens do atendimento -->
+          <div style="margin-top:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;font-size:14px;color:#334155;">Serviços realizados</h3>
+              <button type="button" onclick="labCaixaAdicionarItem()" style="background:#0891b2;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;">+ Adicionar serviço</button>
+            </div>
+            <div id="lcx-itens-lista" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <!-- Observacoes -->
+          <div style="margin-top:16px;">
+            <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Observações (opcional)</label>
+            <textarea id="lcx-obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box;"></textarea>
+          </div>
+
+          <!-- Total e botoes -->
+          <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="font-size:20px;font-weight:700;color:#0f766e;">
+              Total: <span id="lcx-total">R$ 0,00</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" onclick="labCaixaLimpar()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Limpar</button>
+              <button type="submit" style="background:#16a34a;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-weight:700;cursor:pointer;">💰 Salvar Atendimento</button>
+            </div>
+          </div>
+          <div id="lcx-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:10px;"></div>
+        </form>
+      </div>
+
+      <!-- Lista de atendimentos recentes -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;color:#334155;">Últimos atendimentos</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Paciente</th>
+              <th style="text-align:right;">Valor</th>
+              <th>Pagamento</th>
+              <th class="acoes">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="lcx-tbody-recentes"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
     <div id="page-lab-servicos" style="display:none;">
       <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
@@ -8561,6 +8644,7 @@ https://sistema.glinformatica.com.br
     // Carrega usuários sob demanda
     if(pg === 'usuarios') carregarUsuarios();
     if(pg === 'lab-dashboard') carregarLabDashboard();
+    if(pg === 'lab-caixa') carregarLabCaixa();
     if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
@@ -26772,6 +26856,170 @@ ${conteudo}
     partes.push('</div>');
     partes.push('</div>');
     el.innerHTML = partes.join('');
+  }
+
+
+  // ======================================================
+  // LAB CAIXA - Atendimentos particulares com itens
+  // ======================================================
+  var _labServicosCatalogo = [];
+  var _labCaixaItens = [];  // [{servicoId, nome, valor}]
+  var _labAtendimentosRecentes = [];
+
+  async function carregarLabCaixa() {
+    // Reset form se nao estiver edicao
+    const dataEl = document.getElementById('lcx-data');
+    if (dataEl && !dataEl.value) dataEl.value = new Date().toISOString().slice(0,10);
+    try {
+      _labServicosCatalogo = await api('GET', '/api/lab-servicos');
+    } catch (e) { _labServicosCatalogo = []; }
+    try {
+      _labAtendimentosRecentes = await api('GET', '/api/lab-atendimentos?limite=20');
+    } catch (e) { _labAtendimentosRecentes = []; }
+    // Se tem lista vazia, inicia com 1 item
+    if (_labCaixaItens.length === 0) {
+      _labCaixaItens = [{ servicoId: null, nome: '', valor: 0 }];
+    }
+    renderLabCaixaItens();
+    renderLabCaixaRecentes();
+  }
+
+  function renderLabCaixaItens() {
+    const el = document.getElementById('lcx-itens-lista');
+    if (!el) return;
+    el.innerHTML = _labCaixaItens.map((it, idx) => {
+      const opcoesServ = _labServicosCatalogo.map(s =>
+        '<option value="' + s.id + '" data-preco="' + s.preco + '"' + (it.servicoId == s.id ? ' selected' : '') + '>' + escapeHtml(s.nome) + '</option>'
+      ).join('');
+      return '<div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:center;">'
+        + '<div>'
+        + '  <select onchange="labCaixaSelecionarServico(' + idx + ', this)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">'
+        + '    <option value="">-- Escolha ou digite nome manual --</option>'
+        + opcoesServ
+        + '  </select>'
+        + '  <input type="text" placeholder="Ou digite nome manual" value="' + escapeAttr(it.nome || '') + '" oninput="labCaixaMudarNome(' + idx + ', this.value)" style="width:100%;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;font-size:12px;">'
+        + '</div>'
+        + '<input type="number" step="0.01" min="0" placeholder="0,00" value="' + (it.valor || '') + '" oninput="labCaixaMudarValor(' + idx + ', this.value)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;">'
+        + '<button type="button" onclick="labCaixaRemoverItem(' + idx + ')" style="background:#dc2626;color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;">✖</button>'
+        + '</div>';
+    }).join('');
+    labCaixaCalcularTotal();
+  }
+
+  function labCaixaSelecionarServico(idx, selectEl) {
+    const val = selectEl.value;
+    const servicoId = val ? parseInt(val) : null;
+    if (servicoId) {
+      const s = _labServicosCatalogo.find(x => x.id === servicoId);
+      if (s) {
+        _labCaixaItens[idx] = { servicoId: s.id, nome: s.nome, valor: Number(s.preco) || 0 };
+      }
+    } else {
+      _labCaixaItens[idx].servicoId = null;
+    }
+    renderLabCaixaItens();
+  }
+
+  function labCaixaMudarNome(idx, novo) {
+    _labCaixaItens[idx].nome = novo;
+    _labCaixaItens[idx].servicoId = null; // nome manual = sem vinculo
+  }
+
+  function labCaixaMudarValor(idx, novo) {
+    _labCaixaItens[idx].valor = parseFloat(novo) || 0;
+    labCaixaCalcularTotal();
+  }
+
+  function labCaixaAdicionarItem() {
+    _labCaixaItens.push({ servicoId: null, nome: '', valor: 0 });
+    renderLabCaixaItens();
+  }
+
+  function labCaixaRemoverItem(idx) {
+    _labCaixaItens.splice(idx, 1);
+    if (_labCaixaItens.length === 0) _labCaixaItens.push({ servicoId: null, nome: '', valor: 0 });
+    renderLabCaixaItens();
+  }
+
+  function labCaixaCalcularTotal() {
+    const total = _labCaixaItens.reduce((s, it) => s + (Number(it.valor) || 0), 0);
+    const el = document.getElementById('lcx-total');
+    if (el) el.textContent = formatarBRL(total);
+  }
+
+  function labCaixaLimpar() {
+    if (!confirm('Limpar atendimento atual?')) return;
+    document.getElementById('lcx-paciente').value = '';
+    document.getElementById('lcx-doc').value = '';
+    document.getElementById('lcx-tel').value = '';
+    document.getElementById('lcx-forma').value = 'Dinheiro';
+    document.getElementById('lcx-obs').value = '';
+    document.getElementById('lcx-erro').style.display = 'none';
+    _labCaixaItens = [{ servicoId: null, nome: '', valor: 0 }];
+    renderLabCaixaItens();
+  }
+
+  async function salvarLabAtendimento() {
+    const data = document.getElementById('lcx-data').value;
+    const pacienteNome = document.getElementById('lcx-paciente').value.trim();
+    const pacienteDoc = document.getElementById('lcx-doc').value.trim();
+    const pacienteTel = document.getElementById('lcx-tel').value.trim();
+    const formaPagamento = document.getElementById('lcx-forma').value;
+    const obs = document.getElementById('lcx-obs').value.trim();
+    const erro = document.getElementById('lcx-erro');
+    // Filtra itens validos
+    const itensValidos = _labCaixaItens.filter(it => (it.nome || '').trim() && Number(it.valor) >= 0);
+    if (itensValidos.length === 0) {
+      erro.textContent = 'Adicione pelo menos um servico com nome.';
+      erro.style.display = 'block';
+      return;
+    }
+    if (!data) {
+      erro.textContent = 'Informe a data.';
+      erro.style.display = 'block';
+      return;
+    }
+    erro.style.display = 'none';
+    try {
+      const resp = await api('POST', '/api/lab-atendimentos', {
+        data, pacienteNome, pacienteDoc, pacienteTel, formaPagamento, obs,
+        itens: itensValidos.map(it => ({ servicoId: it.servicoId, servicoNome: it.nome, valor: it.valor }))
+      });
+      alert('✅ Atendimento salvo!\n\nTotal: ' + formatarBRL(resp.valorTotal));
+      labCaixaLimpar();
+      await carregarLabCaixa();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  function renderLabCaixaRecentes() {
+    const tbody = document.getElementById('lcx-tbody-recentes');
+    if (!tbody) return;
+    if (!_labAtendimentosRecentes || _labAtendimentosRecentes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px;">Nenhum atendimento ainda.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = _labAtendimentosRecentes.map(a => '<tr>'
+      + '<td>' + formatarDataBR(a.data) + '</td>'
+      + '<td>' + escapeHtml(a.pacienteNome || '-') + '</td>'
+      + '<td style="text-align:right;font-weight:600;">' + formatarBRL(a.valorTotal) + '</td>'
+      + '<td>' + escapeHtml(a.formaPagamento || '-') + '</td>'
+      + '<td class="acoes" style="text-align:center;">'
+      + '<button onclick="excluirLabAtendimento(' + a.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">Excluir</button>'
+      + '</td></tr>'
+    ).join('');
+  }
+
+  async function excluirLabAtendimento(id) {
+    if (!confirm('Excluir atendimento?')) return;
+    try {
+      await api('DELETE', '/api/lab-atendimentos/' + id);
+      await carregarLabCaixa();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
   }
 
 </script>
