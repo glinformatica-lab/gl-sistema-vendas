@@ -1281,6 +1281,55 @@
     </div>
 
     <!-- Serviços -->
+    <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
+    <div id="page-lab-servicos" style="display:none;">
+      <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+        <button class="btn" onclick="abrirLabServicoNovo()">+ Novo Serviço</button>
+        <input id="filtro-lab-servicos" type="text" placeholder="Buscar serviço..." oninput="renderLabServicos()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th style="text-align:right;">Preço</th>
+            <th class="acoes">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-lab-servicos"></tbody>
+      </table>
+    </div>
+
+    <!-- Modal: Cadastrar/Editar Lab Servico -->
+    <div class="modal" id="modal-lab-servico">
+      <div class="modal-card">
+        <h2 id="mls-titulo">Novo Serviço</h2>
+        <form id="form-lab-servico" onsubmit="event.preventDefault(); salvarLabServico();">
+          <div class="row">
+            <div>
+              <label>Código (opcional)</label>
+              <input type="text" id="mls-codigo" placeholder="Ex: CONS-ORT">
+            </div>
+            <div>
+              <label>Preço *</label>
+              <input type="number" step="0.01" min="0" id="mls-preco" required>
+            </div>
+          </div>
+          <label>Nome *</label>
+          <input type="text" id="mls-nome" required placeholder="Ex: Consulta Ortopedia">
+          <label>Descrição</label>
+          <textarea id="mls-descricao" rows="2"></textarea>
+          <div id="mls-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin:10px 0;"></div>
+          <div class="actions" style="display:flex;gap:10px;margin-top:14px;">
+            <button type="button" class="btn cancelar" onclick="fecharLabServico()">Cancelar</button>
+            <button type="submit" class="btn primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="page-servicos" style="display:none;">
       <div class="page-title">Serviços</div>
       <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
@@ -8468,6 +8517,7 @@ https://sistema.glinformatica.com.br
     if (window.innerWidth <= 900) fecharMenu();
     // Carrega usuários sob demanda
     if(pg === 'usuarios') carregarUsuarios();
+    if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
     if(pg === 'orcamentos') carregarOrcamentos();
@@ -26479,6 +26529,120 @@ ${conteudo}
       erro.style.display = 'block';
     }
   });
+
+  // ======================================================
+  // LAB SERVICOS - Catalogo de servicos do laboratorio
+  // ======================================================
+  var _labServicos = [];
+  var _labServicoEditandoId = null;
+
+  async function carregarLabServicos() {
+    try {
+      _labServicos = await api('GET', '/api/lab-servicos');
+      renderLabServicos();
+    } catch (err) {
+      console.error('[lab-servicos] carregar:', err);
+      alert('Erro ao carregar servicos: ' + err.message);
+    }
+  }
+
+  function renderLabServicos() {
+    const tbody = document.getElementById('tbody-lab-servicos');
+    if (!tbody) return;
+    const filtroEl = document.getElementById('filtro-lab-servicos');
+    const filtro = (filtroEl ? filtroEl.value : '').toLowerCase().trim();
+    const lista = _labServicos.filter(s => {
+      if (!filtro) return true;
+      return (s.nome || '').toLowerCase().includes(filtro) || (s.codigo || '').toLowerCase().includes(filtro);
+    });
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum servico cadastrado. Clique em "+ Novo Servico" para comecar.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(s => '<tr>'
+      + '<td>' + escapeHtml(s.codigo || '-') + '</td>'
+      + '<td style="font-weight:600;">' + escapeHtml(s.nome) + '</td>'
+      + '<td style="color:#64748b;font-size:12px;">' + escapeHtml(s.descricao || '-') + '</td>'
+      + '<td style="text-align:right;font-weight:600;">' + fmtBRL(s.preco) + '</td>'
+      + '<td class="acoes" style="text-align:center;white-space:nowrap;">'
+      + '<button onclick="editarLabServico(' + s.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px;">Editar</button>'
+      + '<button onclick="excluirLabServico(' + s.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Excluir</button>'
+      + '</td></tr>'
+    ).join('');
+  }
+
+  function abrirLabServicoNovo() {
+    _labServicoEditandoId = null;
+    document.getElementById('mls-titulo').textContent = 'Novo Servico';
+    document.getElementById('mls-codigo').value = '';
+    document.getElementById('mls-nome').value = '';
+    document.getElementById('mls-descricao').value = '';
+    document.getElementById('mls-preco').value = '';
+    document.getElementById('mls-erro').style.display = 'none';
+    document.getElementById('modal-lab-servico').classList.add('show');
+    setTimeout(() => { const el = document.getElementById('mls-nome'); if (el) el.focus(); }, 100);
+  }
+
+  function editarLabServico(id) {
+    const s = _labServicos.find(x => x.id === id);
+    if (!s) return;
+    _labServicoEditandoId = id;
+    document.getElementById('mls-titulo').textContent = 'Editar Servico';
+    document.getElementById('mls-codigo').value = s.codigo || '';
+    document.getElementById('mls-nome').value = s.nome || '';
+    document.getElementById('mls-descricao').value = s.descricao || '';
+    document.getElementById('mls-preco').value = s.preco || '';
+    document.getElementById('mls-erro').style.display = 'none';
+    document.getElementById('modal-lab-servico').classList.add('show');
+  }
+
+  function fecharLabServico() {
+    document.getElementById('modal-lab-servico').classList.remove('show');
+  }
+
+  async function salvarLabServico() {
+    const codigo = document.getElementById('mls-codigo').value.trim();
+    const nome = document.getElementById('mls-nome').value.trim();
+    const descricao = document.getElementById('mls-descricao').value.trim();
+    const preco = parseFloat(document.getElementById('mls-preco').value) || 0;
+    const erro = document.getElementById('mls-erro');
+    if (!nome) {
+      erro.textContent = 'Nome e obrigatorio.';
+      erro.style.display = 'block';
+      return;
+    }
+    if (preco < 0) {
+      erro.textContent = 'Preco invalido.';
+      erro.style.display = 'block';
+      return;
+    }
+    erro.style.display = 'none';
+    try {
+      if (_labServicoEditandoId) {
+        await api('PUT', '/api/lab-servicos/' + _labServicoEditandoId, { codigo, nome, descricao, preco });
+      } else {
+        await api('POST', '/api/lab-servicos', { codigo, nome, descricao, preco });
+      }
+      fecharLabServico();
+      await carregarLabServicos();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirLabServico(id) {
+    const s = _labServicos.find(x => x.id === id);
+    if (!s) return;
+    if (!confirm('Excluir servico "' + s.nome + '"?\n\nAtendimentos antigos vao manter o nome historico.')) return;
+    try {
+      await api('DELETE', '/api/lab-servicos/' + id);
+      await carregarLabServicos();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
 </script>
 </body>
 </html>
