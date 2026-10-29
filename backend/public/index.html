@@ -1309,6 +1309,14 @@
     </div>
 
     <!-- Serviços -->
+    <!-- ========== LAB DASHBOARD ========== -->
+    <div id="page-lab-dashboard" style="display:none;">
+      <div class="page-title">🏨 Dashboard - Visão Geral</div>
+      <div id="lab-dash-content">
+        <div style="text-align:center;padding:40px;color:#94a3b8;">Carregando...</div>
+      </div>
+    </div>
+
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
     <div id="page-lab-servicos" style="display:none;">
       <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
@@ -8496,6 +8504,13 @@ https://sistema.glinformatica.com.br
   }
 
   function showPage(pg) {
+    // REDIRECT_LAB_DASHBOARD: modo lab abre no lab-dashboard, nao no dashboard antigo
+    try {
+      if (pg === 'dashboard') {
+        const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+        if (_emp.moduloLaboratorio) pg = 'lab-dashboard';
+      }
+    } catch(e) {}
     if (!podeAcessarPagina(pg)) {
       alert('Você não tem permissão para acessar esta página.');
       return;
@@ -8545,6 +8560,7 @@ https://sistema.glinformatica.com.br
     if (window.innerWidth <= 900) fecharMenu();
     // Carrega usuários sob demanda
     if(pg === 'usuarios') carregarUsuarios();
+    if(pg === 'lab-dashboard') carregarLabDashboard();
     if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
@@ -26669,6 +26685,84 @@ ${conteudo}
     } catch (err) {
       alert('Erro: ' + err.message);
     }
+  }
+
+
+  // ======================================================
+  // LAB DASHBOARD
+  // ======================================================
+  async function carregarLabDashboard() {
+    const el = document.getElementById('lab-dash-content');
+    if (!el) return;
+    try {
+      const d = await api('GET', '/api/lab-dashboard');
+      renderLabDashboard(d);
+    } catch (err) {
+      el.innerHTML = '<div style="color:#dc2626;padding:20px;background:#fef2f2;border-radius:8px;">Erro: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  function renderLabDashboard(d) {
+    const el = document.getElementById('lab-dash-content');
+    if (!el) return;
+    const h = new Date().getHours();
+    const sauda = h < 12 ? 'Bom dia' : (h < 18 ? 'Boa tarde' : 'Boa noite');
+    const nomeUsr = (window._user && window._user.nome) || JSON.parse(localStorage.getItem('usuario')||'{}').nome || '';
+    const partes = [];
+    partes.push('<div style="background:linear-gradient(135deg,#14b8a6,#0f766e);color:#fff;padding:20px 24px;border-radius:14px;margin-bottom:20px;">'
+      + '<div style="font-size:14px;opacity:0.9;">' + sauda + (nomeUsr ? ', ' + escapeHtml(nomeUsr) : '') + '!</div>'
+      + '<div style="font-size:22px;font-weight:700;margin-top:4px;">🏨 Dashboard do Laboratório</div>'
+      + '</div>');
+    partes.push('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px;">');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Receita Hoje</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#0f766e;margin-top:6px;">' + fmtBRL(d.receitaHoje) + '</div>'
+      + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.qtdAtendimentosHoje + ' atendimento(s)</div>'
+      + '</div>');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Receita do Mês</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#0891b2;margin-top:6px;">' + fmtBRL(d.receitaMes) + '</div>'
+      + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.qtdAtendimentosMes + ' atendimento(s)</div>'
+      + '</div>');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">A Pagar (Mês)</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#dc2626;margin-top:6px;">' + fmtBRL(d.contasPagarMes.total) + '</div>'
+      + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.contasPagarMes.qtd + ' conta(s) pendente(s)</div>'
+      + '</div>');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">A Receber (Mês)</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#16a34a;margin-top:6px;">' + fmtBRL(d.contasReceberMes.total) + '</div>'
+      + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.contasReceberMes.qtd + ' conta(s) pendente(s)</div>'
+      + '</div>');
+    partes.push('</div>');
+    partes.push('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px;">⚠ Estoque baixo</div>');
+    if (!d.estoqueBaixo || d.estoqueBaixo.length === 0) {
+      partes.push('<div style="color:#94a3b8;font-size:13px;">Tudo em ordem.</div>');
+    } else {
+      partes.push('<ul style="margin:0;padding-left:20px;font-size:13px;">');
+      d.estoqueBaixo.forEach(p => {
+        partes.push('<li style="margin-bottom:4px;"><strong>' + escapeHtml(p.nome) + '</strong> — tem ' + p.estoque + ' (mínimo: ' + p.estoqueMinimo + ')</li>');
+      });
+      partes.push('</ul>');
+    }
+    partes.push('</div>');
+    partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
+      + '<div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px;">📅 Vencendo em até 30 dias</div>');
+    if (!d.vencendoLogo || d.vencendoLogo.length === 0) {
+      partes.push('<div style="color:#94a3b8;font-size:13px;">Nenhum insumo próximo do vencimento.</div>');
+    } else {
+      partes.push('<ul style="margin:0;padding-left:20px;font-size:13px;">');
+      d.vencendoLogo.forEach(p => {
+        const diasTxt = p.diasPraVencer < 0 ? '<span style="color:#dc2626;font-weight:700;">VENCIDO</span>' : (p.diasPraVencer + ' dias');
+        partes.push('<li style="margin-bottom:4px;"><strong>' + escapeHtml(p.nome) + '</strong> — ' + diasTxt + '</li>');
+      });
+      partes.push('</ul>');
+    }
+    partes.push('</div>');
+    partes.push('</div>');
+    el.innerHTML = partes.join('');
   }
 
 </script>
