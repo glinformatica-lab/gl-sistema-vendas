@@ -75,6 +75,13 @@
       border-left: 4px solid var(--azul);
       font-weight: 600;
     }
+    /* === Modo Laboratorio: esconde todo o menu padrao === */
+    body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio) {
+      display: none !important;
+    }
+    body.modo-lab #menu .feature-laboratorio {
+      display: block !important;
+    }
     .menu-btn.submenu-item:hover {
       background: #e0f2fe;
       border-left: 4px solid var(--azul);
@@ -547,6 +554,15 @@
       <kbd style="background:#fff;color:#64748b;padding:1px 6px;border-radius:4px;font-size:10px;font-family:monospace;border:1px solid #cbd5e1;">Ctrl+K</kbd>
     </button>
     <button class="menu-btn active" onclick="showPage('dashboard')">&#128202; Início</button>
+
+    <!-- ========== MENU DO MODULO LABORATORIO (feature-laboratorio) ========== -->
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-dashboard')" style="display:none;">&#128657; Dashboard Lab</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-caixa')" style="display:none;">&#128181; Caixa</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-servicos')" style="display:none;">&#128278; Servicos</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-insumos')" style="display:none;">&#128230; Insumos</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-fornecedores')" style="display:none;">&#128666; Fornecedores</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-financeiro')" style="display:none;">&#128176; Financeiro</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-saidas')" style="display:none;">&#128229; Saida Manual</button>
 
     <!-- Cadastros -->
     <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('cadastros')" data-grupo="cadastros" type="button">
@@ -8700,6 +8716,7 @@ https://sistema.glinformatica.com.br
       if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
       if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
       if (typeof atualizarVisibilidadeIntegraHiper === "function") atualizarVisibilidadeIntegraHiper();
+      if (typeof atualizarVisibilidadeLaboratorio === "function") atualizarVisibilidadeLaboratorio();
       // Mostra botão "Trocar Empresa" se cliente tem multi-empresa
       if (localStorage.getItem('multiEmpresa') === '1') {
         const btnTrocar = document.getElementById('btn-trocar-empresa');
@@ -8802,6 +8819,7 @@ https://sistema.glinformatica.com.br
       if (typeof atualizarVisibilidadeAmbientes === "function") atualizarVisibilidadeAmbientes();
       if (typeof atualizarVisibilidadeSalao === "function") atualizarVisibilidadeSalao();
       if (typeof atualizarVisibilidadeIntegraHiper === "function") atualizarVisibilidadeIntegraHiper();
+      if (typeof atualizarVisibilidadeLaboratorio === "function") atualizarVisibilidadeLaboratorio();
     } catch(e) { console.warn('Erro ao carregar empresa:', e.message); }
     renderGraficosDashboard();
   });
@@ -10919,6 +10937,7 @@ https://sistema.glinformatica.com.br
     document.getElementById('modal-novo-produto-rapido').style.display = 'flex';
     // Garante que o campo "Preço SEM NOTA" aparece se módulo INTEGRA HIPER está ativo
     if (typeof atualizarVisibilidadeIntegraHiper === 'function') atualizarVisibilidadeIntegraHiper();
+    if (typeof atualizarVisibilidadeLaboratorio === 'function') atualizarVisibilidadeLaboratorio();
     // Carrega marcas em background só se módulo iluminação ativo
     const _emp = JSON.parse(localStorage.getItem('empresa') || '{}');
     if (_emp.usaAmbientes) {
@@ -12144,6 +12163,7 @@ https://sistema.glinformatica.com.br
     document.getElementById('modal-nova-venda').style.display = 'flex';
     // Garante que qualquer elemento do módulo INTEGRA HIPER dentro do modal fique com o display certo
     if (typeof atualizarVisibilidadeIntegraHiper === 'function') atualizarVisibilidadeIntegraHiper();
+    if (typeof atualizarVisibilidadeLaboratorio === 'function') atualizarVisibilidadeLaboratorio();
     const hoje = new Date().toISOString().slice(0,10);
     if(!document.getElementById('nv-data').value) document.getElementById('nv-data').value = hoje;
     const tbody = document.getElementById('tbody-itens-venda');
@@ -25230,6 +25250,20 @@ ${conteudo}
       el.style.display = ativo ? '' : 'none';
     });
   }
+  // Modo Laboratorio: menu totalmente diferente (paginas do lab so)
+  function atualizarVisibilidadeLaboratorio() {
+    const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
+    const modoLab = !!empresa.moduloLaboratorio;
+    if (modoLab) {
+      document.body.classList.add('modo-lab');
+    } else {
+      document.body.classList.remove('modo-lab');
+    }
+    document.querySelectorAll('.feature-laboratorio').forEach(el => {
+      el.style.display = modoLab ? '' : 'none';
+    });
+  }
+
 
   // Quando o Módulo Salão está ativo, esconde menus não essenciais pra deixar
   // a UI enxuta pra dona do salão (que não usa vendas, orçamentos, estoque, etc)
