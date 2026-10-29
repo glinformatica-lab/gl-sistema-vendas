@@ -25358,6 +25358,15 @@ ${conteudo}
     document.querySelectorAll('.feature-laboratorio').forEach(el => {
       el.style.display = modoLab ? '' : 'none';
     });
+    // FORCE_DASH_REDIRECT: se modo lab e dashboard antigo visivel, troca
+    if (modoLab) {
+      try {
+        const dashAntigo = document.getElementById('page-dashboard');
+        if (dashAntigo && dashAntigo.style.display !== 'none' && typeof showPage === 'function') {
+          setTimeout(() => showPage('lab-dashboard'), 50);
+        }
+      } catch(e) { console.warn('redirect lab-dashboard:', e); }
+    }
   }
 
 
