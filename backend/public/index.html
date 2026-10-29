@@ -26607,7 +26607,7 @@ ${conteudo}
       + '<td>' + escapeHtml(s.codigo || '-') + '</td>'
       + '<td style="font-weight:600;">' + escapeHtml(s.nome) + '</td>'
       + '<td style="color:#64748b;font-size:12px;">' + escapeHtml(s.descricao || '-') + '</td>'
-      + '<td style="text-align:right;font-weight:600;">' + fmtBRL(s.preco) + '</td>'
+      + '<td style="text-align:right;font-weight:600;">' + formatarBRL(s.preco) + '</td>'
       + '<td class="acoes" style="text-align:center;white-space:nowrap;">'
       + '<button onclick="editarLabServico(' + s.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px;">Editar</button>'
       + '<button onclick="excluirLabServico(' + s.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Excluir</button>'
@@ -26716,22 +26716,22 @@ ${conteudo}
     partes.push('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px;">');
     partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
       + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Receita Hoje</div>'
-      + '<div style="font-size:26px;font-weight:700;color:#0f766e;margin-top:6px;">' + fmtBRL(d.receitaHoje) + '</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#0f766e;margin-top:6px;">' + formatarBRL(d.receitaHoje) + '</div>'
       + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.qtdAtendimentosHoje + ' atendimento(s)</div>'
       + '</div>');
     partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
       + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Receita do Mês</div>'
-      + '<div style="font-size:26px;font-weight:700;color:#0891b2;margin-top:6px;">' + fmtBRL(d.receitaMes) + '</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#0891b2;margin-top:6px;">' + formatarBRL(d.receitaMes) + '</div>'
       + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.qtdAtendimentosMes + ' atendimento(s)</div>'
       + '</div>');
     partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
       + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">A Pagar (Mês)</div>'
-      + '<div style="font-size:26px;font-weight:700;color:#dc2626;margin-top:6px;">' + fmtBRL(d.contasPagarMes.total) + '</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#dc2626;margin-top:6px;">' + formatarBRL(d.contasPagarMes.total) + '</div>'
       + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.contasPagarMes.qtd + ' conta(s) pendente(s)</div>'
       + '</div>');
     partes.push('<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">'
       + '<div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">A Receber (Mês)</div>'
-      + '<div style="font-size:26px;font-weight:700;color:#16a34a;margin-top:6px;">' + fmtBRL(d.contasReceberMes.total) + '</div>'
+      + '<div style="font-size:26px;font-weight:700;color:#16a34a;margin-top:6px;">' + formatarBRL(d.contasReceberMes.total) + '</div>'
       + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + d.contasReceberMes.qtd + ' conta(s) pendente(s)</div>'
       + '</div>');
     partes.push('</div>');
