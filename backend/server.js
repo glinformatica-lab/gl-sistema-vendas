@@ -36,6 +36,7 @@ app.use('/api/contas-receber',  autenticar, verificarAcesso, require('./routes/c
 app.use('/api/usuarios',        autenticar, verificarAcesso, require('./routes/usuarios'));
 app.use('/api/empresa',         autenticar, verificarAcesso, require('./routes/empresa'));
 app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/caixa'));
+app.use('/api/lab-servicos',   autenticar, verificarAcesso, require('./routes/lab-servicos'));
 app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
 // Módulo Salão
 app.use('/api/profissionais',     autenticar, verificarAcesso, require('./routes/profissionais'));
