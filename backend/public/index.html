@@ -76,7 +76,7 @@
       font-weight: 600;
     }
     /* === Modo Laboratorio: esconde todo o menu padrao === */
-    body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio) {
+    body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio):not(.permanente-sidebar) {
       display: none !important;
     }
     body.modo-lab #menu .feature-laboratorio {
@@ -563,6 +563,8 @@
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-fornecedores')" style="display:none;">&#128666; Fornecedores</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-financeiro')" style="display:none;">&#128176; Financeiro</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-saidas')" style="display:none;">&#128229; Saida Manual</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('usuarios')" style="display:none;">&#128101; Usuarios</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('configuracoes')" style="display:none;">&#9881;&#65039; Configuracoes</button>
 
     <!-- Cadastros -->
     <button class="menu-btn menu-grupo" onclick="toggleGrupoMenu('cadastros')" data-grupo="cadastros" type="button">
@@ -668,8 +670,8 @@
 
     <button class="menu-btn" onclick="showPage('minha-conta')">&#128100; Minha Conta</button>
     <div style="flex:1;"></div>
-    <div id="info-usuario" style="padding:14px 24px;border-top:1px solid var(--cinza-borda);font-size:12px;color:#668;"></div>
-    <a href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20GL%20Sistema%20de%20Vendas"
+    <div id="info-usuario" class="permanente-sidebar" style="padding:14px 24px;border-top:1px solid var(--cinza-borda);font-size:12px;color:#668;"></div>
+    <a class="permanente-sidebar" href="https://wa.me/5562992347572?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20GL%20Sistema%20de%20Vendas"
        target="_blank" rel="noopener"
        style="display:flex;align-items:center;gap:8px;padding:10px 24px;background:#f6f8fc;border-top:1px solid var(--cinza-borda);text-decoration:none;color:#222;font-size:12px;transition:background 0.15s;"
        onmouseover="this.style.background='#eaf4ec'"
@@ -681,8 +683,8 @@
         <div style="color:#25D366;font-weight:700;">(62) 99234-7572</div>
       </div>
     </a>
-    <button id="btn-trocar-empresa" class="menu-btn" style="display:none;font-size:13px;color:var(--azul);padding:12px 24px;background:#dbeafe;" onclick="abrirTrocarEmpresa()" title="Trocar entre suas empresas">&#128257; Trocar Empresa</button>
-    <button class="menu-btn" style="font-size:13px;color:var(--vermelho);padding:12px 24px;" onclick="logout()" title="Encerrar sessão">&#128274; Sair</button>
+    <button id="btn-trocar-empresa" class="menu-btn permanente-sidebar" style="display:none;font-size:13px;color:var(--azul);padding:12px 24px;background:#dbeafe;" onclick="abrirTrocarEmpresa()" title="Trocar entre suas empresas">&#128257; Trocar Empresa</button>
+    <button class="menu-btn permanente-sidebar" style="font-size:13px;color:var(--vermelho);padding:12px 24px;" onclick="logout()" title="Encerrar sessão">&#128274; Sair</button>
   </nav>
   <div id="conteudo">
     <!-- Banner de modo suporte (Master acessando empresa) -->
