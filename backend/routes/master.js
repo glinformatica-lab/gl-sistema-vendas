@@ -133,7 +133,7 @@ router.get('/empresas/:id', async (req, res) => {
 
 // Atualizar empresa (status, plano, vencimento, mensalidade, observação, módulos)
 router.put('/empresas/:id', async (req, res) => {
-  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo, usaAmbientes, moduloSalao, moduloIntegraHiper } = req.body || {};
+  const { status, plano, dataVencimento, valorMensalidade, observacao, nome, moduloFiscalAtivo, usaAmbientes, moduloSalao, moduloIntegraHiper, moduloLaboratorio } = req.body || {};
   // Valida valores
   const statusValidos = ['trial', 'ativa', 'vencida', 'bloqueada'];
   const planosValidos = ['trial', 'basico', 'pro', 'pro-fiscal', 'salao', 'anual', 'basico-anual', 'pro-anual', 'pro-fiscal-anual', 'mensal'];
@@ -170,6 +170,16 @@ router.put('/empresas/:id', async (req, res) => {
       if (setSalao) posParam++;
       setIntegraHiper = `, modulo_integra_hiper = $${posParam}`;
     }
+    // Feature: modulo_laboratorio
+    let setLaboratorio = '';
+    if (moduloLaboratorio === true || moduloLaboratorio === false) {
+      let posParam = 8;
+      if (setModuloFiscal) posParam++;
+      if (setAmbientes) posParam++;
+      if (setSalao) posParam++;
+      if (setIntegraHiper) posParam++;
+      setLaboratorio = `, modulo_laboratorio = $${posParam}`;
+    }
     const params = [
       nome || null, status || null, plano || null, dataVencimento || null,
       valorMensalidade != null ? Number(valorMensalidade) : null,
@@ -180,6 +190,7 @@ router.put('/empresas/:id', async (req, res) => {
     if (setAmbientes) params.push(usaAmbientes);
     if (setSalao) params.push(moduloSalao);
     if (setIntegraHiper) params.push(moduloIntegraHiper);
+    if (setLaboratorio) params.push(moduloLaboratorio);
     const r = await db.query(
       `UPDATE empresas SET
          nome = COALESCE($1, nome),
@@ -188,7 +199,7 @@ router.put('/empresas/:id', async (req, res) => {
          data_vencimento = COALESCE($4, data_vencimento),
          valor_mensalidade = COALESCE($5, valor_mensalidade),
          observacao = COALESCE($6, observacao)
-         ${setModuloFiscal}${setAmbientes}${setSalao}${setIntegraHiper}
+         ${setModuloFiscal}${setAmbientes}${setSalao}${setIntegraHiper}${setLaboratorio}
        WHERE id=$7 RETURNING *`,
       params
     );

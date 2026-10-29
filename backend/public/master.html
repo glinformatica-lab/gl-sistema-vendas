@@ -432,6 +432,21 @@
         </p>
       </div>
 
+      <!-- Módulo Laboratório (interface enxuta pra labs de consultas/exames) -->
+      <div style="background:#ccfbf1;border:1px solid #5eead4;border-radius:8px;padding:14px;margin:12px 0;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="checkbox" id="me-modulo-laboratorio" style="width:20px;height:20px;cursor:pointer;">
+          <label for="me-modulo-laboratorio" style="margin:0;font-weight:600;color:#0f766e;cursor:pointer;font-size:14px;">
+            🧪 Ativar Módulo Laboratório
+          </label>
+        </div>
+        <p style="margin:6px 0 0 32px;font-size:12px;color:#557;line-height:1.4;">
+          Interface exclusiva pra laboratórios de consultas e exames médicos.<br>
+          Esconde todas as telas padrão (vendas, orçamentos, clientes) e libera: Caixa particular com recibo, Serviços, Insumos com validade e estoque mínimo, Saída manual rastreada.<br>
+          <strong style="color:#0f766e;">Só clientes do ramo de saúde devem ativar.</strong>
+        </p>
+      </div>
+
       <label>Observações</label>
       <textarea id="me-observacao" rows="3"></textarea>
 
@@ -765,7 +780,7 @@
                   <tr style="border-top:1px solid #f1f5f9;">
                     <td style="padding:6px 8px;"><strong>${escapeHtml(e.nome)}</strong> <span style="color:#94a3b8;font-size:10px;">#${e.id}</span></td>
                     <td style="padding:6px 8px;text-align:center;"><span style="background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700;">${escapeHtml(e.plano || '—')}</span></td>
-                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : ''}${e.moduloSalao ? ' 💇' : ''}${e.moduloIntegraHiper ? ' 🔗' : ''}${!e.usaAmbientes && !e.moduloSalao && !e.moduloIntegraHiper ? '—' : ''}</td>
+                    <td style="padding:6px 8px;text-align:center;">${e.usaAmbientes ? '💡' : ''}${e.moduloSalao ? ' 💇' : ''}${e.moduloIntegraHiper ? ' 🔗' : ''}${e.moduloLaboratorio ? ' 🧪' : ''}${!e.usaAmbientes && !e.moduloSalao && !e.moduloIntegraHiper && !e.moduloLaboratorio ? '—' : ''}</td>
                     <td style="padding:6px 8px;text-align:right;font-weight:600;">${e.totalProdutos}</td>
                     <td style="padding:6px 8px;text-align:right;color:#0891b2;">${e.totalFotos}</td>
                     <td style="padding:6px 8px;text-align:right;">${e.totalClientes}</td>
@@ -1025,6 +1040,7 @@
     // Salão
     document.getElementById('me-modulo-salao').checked = !!(e.moduloSalao);
     document.getElementById('me-modulo-integra-hiper').checked = !!(e.moduloIntegraHiper);
+    document.getElementById('me-modulo-laboratorio').checked = !!(e.moduloLaboratorio);
     document.getElementById('me-erro').style.display = 'none';
     document.getElementById('modal-editar').classList.add('show');
   }
@@ -1073,7 +1089,8 @@
         moduloFiscalAtivo: document.getElementById('me-modulo-fiscal').checked,
         usaAmbientes: document.getElementById('me-usa-ambientes').checked,
         moduloSalao: document.getElementById('me-modulo-salao').checked,
-        moduloIntegraHiper: document.getElementById('me-modulo-integra-hiper').checked
+        moduloIntegraHiper: document.getElementById('me-modulo-integra-hiper').checked,
+        moduloLaboratorio: document.getElementById('me-modulo-laboratorio').checked
       });
       closeEditar();
       await Promise.all([carregarDashboard(), carregarEmpresas()]);
