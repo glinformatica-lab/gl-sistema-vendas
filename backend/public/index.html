@@ -8864,7 +8864,10 @@ https://sistema.glinformatica.com.br
       }
     } catch(e) {}
     if (!podeAcessarPagina(pg)) {
-      alert('Você não tem permissão para acessar esta página.');
+      // Redirect silencioso pra pagina padrao do depto (sem alert)
+      if ((window._deptoAtual || window._papelAtual) && pg !== 'lab-dashboard' && pg !== 'dashboard') {
+        setTimeout(() => showPage('lab-dashboard'), 0);
+      }
       return;
     }
     // Modo Salão: bloqueia acesso a páginas escondidas (mesmo via URL/atalho)
