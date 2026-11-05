@@ -19,10 +19,10 @@ router.get('/', async (req, res) => {
   try {
     const { dataInicio, dataFim, incluirEstornadas } = req.query;
     const params = [req.user.empresaId];
-    let where = 'empresa_id = $1';
-    if (dataInicio) { params.push(dataInicio); where += ` AND data >= $${params.length}`; }
-    if (dataFim)    { params.push(dataFim);    where += ` AND data <= $${params.length}`; }
-    if (incluirEstornadas !== '1') where += ' AND estornado_em IS NULL';
+    let where = 's.empresa_id = $1';
+    if (dataInicio) { params.push(dataInicio); where += ` AND s.data >= $${params.length}`; }
+    if (dataFim)    { params.push(dataFim);    where += ` AND s.data <= $${params.length}`; }
+    if (incluirEstornadas !== '1') where += ' AND s.estornado_em IS NULL';
     const r = await db.query(
       `SELECT s.*, u1.nome AS usuario_nome, u2.nome AS estornado_por_nome
        FROM lab_saidas_estoque s
