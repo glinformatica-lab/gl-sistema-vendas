@@ -39,6 +39,7 @@ app.use('/api/caixa',           autenticar, verificarAcesso, require('./routes/c
 app.use('/api/lab-servicos',   autenticar, verificarAcesso, require('./routes/lab-servicos'));
 app.use('/api/lab-atendimentos', autenticar, verificarAcesso, require('./routes/lab-atendimentos'));
 app.use('/api/lab-dashboard',    autenticar, verificarAcesso, require('./routes/lab-dashboard'));
+app.use('/api/lab-insumos',     autenticar, verificarAcesso, require('./routes/lab-insumos'));
 app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
 // Módulo Salão
 app.use('/api/profissionais',     autenticar, verificarAcesso, require('./routes/profissionais'));
