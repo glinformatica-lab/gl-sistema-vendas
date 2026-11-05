@@ -1324,22 +1324,16 @@
       <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
         <form id="form-lab-atendimento" onsubmit="event.preventDefault(); salvarLabAtendimento();">
           <!-- Dados do atendimento -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
             <div>
-              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Data</label>
-              <input type="date" id="lcx-data" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
-            </div>
-            <div>
-              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Nome do Paciente</label>
-              <input type="text" id="lcx-paciente" placeholder="Nome do paciente" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
-            </div>
-            <div>
-              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">CPF/RG (opcional)</label>
-              <input type="text" id="lcx-doc" placeholder="000.000.000-00" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
-            </div>
-            <div>
-              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Telefone (opcional)</label>
-              <input type="text" id="lcx-tel" placeholder="(00) 00000-0000" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+              <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Paciente *</label>
+              <div style="display:flex;gap:6px;">
+                <input list="lcx-pacientes-list" id="lcx-paciente-nome" placeholder="Digite o nome ou escolha da lista..." oninput="labCaixaSelecionarPaciente(this.value)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+                <button type="button" onclick="abrirCadastroPacienteRapido()" style="background:#0891b2;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Novo</button>
+              </div>
+              <datalist id="lcx-pacientes-list"></datalist>
+              <input type="hidden" id="lcx-paciente-id" value="">
+              <div id="lcx-paciente-info" style="font-size:11px;color:#64748b;margin-top:6px;min-height:14px;"></div>
             </div>
             <div>
               <label style="display:block;font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px;">Forma de Pagamento</label>
@@ -1350,16 +1344,23 @@
                 <option value="Crédito">Crédito</option>
                 <option value="Outro">Outro</option>
               </select>
+              <div style="font-size:11px;color:#94a3b8;margin-top:6px;">Data do atendimento: <strong id="lcx-data-display" style="color:#334155;"></strong></div>
             </div>
           </div>
 
           <!-- Itens do atendimento -->
           <div style="margin-top:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
               <h3 style="margin:0;font-size:14px;color:#334155;">Serviços realizados</h3>
               <button type="button" onclick="labCaixaAdicionarItem()" style="background:#0891b2;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;">+ Adicionar serviço</button>
             </div>
-            <div id="lcx-itens-lista" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 160px 40px;gap:8px;padding:0 10px;margin-bottom:4px;">
+              <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.5px;">SERVIÇO</div>
+              <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.5px;text-align:right;">VALOR (R$)</div>
+              <div></div>
+            </div>
+            <datalist id="lcx-servicos-list"></datalist>
+            <div id="lcx-itens-lista" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
 
           <!-- Observacoes -->
@@ -26866,16 +26867,25 @@ ${conteudo}
   var _labCaixaItens = [];  // [{servicoId, nome, valor}]
   var _labAtendimentosRecentes = [];
 
+  var _labClientes = [];
+  var _labClienteSelecionadoId = null;
+
   async function carregarLabCaixa() {
-    // Reset form se nao estiver edicao
-    const dataEl = document.getElementById('lcx-data');
-    if (dataEl && !dataEl.value) dataEl.value = new Date().toISOString().slice(0,10);
+    // Atualiza data display pra hoje
+    const dataDisplayEl = document.getElementById('lcx-data-display');
+    if (dataDisplayEl) dataDisplayEl.textContent = formatarDataBR(new Date().toISOString().slice(0,10));
     try {
       _labServicosCatalogo = await api('GET', '/api/lab-servicos');
     } catch (e) { _labServicosCatalogo = []; }
     try {
+      _labClientes = await api('GET', '/api/clientes');
+    } catch (e) { _labClientes = []; }
+    try {
       _labAtendimentosRecentes = await api('GET', '/api/lab-atendimentos?limite=20');
     } catch (e) { _labAtendimentosRecentes = []; }
+    // Popula datalists
+    popularDatalistServicos();
+    popularDatalistPacientes();
     // Se tem lista vazia, inicia com 1 item
     if (_labCaixaItens.length === 0) {
       _labCaixaItens = [{ servicoId: null, nome: '', valor: 0 }];
@@ -26884,46 +26894,67 @@ ${conteudo}
     renderLabCaixaRecentes();
   }
 
+  function popularDatalistServicos() {
+    const dl = document.getElementById('lcx-servicos-list');
+    if (!dl) return;
+    dl.innerHTML = _labServicosCatalogo.map(s =>
+      '<option value="' + escapeAttr(s.nome) + '" data-preco="' + s.preco + '">R$ ' + Number(s.preco).toFixed(2).replace('.', ',') + '</option>'
+    ).join('');
+  }
+
+  function popularDatalistPacientes() {
+    const dl = document.getElementById('lcx-pacientes-list');
+    if (!dl) return;
+    dl.innerHTML = _labClientes.map(c =>
+      '<option value="' + escapeAttr(c.nome) + '">' + (c.doc ? c.doc + ' - ' : '') + (c.telefone || '') + '</option>'
+    ).join('');
+  }
+
+  function labCaixaSelecionarPaciente(nome) {
+    const nomeNorm = (nome || '').trim().toLowerCase();
+    const c = _labClientes.find(x => (x.nome || '').trim().toLowerCase() === nomeNorm);
+    const infoEl = document.getElementById('lcx-paciente-info');
+    const hiddenEl = document.getElementById('lcx-paciente-id');
+    if (c) {
+      _labClienteSelecionadoId = c.id;
+      if (hiddenEl) hiddenEl.value = c.id;
+      const partes = [];
+      if (c.doc) partes.push('<strong>CPF/RG:</strong> ' + escapeHtml(c.doc));
+      if (c.telefone) partes.push('<strong>Tel:</strong> ' + escapeHtml(c.telefone));
+      if (infoEl) infoEl.innerHTML = partes.length ? '✅ ' + partes.join(' &middot; ') : '✅ Paciente cadastrado';
+    } else {
+      _labClienteSelecionadoId = null;
+      if (hiddenEl) hiddenEl.value = '';
+      if (infoEl) infoEl.innerHTML = nomeNorm ? '<span style="color:#f59e0b;">⚠ Paciente não cadastrado. Clique "+ Novo" pra cadastrar.</span>' : '';
+    }
+  }
+
   function renderLabCaixaItens() {
     const el = document.getElementById('lcx-itens-lista');
     if (!el) return;
-    el.innerHTML = _labCaixaItens.map((it, idx) => {
-      const opcoesServ = _labServicosCatalogo.map(s =>
-        '<option value="' + s.id + '" data-preco="' + s.preco + '"' + (it.servicoId == s.id ? ' selected' : '') + '>' + escapeHtml(s.nome) + '</option>'
-      ).join('');
-      return '<div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:center;">'
-        + '<div>'
-        + '  <select onchange="labCaixaSelecionarServico(' + idx + ', this)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">'
-        + '    <option value="">-- Escolha ou digite nome manual --</option>'
-        + opcoesServ
-        + '  </select>'
-        + '  <input type="text" placeholder="Ou digite nome manual" value="' + escapeAttr(it.nome || '') + '" oninput="labCaixaMudarNome(' + idx + ', this.value)" style="width:100%;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;font-size:12px;">'
-        + '</div>'
-        + '<input type="number" step="0.01" min="0" placeholder="0,00" value="' + (it.valor || '') + '" oninput="labCaixaMudarValor(' + idx + ', this.value)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;">'
-        + '<button type="button" onclick="labCaixaRemoverItem(' + idx + ')" style="background:#dc2626;color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;">✖</button>'
-        + '</div>';
-    }).join('');
+    el.innerHTML = _labCaixaItens.map((it, idx) => (
+      '<div style="display:grid;grid-template-columns:1fr 160px 40px;gap:8px;align-items:center;background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;">'
+      + '<input type="text" list="lcx-servicos-list" placeholder="Digite ou escolha..." value="' + escapeAttr(it.nome || '') + '" oninput="labCaixaMudarServicoNome(' + idx + ', this.value)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box;">'
+      + '<input type="number" step="0.01" min="0" placeholder="0,00" value="' + (it.valor || '') + '" oninput="labCaixaMudarValor(' + idx + ', this.value)" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;box-sizing:border-box;">'
+      + '<button type="button" onclick="labCaixaRemoverItem(' + idx + ')" title="Remover" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 10px;border-radius:6px;cursor:pointer;font-weight:700;">✖</button>'
+      + '</div>'
+    )).join('');
     labCaixaCalcularTotal();
   }
 
-  function labCaixaSelecionarServico(idx, selectEl) {
-    const val = selectEl.value;
-    const servicoId = val ? parseInt(val) : null;
-    if (servicoId) {
-      const s = _labServicosCatalogo.find(x => x.id === servicoId);
-      if (s) {
-        _labCaixaItens[idx] = { servicoId: s.id, nome: s.nome, valor: Number(s.preco) || 0 };
-      }
+  function labCaixaMudarServicoNome(idx, novo) {
+    _labCaixaItens[idx].nome = novo;
+    // Tenta achar servico pelo nome exato - se achar, preenche o valor
+    const s = _labServicosCatalogo.find(x => (x.nome || '').trim().toLowerCase() === (novo || '').trim().toLowerCase());
+    if (s) {
+      _labCaixaItens[idx].servicoId = s.id;
+      _labCaixaItens[idx].valor = Number(s.preco) || 0;
+      renderLabCaixaItens();
     } else {
       _labCaixaItens[idx].servicoId = null;
     }
-    renderLabCaixaItens();
   }
 
-  function labCaixaMudarNome(idx, novo) {
-    _labCaixaItens[idx].nome = novo;
-    _labCaixaItens[idx].servicoId = null; // nome manual = sem vinculo
-  }
 
   function labCaixaMudarValor(idx, novo) {
     _labCaixaItens[idx].valor = parseFloat(novo) || 0;
@@ -26949,33 +26980,43 @@ ${conteudo}
 
   function labCaixaLimpar() {
     if (!confirm('Limpar atendimento atual?')) return;
-    document.getElementById('lcx-paciente').value = '';
-    document.getElementById('lcx-doc').value = '';
-    document.getElementById('lcx-tel').value = '';
-    document.getElementById('lcx-forma').value = 'Dinheiro';
-    document.getElementById('lcx-obs').value = '';
-    document.getElementById('lcx-erro').style.display = 'none';
+    labCaixaLimparSemConfirmar();
+  }
+
+  function labCaixaLimparSemConfirmar() {
+    const p = document.getElementById('lcx-paciente-nome'); if (p) p.value = '';
+    const pi = document.getElementById('lcx-paciente-id'); if (pi) pi.value = '';
+    const info = document.getElementById('lcx-paciente-info'); if (info) info.innerHTML = '';
+    _labClienteSelecionadoId = null;
+    const forma = document.getElementById('lcx-forma'); if (forma) forma.value = 'Dinheiro';
+    const obs = document.getElementById('lcx-obs'); if (obs) obs.value = '';
+    const erro = document.getElementById('lcx-erro'); if (erro) erro.style.display = 'none';
     _labCaixaItens = [{ servicoId: null, nome: '', valor: 0 }];
     renderLabCaixaItens();
   }
 
   async function salvarLabAtendimento() {
-    const data = document.getElementById('lcx-data').value;
-    const pacienteNome = document.getElementById('lcx-paciente').value.trim();
-    const pacienteDoc = document.getElementById('lcx-doc').value.trim();
-    const pacienteTel = document.getElementById('lcx-tel').value.trim();
+    const data = new Date().toISOString().slice(0,10); // sempre hoje
+    const pacienteNome = document.getElementById('lcx-paciente-nome').value.trim();
+    // Pega doc/tel do cliente selecionado (se houver)
+    let pacienteDoc = '';
+    let pacienteTel = '';
+    if (_labClienteSelecionadoId) {
+      const c = _labClientes.find(x => x.id === _labClienteSelecionadoId);
+      if (c) { pacienteDoc = c.doc || ''; pacienteTel = c.telefone || ''; }
+    }
     const formaPagamento = document.getElementById('lcx-forma').value;
     const obs = document.getElementById('lcx-obs').value.trim();
     const erro = document.getElementById('lcx-erro');
-    // Filtra itens validos
-    const itensValidos = _labCaixaItens.filter(it => (it.nome || '').trim() && Number(it.valor) >= 0);
-    if (itensValidos.length === 0) {
-      erro.textContent = 'Adicione pelo menos um servico com nome.';
+    if (!pacienteNome) {
+      erro.textContent = 'Informe o paciente. Se não estiver cadastrado, clique em "+ Novo".';
       erro.style.display = 'block';
       return;
     }
-    if (!data) {
-      erro.textContent = 'Informe a data.';
+    // Filtra itens validos
+    const itensValidos = _labCaixaItens.filter(it => (it.nome || '').trim() && Number(it.valor) >= 0);
+    if (itensValidos.length === 0) {
+      erro.textContent = 'Adicione pelo menos um servico com nome e valor.';
       erro.style.display = 'block';
       return;
     }
@@ -27134,6 +27175,93 @@ ${conteudo}
     }
   }
 
+
+  // ======================================================
+  // Cadastro rapido de paciente (reusa /api/clientes)
+  // ======================================================
+  function abrirCadastroPacienteRapido() {
+    const nomeDigitado = document.getElementById('lcx-paciente-nome').value.trim();
+    document.getElementById('mpr-nome').value = nomeDigitado;
+    document.getElementById('mpr-doc').value = '';
+    document.getElementById('mpr-tel').value = '';
+    document.getElementById('mpr-endereco').value = '';
+    document.getElementById('mpr-cidade').value = '';
+    document.getElementById('mpr-uf').value = '';
+    document.getElementById('mpr-erro').style.display = 'none';
+    document.getElementById('modal-paciente-rapido').style.display = 'flex';
+    setTimeout(() => { const el = document.getElementById(nomeDigitado ? 'mpr-doc' : 'mpr-nome'); if (el) el.focus(); }, 100);
+  }
+
+  function fecharCadastroPacienteRapido() {
+    document.getElementById('modal-paciente-rapido').style.display = 'none';
+  }
+
+  async function salvarPacienteRapido() {
+    const nome = document.getElementById('mpr-nome').value.trim();
+    const doc = document.getElementById('mpr-doc').value.trim();
+    const telefone = document.getElementById('mpr-tel').value.trim();
+    const endereco = document.getElementById('mpr-endereco').value.trim();
+    const cidade = document.getElementById('mpr-cidade').value.trim();
+    const uf = document.getElementById('mpr-uf').value.trim().toUpperCase();
+    const erro = document.getElementById('mpr-erro');
+    if (!nome) {
+      erro.textContent = 'Nome e obrigatorio.';
+      erro.style.display = 'block';
+      return;
+    }
+    erro.style.display = 'none';
+    try {
+      const novo = await api('POST', '/api/clientes', { nome, doc, telefone, endereco, cidade, uf });
+      // Recarrega lista e seleciona o novo
+      _labClientes = await api('GET', '/api/clientes');
+      popularDatalistPacientes();
+      document.getElementById('lcx-paciente-nome').value = novo.nome;
+      labCaixaSelecionarPaciente(novo.nome);
+      fecharCadastroPacienteRapido();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
 </script>
+
+  <!-- Modal: cadastro rapido de paciente -->
+  <div id="modal-paciente-rapido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <h2 style="margin-top:0;color:#0891b2;">Cadastrar Paciente</h2>
+      <form id="form-paciente-rapido" onsubmit="event.preventDefault(); salvarPacienteRapido();">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Nome *</label>
+        <input type="text" id="mpr-nome" required style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">CPF/RG</label>
+            <input type="text" id="mpr-doc" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Telefone</label>
+            <input type="text" id="mpr-tel" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+        </div>
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Endereço (opcional)</label>
+        <input type="text" id="mpr-endereco" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Cidade</label>
+            <input type="text" id="mpr-cidade" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">UF</label>
+            <input type="text" id="mpr-uf" maxlength="2" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-transform:uppercase;">
+          </div>
+        </div>
+        <div id="mpr-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="button" onclick="fecharCadastroPacienteRapido()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar Paciente</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>
