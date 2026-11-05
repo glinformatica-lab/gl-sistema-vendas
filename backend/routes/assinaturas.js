@@ -16,6 +16,7 @@ const PLANOS = {
   basico:        { nome: 'Plano Básico',     valor: 99.90,   meses: 1,  modulosVendaOnline: false, moduloFiscal: false },
   pro:           { nome: 'Plano Pro',        valor: 149.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: false },
   'pro-fiscal':  { nome: 'Plano Pro Fiscal', valor: 249.90,  meses: 1,  modulosVendaOnline: true,  moduloFiscal: true  },
+  'laboratorio': { nome: 'Módulo Laboratório', valor: 149.90, meses: 1,  modulosVendaOnline: false, moduloFiscal: false },
   // === Plano SALÃO (módulo específico) ===
   salao:         { nome: 'Módulo Salão',     valor: 149.90,  meses: 1,  modulosVendaOnline: false, moduloFiscal: false, moduloSalao: true },
   // === Planos ANUAIS (10% de desconto) ===
@@ -46,7 +47,7 @@ router.post('/iniciar', async (req, res) => {
 
   // Validações de entrada
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro", "pro-fiscal", "salao" ou "laboratorio".' });
   }
   // Bloqueia novas contratações de Pro Fiscal (ainda em desenvolvimento - aguardando NFe)
   if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
@@ -360,7 +361,7 @@ router.post('/renovar', async (req, res) => {
 
   const { plano } = req.body || {};
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro", "pro-fiscal", "salao" ou "laboratorio".' });
   }
   // Bloqueia renovação no Pro Fiscal (em desenvolvimento)
   if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
@@ -718,7 +719,7 @@ const { autenticar } = require('../middleware/auth');
 router.post('/renovar', autenticar, async (req, res) => {
   const { plano } = req.body || {};
   if (!plano || !PLANOS[plano]) {
-    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro" ou "pro-fiscal".' });
+    return res.status(400).json({ error: 'Plano inválido. Use "basico", "pro", "pro-fiscal", "salao" ou "laboratorio".' });
   }
   if (plano === 'pro-fiscal' || plano === 'pro-fiscal-anual') {
     return res.status(400).json({ error: 'O Plano Pro Fiscal está em desenvolvimento. Por enquanto, escolha Básico ou Pro.' });
