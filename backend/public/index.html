@@ -625,7 +625,55 @@
     .card-fin.pago { background:#e8f5e9; border-left: 4px solid #2e7d32; }
     .card-fin h4 { margin:0 0 6px; font-size:13px; color:#666; text-transform:uppercase; letter-spacing:0.5px; }
     .card-fin .valor { font-size:22px; font-weight:700; color:#333; }
-  </style>
+      /* Lab Financeiro - Botoes de acao */
+    .btn-acao-fin {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.18s ease;
+      margin-right: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      line-height: 1;
+    }
+    .btn-acao-fin.btn-pagar {
+      background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+      color: white;
+      box-shadow: 0 1px 3px rgba(46, 125, 50, 0.3);
+    }
+    .btn-acao-fin.btn-pagar:hover {
+      background: linear-gradient(135deg, #388e3c 0%, #1b5e20 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(46, 125, 50, 0.4);
+    }
+    .btn-acao-fin.btn-receber {
+      background: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+      color: white;
+      box-shadow: 0 1px 3px rgba(13, 71, 161, 0.3);
+    }
+    .btn-acao-fin.btn-receber:hover {
+      background: linear-gradient(135deg, #1565c0 0%, #0a3d8a 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(13, 71, 161, 0.4);
+    }
+    .btn-acao-fin.btn-excluir {
+      background: #fff;
+      color: #c62828;
+      border: 1.5px solid #ffcdd2;
+      padding: 5px 10px;
+    }
+    .btn-acao-fin.btn-excluir:hover {
+      background: #ffebee;
+      border-color: #c62828;
+      transform: translateY(-1px);
+    }
+    .btn-acao-fin:active { transform: translateY(0); }
+    .td-acoes { white-space: nowrap; }
+</style>
 </head>
 <body>
 <button id="menu-toggle" onclick="toggleMenu()" aria-label="Abrir menu">&#9776;</button>
@@ -28143,9 +28191,13 @@ function renderLabFinanceiro() {
     h += "<td>" + (c.categoria || "-") + "</td>";
     h += "<td><b>" + fmt(parseFloat(c.valor || 0)) + "</b></td>";
     h += '<td><span class="status-badge ' + stCls + '">' + stTxt + '</span></td>';
-    h += '<td>';
-    if (!pago) h += '<button class="btn-sm" onclick="pagarConta(' + c.id + ')">' + verboPago + '</button> ';
-    h += '<button class="btn-sm btn-danger" onclick="excluirConta(' + c.id + ')">Excluir</button>';
+    h += '<td class="td-acoes">';
+    if (!pago) {
+      const classeBtn = _labAbaFin === "pagar" ? "btn-pagar" : "btn-receber";
+      const icone = _labAbaFin === "pagar" ? "✓" : "✓";
+      h += '<button class="btn-acao-fin ' + classeBtn + '" onclick="pagarConta(' + c.id + ')" title="' + verboPago + '">' + icone + ' ' + verboPago + '</button>';
+    }
+    h += '<button class="btn-acao-fin btn-excluir" onclick="excluirConta(' + c.id + ')" title="Excluir">🗑️</button>';
     h += '</td></tr>';
   });
   h += "</tbody></table>";
