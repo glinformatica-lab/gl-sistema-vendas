@@ -1515,6 +1515,20 @@
       </table>
     </div>
 
+    <div id="page-lab-saidas" class="pagina feature-laboratorio" style="display:none">
+      <div class="header-pagina" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">📤 Saída Manual de Insumos</h2>
+        <button onclick="abrirNovaSaida()" class="btn btn-primary">+ Nova Saída</button>
+      </div>
+      <div class="filtros-saida">
+        <label>De: <input type="date" id="saida-filtro-inicio" onchange="carregarLabSaidas()"></label>
+        <label>Até: <input type="date" id="saida-filtro-fim" onchange="carregarLabSaidas()"></label>
+        <label><input type="checkbox" id="saida-filtro-estornadas" onchange="carregarLabSaidas()"> Incluir estornadas</label>
+      </div>
+      <div id="lab-saidas-lista"></div>
+    </div>
+
+
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
     <div id="page-lab-servicos" style="display:none;">
       <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
@@ -1552,18 +1566,7 @@
             </div>
           </div>
     <!-- Saida Manual de Insumos -->
-    <div id="page-lab-saidas" class="pagina feature-laboratorio" style="display:none">
-      <div class="header-pagina" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h2 style="margin:0;">📤 Saída Manual de Insumos</h2>
-        <button onclick="abrirNovaSaida()" class="btn btn-primary">+ Nova Saída</button>
-      </div>
-      <div class="filtros-saida">
-        <label>De: <input type="date" id="saida-filtro-inicio" onchange="carregarLabSaidas()"></label>
-        <label>Até: <input type="date" id="saida-filtro-fim" onchange="carregarLabSaidas()"></label>
-        <label><input type="checkbox" id="saida-filtro-estornadas" onchange="carregarLabSaidas()"> Incluir estornadas</label>
-      </div>
-      <div id="lab-saidas-lista"></div>
-    </div>
+    
 
           <label>Nome *</label>
           <input type="text" id="mls-nome" required placeholder="Ex: Consulta Ortopedia">
@@ -28099,6 +28102,35 @@ async function estornarLabSaida(id) {
           </div>
         </div>
     <!-- Modal Saida Manual -->
+    
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque</label>
+            <input type="number" step="0.001" min="0" id="mli-estoque" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque mínimo</label>
+            <input type="number" step="0.001" min="0" id="mli-min" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Preço custo</label>
+            <input type="number" step="0.01" min="0" id="mli-preco" placeholder="0,00" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+        </div>
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Validade</label>
+        <input type="date" id="mli-validade" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Observação</label>
+        <textarea id="mli-obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;"></textarea>
+        <div id="mli-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="button" onclick="fecharLabInsumo()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
     <div id="modal-lab-saida">
       <div class="modal-content">
         <h3 style="margin-top:0;">Nova Saída de Insumo</h3>
@@ -28150,32 +28182,5 @@ async function estornarLabSaida(id) {
         </div>
       </div>
     </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div>
-            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque</label>
-            <input type="number" step="0.001" min="0" id="mli-estoque" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
-          </div>
-          <div>
-            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque mínimo</label>
-            <input type="number" step="0.001" min="0" id="mli-min" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
-          </div>
-          <div>
-            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Preço custo</label>
-            <input type="number" step="0.01" min="0" id="mli-preco" placeholder="0,00" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
-          </div>
-        </div>
-        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Validade</label>
-        <input type="date" id="mli-validade" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
-        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Observação</label>
-        <textarea id="mli-obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;"></textarea>
-        <div id="mli-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
-        <div style="display:flex;gap:10px;margin-top:16px;">
-          <button type="button" onclick="fecharLabInsumo()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
-          <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</body>
+  </body>
 </html>
