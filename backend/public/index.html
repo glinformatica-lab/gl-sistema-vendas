@@ -1430,6 +1430,28 @@
       </table>
     </div>
 
+    <!-- ========== LAB FORNECEDORES ========== -->
+    <div id="page-lab-fornecedores" style="display:none;">
+      <div class="page-title">🚚 Fornecedores</div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn" onclick="abrirLabFornecedor()">+ Novo Fornecedor</button>
+        <input id="filtro-lab-fornecedores" type="text" placeholder="Buscar..." oninput="renderLabFornecedores()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CNPJ/CPF</th>
+            <th>Telefone</th>
+            <th>E-mail</th>
+            <th>Cidade</th>
+            <th class="acoes">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-lab-fornecedores"></tbody>
+      </table>
+    </div>
+
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
     <div id="page-lab-servicos" style="display:none;">
       <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
@@ -8681,6 +8703,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'lab-dashboard') carregarLabDashboard();
     if(pg === 'lab-caixa') carregarLabCaixa();
     if(pg === 'lab-pacientes') carregarLabPacientes();
+    if(pg === 'lab-fornecedores') carregarLabFornecedores();
     if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
@@ -27349,6 +27372,119 @@ ${conteudo}
     }
   }
 
+
+  // ======================================================
+  // LAB FORNECEDORES - CRUD (reusa /api/fornecedores)
+  // ======================================================
+  var _labFornecedores = [];
+
+  async function carregarLabFornecedores() {
+    try {
+      _labFornecedores = await api('GET', '/api/fornecedores');
+      renderLabFornecedores();
+    } catch (err) {
+      alert('Erro ao carregar fornecedores: ' + err.message);
+    }
+  }
+
+  function renderLabFornecedores() {
+    const tbody = document.getElementById('tbody-lab-fornecedores');
+    if (!tbody) return;
+    const filtroEl = document.getElementById('filtro-lab-fornecedores');
+    const filtro = (filtroEl ? filtroEl.value : '').toLowerCase().trim();
+    const lista = _labFornecedores.filter(f => {
+      if (!filtro) return true;
+      return (f.nome || '').toLowerCase().includes(filtro)
+        || (f.doc || '').toLowerCase().includes(filtro)
+        || (f.telefone || '').toLowerCase().includes(filtro)
+        || (f.cidade || '').toLowerCase().includes(filtro);
+    });
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum fornecedor cadastrado. Clique em "+ Novo Fornecedor" para começar.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(f => '<tr>'
+      + '<td style="font-weight:600;">' + escapeHtml(f.nome) + '</td>'
+      + '<td>' + escapeHtml(f.doc || '-') + '</td>'
+      + '<td>' + escapeHtml(f.telefone || '-') + '</td>'
+      + '<td>' + escapeHtml(f.email || '-') + '</td>'
+      + '<td>' + escapeHtml(f.cidade || '-') + '</td>'
+      + '<td class="acoes" style="text-align:center;white-space:nowrap;">'
+      + '<button onclick="abrirLabFornecedor(' + f.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px;">Editar</button>'
+      + '<button onclick="excluirLabFornecedor(' + f.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Excluir</button>'
+      + '</td></tr>'
+    ).join('');
+  }
+
+  function abrirLabFornecedor(id) {
+    if (id) {
+      const f = _labFornecedores.find(x => x.id === id);
+      if (!f) return;
+      document.getElementById('mlf-titulo').textContent = 'Editar Fornecedor';
+      document.getElementById('mlf-id').value = f.id;
+      document.getElementById('mlf-nome').value = f.nome || '';
+      document.getElementById('mlf-doc').value = f.doc || '';
+      document.getElementById('mlf-tel').value = f.telefone || '';
+      document.getElementById('mlf-email').value = f.email || '';
+      document.getElementById('mlf-cidade').value = f.cidade || '';
+    } else {
+      document.getElementById('mlf-titulo').textContent = 'Cadastrar Fornecedor';
+      document.getElementById('mlf-id').value = '';
+      document.getElementById('mlf-nome').value = '';
+      document.getElementById('mlf-doc').value = '';
+      document.getElementById('mlf-tel').value = '';
+      document.getElementById('mlf-email').value = '';
+      document.getElementById('mlf-cidade').value = '';
+    }
+    document.getElementById('mlf-erro').style.display = 'none';
+    document.getElementById('modal-lab-fornecedor').style.display = 'flex';
+    setTimeout(() => { const el = document.getElementById('mlf-nome'); if (el) el.focus(); }, 100);
+  }
+
+  function fecharLabFornecedor() {
+    document.getElementById('modal-lab-fornecedor').style.display = 'none';
+  }
+
+  async function salvarLabFornecedor() {
+    const id = document.getElementById('mlf-id').value;
+    const nome = document.getElementById('mlf-nome').value.trim();
+    const doc = document.getElementById('mlf-doc').value.trim();
+    const telefone = document.getElementById('mlf-tel').value.trim();
+    const email = document.getElementById('mlf-email').value.trim();
+    const cidade = document.getElementById('mlf-cidade').value.trim();
+    const erro = document.getElementById('mlf-erro');
+    if (!nome) {
+      erro.textContent = 'Nome e obrigatorio.';
+      erro.style.display = 'block';
+      return;
+    }
+    erro.style.display = 'none';
+    try {
+      if (id) {
+        await api('PUT', '/api/fornecedores/' + id, { nome, doc, telefone, email, cidade });
+      } else {
+        await api('POST', '/api/fornecedores', { nome, doc, telefone, email, cidade });
+      }
+      fecharLabFornecedor();
+      await carregarLabFornecedores();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirLabFornecedor(id) {
+    const f = _labFornecedores.find(x => x.id === id);
+    if (!f) return;
+    if (!confirm('Excluir fornecedor "' + f.nome + '"?')) return;
+    try {
+      await api('DELETE', '/api/fornecedores/' + id);
+      await carregarLabFornecedores();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
 </script>
 
   <!-- Modal: cadastro rapido de paciente -->
@@ -27385,6 +27521,37 @@ ${conteudo}
         <div style="display:flex;gap:10px;margin-top:16px;">
           <button type="button" onclick="fecharCadastroPacienteRapido()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
           <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar Paciente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: cadastro/edicao fornecedor lab -->
+  <div id="modal-lab-fornecedor" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <h2 id="mlf-titulo" style="margin-top:0;color:#0891b2;">Cadastrar Fornecedor</h2>
+      <input type="hidden" id="mlf-id" value="">
+      <form id="form-lab-fornecedor" onsubmit="event.preventDefault(); salvarLabFornecedor();">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Nome *</label>
+        <input type="text" id="mlf-nome" required style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">CNPJ/CPF</label>
+            <input type="text" id="mlf-doc" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Telefone</label>
+            <input type="text" id="mlf-tel" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+        </div>
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">E-mail</label>
+        <input type="email" id="mlf-email" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Cidade</label>
+        <input type="text" id="mlf-cidade" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <div id="mlf-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="button" onclick="fecharLabFornecedor()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar</button>
         </div>
       </form>
     </div>
