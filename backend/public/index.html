@@ -8835,6 +8835,7 @@ https://sistema.glinformatica.com.br
   function podeAcessarPagina(pg) {
     const papel = window._papelAtual;
     if (papel === 'admin') return true;
+    if (window._deptoAtual && typeof podeAcessarPaginaLab === "function") return podeAcessarPaginaLab(pg);
     if (papel === 'financeiro') {
       return !_paginasBloqueadasFinanceiro.includes(pg);
     }
@@ -28339,12 +28340,11 @@ async function carregarMeDeptoLab() {
 function podeAcessarPaginaLab(pg) {
   if (window._papelAtual === "admin") return true;
   const depto = window._deptoAtual;
-  if (!depto) return true;
+  if (!depto) return false;
+  if (depto === "gerencia") return true;
+  if (pg === "minha-conta" || pg === "lab-dashboard") return true;
   const mapa = DEPTOS_LAB_PAGINAS[depto];
-  if (mapa === "TODAS") return true;
-  if (!mapa) return true;
-  // So aplica controle para paginas LAB-
-  if (!pg.startsWith("lab-")) return true;
+  if (!mapa) return false;
   return mapa.includes(pg);
 }
 
