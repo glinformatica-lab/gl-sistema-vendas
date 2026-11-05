@@ -6,6 +6,10 @@ const router = express.Router();
 const camelizar = (row) => {
   if (!row) return row;
   const out = {};
+  for (const k in row) out[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = row[k];
+  return out;
+};
+
 const parsePerms = (val) => {
   if (!val) return [];
   if (Array.isArray(val)) return val;
@@ -13,11 +17,6 @@ const parsePerms = (val) => {
 };
 const serializePerms = (arr) => Array.isArray(arr) ? JSON.stringify(arr) : null;
 
-  for (const k in row) out[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = row[k];
-  return out;
-};
-
-// Retorna o usuario logado (pra o frontend saber departamento + papel)
 router.get('/me', async (req, res) => {
   try {
     const r = await db.query(
