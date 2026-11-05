@@ -79,7 +79,7 @@
     body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio):not(.permanente-sidebar) {
       display: none !important;
     }
-    body.modo-lab #menu .feature-laboratorio {
+    body.modo-lab #menu > button.feature-laboratorio {
       display: block !important;
     }
     .menu-btn.submenu-item:hover {
@@ -586,10 +586,17 @@
     <!-- ========== MENU DO MODULO LABORATORIO (feature-laboratorio) ========== -->
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-dashboard')" style="display:none;">&#128657; Dashboard Lab</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-caixa')" style="display:none;">&#128181; Caixa</button>
-    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-servicos')" style="display:none;">&#128278; Servicos</button>
-    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-pacientes')" style="display:none;">&#128101; Pacientes</button>
-    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-insumos')" style="display:none;">&#128230; Insumos</button>
-    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-fornecedores')" style="display:none;">&#128666; Fornecedores</button>
+    <!-- Grupo Cadastros Lab -->
+    <button class="menu-btn menu-grupo feature-laboratorio" onclick="toggleGrupoMenu('lab-cadastros')" data-grupo="lab-cadastros" type="button" style="display:none;">
+      <span>&#128230; Cadastros</span>
+      <span class="grupo-seta" id="seta-lab-cadastros">▼</span>
+    </button>
+    <div class="submenu feature-laboratorio" id="submenu-lab-cadastros" style="display:none;">
+      <button class="menu-btn submenu-item" onclick="showPage('lab-pacientes')">&#128101; Pacientes</button>
+      <button class="menu-btn submenu-item" onclick="showPage('lab-servicos')">&#128278; Serviços</button>
+      <button class="menu-btn submenu-item" onclick="showPage('lab-fornecedores')">&#128666; Fornecedores</button>
+      <button class="menu-btn submenu-item" onclick="showPage('lab-insumos')">&#128230; Insumos</button>
+    </div>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-financeiro')" style="display:none;">&#128176; Financeiro</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-saidas')" style="display:none;">&#128229; Saida Manual</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('usuarios')" style="display:none;">&#128101; Usuarios</button>
@@ -8430,6 +8437,11 @@ https://sistema.glinformatica.com.br
   // Mapa: qual grupo de submenu cada página pertence
   const _grupoMenu = {
     'produtos': 'cadastros',
+    // Modulo Lab
+    'lab-pacientes': 'lab-cadastros',
+    'lab-servicos': 'lab-cadastros',
+    'lab-fornecedores': 'lab-cadastros',
+    'lab-insumos': 'lab-cadastros',
     'servicos': 'cadastros',
     'ambientes': 'cadastros',
     'clientes': 'cadastros',
