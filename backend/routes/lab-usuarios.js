@@ -6,6 +6,13 @@ const router = express.Router();
 const camelizar = (row) => {
   if (!row) return row;
   const out = {};
+const parsePerms = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
+};
+const serializePerms = (arr) => Array.isArray(arr) ? JSON.stringify(arr) : null;
+
   for (const k in row) out[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = row[k];
   return out;
 };
@@ -14,7 +21,7 @@ const camelizar = (row) => {
 router.get('/me', async (req, res) => {
   try {
     const r = await db.query(
-      'SELECT id, email, nome, papel, departamento FROM usuarios WHERE id = $1 AND empresa_id = $2',
+      'SELECT id, email, nome, papel, departamento, permissoes FROM usuarios WHERE id = $1 AND empresa_id = $2',
       [req.user.userId, req.user.empresaId]
     );
     if (!r.rowCount) {
@@ -38,10 +45,10 @@ router.get('/me', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
-      'SELECT id, email, nome, papel, departamento, criado_em FROM usuarios WHERE empresa_id = $1 ORDER BY departamento NULLS LAST, nome',
+      'SELECT id, email, nome, papel, departamento, permissoes, criado_em FROM usuarios WHERE empresa_id = $1 ORDER BY departamento NULLS LAST, nome',
       [req.user.empresaId]
     );
-    res.json(r.rows.map(camelizar));
+    res.json(r.rows.map(row => ({ ...camelizar(row), permissoes: parsePerms(row.permissoes) })));
   } catch (err) {
     console.error('[lab-usuarios/list]', err);
     res.status(500).json({ error: 'Erro ao listar usuarios.' });
@@ -50,7 +57,7 @@ router.get('/', async (req, res) => {
 
 // Cria novo usuario (so admin ou gerencia)
 router.post('/', async (req, res) => {
-  const { email, nome, senha, departamento, papel } = req.body || {};
+  const { email, nome, senha, departamento, papel, permissoes } = req.body || {};
   if (!email || !nome || !senha) return res.status(400).json({ error: 'email, nome e senha obrigatorios.' });
   if (String(senha).length < 4) return res.status(400).json({ error: 'Senha minima de 4 caracteres.' });
   // Permissao: so admin ou gerencia
@@ -60,13 +67,13 @@ router.post('/', async (req, res) => {
   try {
     const hash = await bcrypt.hash(senha, 10);
     const ins = await db.query(
-      `INSERT INTO usuarios (empresa_id, email, nome, senha_hash, papel, departamento)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, nome, papel, departamento`,
+      `INSERT INTO usuarios (empresa_id, email, nome, senha_hash, papel, departamento, permissoes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, email, nome, papel, departamento, permissoes`,
       [req.user.empresaId, String(email).toLowerCase().trim(), nome.trim(), hash,
-       papel || 'operador', departamento || null]
+       papel || 'operador', departamento || null, serializePerms(permissoes)]
     );
-    res.json(camelizar(ins.rows[0]));
+    const row = ins.rows[0]; res.json({ ...camelizar(row), permissoes: parsePerms(row.permissoes) });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Email ja cadastrado.' });
     console.error('[lab-usuarios/create]', err);
@@ -76,7 +83,7 @@ router.post('/', async (req, res) => {
 
 // Edita usuario
 router.put('/:id', async (req, res) => {
-  const { email, nome, departamento, papel, senha } = req.body || {};
+  const { email, nome, departamento, papel, senha, permissoes } = req.body || {};
   // Permissao
   if (req.user.papel !== 'admin' && req.user.departamento !== 'gerencia') {
     return res.status(403).json({ error: 'Apenas admin/gerencia podem editar usuarios.' });
@@ -86,7 +93,8 @@ router.put('/:id', async (req, res) => {
   let i = 1;
   if (email !== undefined) { sets.push(`email = $${i++}`); vals.push(String(email).toLowerCase().trim()); }
   if (nome !== undefined)  { sets.push(`nome = $${i++}`);  vals.push(String(nome).trim()); }
-  if (departamento !== undefined) { sets.push(`departamento = $${i++}`); vals.push(departamento || null); }
+  if (departamento !== undefined) { sets.push(`departamento = ${i++}`); vals.push(departamento || null); }
+  if (permissoes !== undefined) { sets.push(`permissoes = ${i++}`); vals.push(serializePerms(permissoes)); }
   if (papel !== undefined) { sets.push(`papel = $${i++}`); vals.push(papel); }
   if (senha && String(senha).length >= 4) {
     const hash = await bcrypt.hash(senha, 10);
@@ -99,11 +107,11 @@ router.put('/:id', async (req, res) => {
     const r = await db.query(
       `UPDATE usuarios SET ${sets.join(', ')}
        WHERE id = $${i++} AND empresa_id = $${i}
-       RETURNING id, email, nome, papel, departamento`,
+       RETURNING id, email, nome, papel, departamento, permissoes`,
       vals
     );
     if (!r.rowCount) return res.status(404).json({ error: 'Usuario nao encontrado.' });
-    res.json(camelizar(r.rows[0]));
+    const row = r.rows[0]; res.json({ ...camelizar(row), permissoes: parsePerms(row.permissoes) });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Email ja cadastrado.' });
     console.error('[lab-usuarios/update]', err);
