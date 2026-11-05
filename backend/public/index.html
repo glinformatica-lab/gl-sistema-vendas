@@ -8874,6 +8874,8 @@ https://sistema.glinformatica.com.br
       }
     } catch(e) {}
     if (!podeAcessarPagina(pg)) {
+      // Esconde todas pra nao deixar outra pagina visivel
+      document.querySelectorAll('[id^="page-"]').forEach(div => div.style.display = 'none');
       // Redirect pra primeira pagina permitida do usuario
       const perms = window._permissoesAtual || [];
       if (perms.length > 0) {
@@ -28366,7 +28368,8 @@ async function carregarMeDeptoLab() {
     window._permissoesAtual = me.permissoes || [];
     aplicarFiltroDeptoLab();
     if (window._permissoesAtual.length > 0 && window._papelAtual !== "admin") {
-      // Vai pra primeira pagina permitida ao carregar
+      // Esconde tudo e vai pra primeira permissao
+      document.querySelectorAll('[id^="page-"]').forEach(div => div.style.display = "none");
       const alvo = window._permissoesAtual.includes("lab-dashboard") ? "lab-dashboard" : window._permissoesAtual[0];
       if (typeof showPage === "function") showPage(alvo);
     }
@@ -28508,7 +28511,7 @@ async function excluirLabUsuario(id) {
 
 // Carrega depto no load
 if (typeof window !== "undefined") {
-  setTimeout(() => { if (typeof carregarMeDeptoLab === "function") carregarMeDeptoLab(); }, 1500);
+  setTimeout(() => { if (typeof carregarMeDeptoLab === "function") carregarMeDeptoLab(); }, 200);
 }
 
   
