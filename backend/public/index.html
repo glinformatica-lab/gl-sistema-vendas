@@ -28337,6 +28337,13 @@ async function carregarMeDeptoLab() {
     window._deptoAtual = me.departamento || null;
     window._papelAtual = me.papel || null;
     aplicarFiltroDeptoLab();
+    // Se tem depto e nao e admin, garante estar no lab-dashboard
+    if (window._deptoAtual && window._papelAtual !== "admin") {
+      const current = document.querySelector("[id^=page-]:not([style*=none])");
+      if (current && current.id !== "page-lab-dashboard" && !current.id.startsWith("page-lab-")) {
+        if (typeof showPage === "function") showPage("lab-dashboard");
+      }
+    }
   } catch (err) { console.warn("[me depto]", err.message); }
 }
 
@@ -28353,14 +28360,24 @@ function podeAcessarPaginaLab(pg) {
 
 function aplicarFiltroDeptoLab() {
   if (window._papelAtual === "admin") return;
-  if (!window._deptoAtual || window._deptoAtual === "gerencia") return;
-  // Esconde botoes do menu que o depto nao pode acessar
-  document.querySelectorAll("[onclick^=\"showPage(\"]").forEach(btn => {
-    const m = btn.getAttribute("onclick").match(/showPage\('([^']+)'\)/);
+  const depto = window._deptoAtual;
+  if (!depto) return;
+  // No modo lab, operador com depto so ve paginas lab-* permitidas
+  document.querySelectorAll("#menu button, #menu a").forEach(btn => {
+    const oc = btn.getAttribute("onclick") || "";
+    const m = oc.match(/showPage\(['\"]([^'\"]+)['\"]\)/);
     if (!m) return;
     const pg = m[1];
-    if (pg.startsWith("lab-") && !podeAcessarPaginaLab(pg)) {
+    // Nao e lab? Esconde (modo lab so mostra lab)
+    if (!pg.startsWith("lab-")) {
       btn.style.display = "none";
+      return;
+    }
+    // Lab mas depto nao permite: esconde
+    if (depto !== "gerencia" && typeof podeAcessarPaginaLab === "function" && !podeAcessarPaginaLab(pg)) {
+      btn.style.display = "none";
+    } else {
+      btn.style.display = "";
     }
   });
 }
@@ -28478,7 +28495,23 @@ if (typeof window !== "undefined") {
   setTimeout(() => { if (typeof carregarMeDeptoLab === "function") carregarMeDeptoLab(); }, 1500);
 }
 
-  </script>
+  
+// Re-aplica filtro quando o menu for modificado
+if (typeof window !== "undefined" && !window._filtroAplicadoLab) {
+  window._filtroAplicadoLab = true;
+  setTimeout(() => {
+    try {
+      const menu = document.getElementById("menu");
+      if (menu) {
+        const obs = new MutationObserver(() => {
+          if (typeof aplicarFiltroDeptoLab === "function" && window._deptoAtual) aplicarFiltroDeptoLab();
+        });
+        obs.observe(menu, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
+      }
+    } catch(e) { console.warn("obs erro", e); }
+  }, 2000);
+}
+</script>
 
   <!-- Modal: cadastro rapido de paciente -->
   <div id="modal-paciente-rapido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
