@@ -691,6 +691,16 @@
     #modal-lab-usuario .form-group { margin-bottom: 12px; }
     #modal-lab-usuario .form-group label { display:block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
     #modal-lab-usuario .form-group input, #modal-lab-usuario .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    /* Permissoes Checkboxes */
+    .perm-areas { background:#f9f9f9; border:1px solid #e0e0e0; border-radius:8px; padding:12px; }
+    .perm-area { margin-bottom:10px; padding-bottom:8px; border-bottom:1px dashed #ddd; }
+    .perm-area:last-child { border-bottom:none; margin-bottom:0; }
+    .perm-area h4 { margin:0 0 6px; font-size:13px; color:#555; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+    .perm-check { display:inline-flex; align-items:center; gap:6px; margin:4px 10px 4px 0; cursor:pointer; font-size:14px; }
+    .perm-check input { margin:0; cursor:pointer; }
+    .perm-actions { display:flex; gap:8px; margin-top:10px; }
+    .perm-actions button { padding:4px 10px; font-size:12px; border:1px solid #ccc; background:#fff; border-radius:5px; cursor:pointer; }
+    .perm-actions button:hover { background:#f0f0f0; }
 </style>
 </head>
 <body>
@@ -28331,16 +28341,31 @@ const DEPTOS_LABELS = {
 };
 
 // Busca usuario atual e guarda depto
+
+// Permissoes helpers
+function coletarPermissoes() {
+  return Array.from(document.querySelectorAll(".usr-perm:checked")).map(c => c.value);
+}
+function preencherPermissoes(arr) {
+  const set = new Set(arr || []);
+  document.querySelectorAll(".usr-perm").forEach(c => { c.checked = set.has(c.value); });
+}
+function marcarTodasPerms() {
+  document.querySelectorAll(".usr-perm").forEach(c => c.checked = true);
+}
+function desmarcarTodasPerms() {
+  document.querySelectorAll(".usr-perm").forEach(c => c.checked = false);
+}
 async function carregarMeDeptoLab() {
   try {
     const me = await api("GET", "/api/lab-usuarios/me");
     window._deptoAtual = me.departamento || null;
     window._papelAtual = me.papel || null;
+    window._permissoesAtual = me.permissoes || [];
     aplicarFiltroDeptoLab();
-    // Se tem depto e nao e admin, garante estar no lab-dashboard
-    if (window._deptoAtual && window._papelAtual !== "admin") {
+    if ((window._permissoesAtual.length > 0 || window._deptoAtual) && window._papelAtual !== "admin") {
       const current = document.querySelector("[id^=page-]:not([style*=none])");
-      if (current && current.id !== "page-lab-dashboard" && !current.id.startsWith("page-lab-")) {
+      if (current && !current.id.startsWith("page-lab-")) {
         if (typeof showPage === "function") showPage("lab-dashboard");
       }
     }
@@ -28349,36 +28374,26 @@ async function carregarMeDeptoLab() {
 
 function podeAcessarPaginaLab(pg) {
   if (window._papelAtual === "admin") return true;
-  const depto = window._deptoAtual;
-  if (!depto) return false;
-  if (depto === "gerencia") return true;
-  if (pg === "minha-conta" || pg === "lab-dashboard") return true;
-  const mapa = DEPTOS_LAB_PAGINAS[depto];
-  if (!mapa) return false;
-  return mapa.includes(pg);
+  const perms = window._permissoesAtual;
+  // Se ainda nao carregou, nao bloqueia (defensive)
+  if (!perms) return pg === "lab-dashboard" || pg === "minha-conta";
+  if (!Array.isArray(perms) || perms.length === 0) return false;
+  if (pg === "minha-conta") return true;
+  return perms.includes(pg);
 }
 
 function aplicarFiltroDeptoLab() {
   if (window._papelAtual === "admin") return;
-  const depto = window._deptoAtual;
-  if (!depto) return;
-  // No modo lab, operador com depto so ve paginas lab-* permitidas
+  const perms = window._permissoesAtual;
+  if (!perms || !Array.isArray(perms)) return;
   document.querySelectorAll("#menu button, #menu a").forEach(btn => {
     const oc = btn.getAttribute("onclick") || "";
     const m = oc.match(/showPage\(['\"]([^'\"]+)['\"]\)/);
     if (!m) return;
     const pg = m[1];
-    // Nao e lab? Esconde (modo lab so mostra lab)
-    if (!pg.startsWith("lab-")) {
-      btn.style.display = "none";
-      return;
-    }
-    // Lab mas depto nao permite: esconde
-    if (depto !== "gerencia" && typeof podeAcessarPaginaLab === "function" && !podeAcessarPaginaLab(pg)) {
-      btn.style.display = "none";
-    } else {
-      btn.style.display = "";
-    }
+    if (!pg.startsWith("lab-")) { btn.style.display = "none"; return; }
+    if (!perms.includes(pg)) btn.style.display = "none";
+    else btn.style.display = "";
   });
 }
 
@@ -28431,7 +28446,7 @@ function abrirNovoUsuario() {
   document.getElementById("usr-senha").value = "";
   document.getElementById("usr-senha").placeholder = "Minimo 4 caracteres";
   document.getElementById("label-senha").textContent = "Senha *";
-  document.getElementById("usr-departamento").value = "";
+  desmarcarTodasPerms();
   document.getElementById("usr-papel").value = "operador";
   document.getElementById("modal-lab-usuario").style.display = "flex";
 }
@@ -28446,7 +28461,7 @@ function editarLabUsuario(id) {
   document.getElementById("usr-senha").value = "";
   document.getElementById("usr-senha").placeholder = "Deixe vazio para manter a atual";
   document.getElementById("label-senha").textContent = "Nova senha (opcional)";
-  document.getElementById("usr-departamento").value = u.departamento || "";
+  preencherPermissoes(u.permissoes || []);
   document.getElementById("usr-papel").value = u.papel || "operador";
   document.getElementById("modal-lab-usuario").style.display = "flex";
 }
@@ -28460,21 +28475,21 @@ async function salvarLabUsuario() {
   const nome = document.getElementById("usr-nome").value.trim();
   const email = document.getElementById("usr-email").value.trim();
   const senha = document.getElementById("usr-senha").value;
-  const departamento = document.getElementById("usr-departamento").value || null;
+  const permissoes = coletarPermissoes();
   const papel = document.getElementById("usr-papel").value;
 
   if (!nome) { alert("Informe o nome."); return; }
   if (!email) { alert("Informe o email."); return; }
   if (!id && (!senha || senha.length < 4)) { alert("Informe uma senha de pelo menos 4 caracteres."); return; }
-  if (!departamento) { alert("Selecione o departamento."); return; }
+  // validacao de perm removida (pode salvar sem perms = sem acesso)
 
   try {
     if (id) {
-      const body = { nome, email, departamento, papel };
+      const body = { nome, email, permissoes, papel };
       if (senha && senha.length >= 4) body.senha = senha;
       await api("PUT", "/api/lab-usuarios/" + id, body);
     } else {
-      await api("POST", "/api/lab-usuarios", { nome, email, senha, departamento, papel });
+      await api("POST", "/api/lab-usuarios", { nome, email, senha, permissoes, papel });
     }
     fecharModalUsuario();
     carregarLabUsuarios();
@@ -28739,14 +28754,34 @@ if (typeof window !== "undefined" && !window._filtroAplicadoLab) {
           <input type="password" id="usr-senha" placeholder="Minimo 4 caracteres">
         </div>
         <div class="form-group">
-          <label>Departamento *</label>
-          <select id="usr-departamento">
-            <option value="">-- Selecione --</option>
-            <option value="recepcao">🏥 Recepção</option>
-            <option value="tecnica">🧪 Técnica</option>
-            <option value="financeiro">💰 Financeiro</option>
-            <option value="gerencia">👔 Gerência</option>
-          </select>
+          <label>Permissões (o que o usuário pode acessar)</label>
+          <div class="perm-areas">
+            <div class="perm-area">
+              <h4>🏥 Atendimento</h4>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-dashboard"> Dashboard</label>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-caixa"> Caixa</label>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-pacientes"> Pacientes</label>
+            </div>
+            <div class="perm-area">
+              <h4>🧪 Estoque</h4>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-insumos"> Insumos</label>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-saidas"> Saída Manual</label>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-fornecedores"> Fornecedores</label>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-servicos"> Serviços</label>
+            </div>
+            <div class="perm-area">
+              <h4>💰 Financeiro</h4>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-financeiro"> Financeiro</label>
+            </div>
+            <div class="perm-area">
+              <h4>👥 Administração</h4>
+              <label class="perm-check"><input type="checkbox" class="usr-perm" value="lab-usuarios"> Gerenciar Usuários</label>
+            </div>
+            <div class="perm-actions">
+              <button type="button" onclick="marcarTodasPerms()">✓ Marcar tudo</button>
+              <button type="button" onclick="desmarcarTodasPerms()">✗ Desmarcar tudo</button>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label>Papel</label>
