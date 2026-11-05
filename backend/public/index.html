@@ -27475,6 +27475,7 @@ ${conteudo}
         '  </div>',
         '  <div class="recibo">',
         '    <div class="cabecalho">',
+        (emp.logo ? '      <img src="' + emp.logo + '" alt="Logo" style="max-height:90px;max-width:280px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;">' : ''),
         '      <h1>' + escapeHtml(nomeEmp) + '</h1>',
         '      <div class="sub">' + [cnpjEmp, endEmp, telEmp].filter(Boolean).join(' &middot; ') + '</div>',
         '    </div>',
