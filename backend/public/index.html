@@ -27289,6 +27289,22 @@ ${conteudo}
       erro.style.display = 'block';
       return;
     }
+    // Valida documento (se preenchido)
+    const vDoc = validaDocLab(doc);
+    if (!vDoc.ok) {
+      erro.textContent = vDoc.erro;
+      erro.style.display = 'block';
+      document.getElementById('mpr-doc').focus();
+      return;
+    }
+    // Valida telefone (se preenchido)
+    const vTel = validaTelefoneLab(telefone);
+    if (!vTel.ok) {
+      erro.textContent = vTel.erro;
+      erro.style.display = 'block';
+      document.getElementById('mpr-tel').focus();
+      return;
+    }
     erro.style.display = 'none';
     try {
       let novo;
@@ -27458,6 +27474,22 @@ ${conteudo}
       erro.style.display = 'block';
       return;
     }
+    // Valida documento (se preenchido)
+    const vDoc = validaDocLab(doc);
+    if (!vDoc.ok) {
+      erro.textContent = vDoc.erro;
+      erro.style.display = 'block';
+      document.getElementById('mlf-doc').focus();
+      return;
+    }
+    // Valida telefone (se preenchido)
+    const vTel = validaTelefoneLab(telefone);
+    if (!vTel.ok) {
+      erro.textContent = vTel.erro;
+      erro.style.display = 'block';
+      document.getElementById('mlf-tel').focus();
+      return;
+    }
     erro.style.display = 'none';
     try {
       if (id) {
@@ -27517,6 +27549,66 @@ ${conteudo}
       v = v.replace(/(\d{5})(\d{1,4})$/, '$1-$2');
     }
     return v;
+  }
+
+
+  // ======================================================
+  // VALIDACOES LAB - CPF, CNPJ, Telefone
+  // ======================================================
+  function validaCPFLab(cpf) {
+    cpf = (cpf || '').replace(/\D/g, '');
+    if (cpf.length !== 11) return false;
+    // Sequencias invalidas
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+    // Digitos verificadores
+    let soma = 0;
+    for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
+    let d1 = (soma * 10) % 11;
+    if (d1 === 10) d1 = 0;
+    if (d1 !== parseInt(cpf[9])) return false;
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
+    let d2 = (soma * 10) % 11;
+    if (d2 === 10) d2 = 0;
+    return d2 === parseInt(cpf[10]);
+  }
+
+  function validaCNPJLab(cnpj) {
+    cnpj = (cnpj || '').replace(/\D/g, '');
+    if (cnpj.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(cnpj)) return false;
+    const peso1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+    const peso2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+    let soma = 0;
+    for (let i = 0; i < 12; i++) soma += parseInt(cnpj[i]) * peso1[i];
+    let d1 = soma % 11;
+    d1 = d1 < 2 ? 0 : 11 - d1;
+    if (d1 !== parseInt(cnpj[12])) return false;
+    soma = 0;
+    for (let i = 0; i < 13; i++) soma += parseInt(cnpj[i]) * peso2[i];
+    let d2 = soma % 11;
+    d2 = d2 < 2 ? 0 : 11 - d2;
+    return d2 === parseInt(cnpj[13]);
+  }
+
+  // Retorna { ok: bool, erro: string, tipo: "cpf"|"cnpj"|null }
+  function validaDocLab(doc) {
+    const num = (doc || '').replace(/\D/g, '');
+    if (!num) return { ok: true, erro: '', tipo: null }; // vazio e opcional
+    if (num.length === 11) {
+      return validaCPFLab(num) ? { ok: true, tipo: 'cpf' } : { ok: false, erro: 'CPF invalido' };
+    }
+    if (num.length === 14) {
+      return validaCNPJLab(num) ? { ok: true, tipo: 'cnpj' } : { ok: false, erro: 'CNPJ invalido' };
+    }
+    return { ok: false, erro: 'Documento deve ter 11 digitos (CPF) ou 14 digitos (CNPJ)' };
+  }
+
+  function validaTelefoneLab(tel) {
+    const num = (tel || '').replace(/\D/g, '');
+    if (!num) return { ok: true, erro: '' }; // vazio e opcional
+    if (num.length === 10 || num.length === 11) return { ok: true };
+    return { ok: false, erro: 'Telefone deve ter 10 digitos (fixo) ou 11 digitos (celular)' };
   }
 
 </script>
