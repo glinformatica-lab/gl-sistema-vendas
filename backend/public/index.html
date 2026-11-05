@@ -587,6 +587,7 @@
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-dashboard')" style="display:none;">&#128657; Dashboard Lab</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-caixa')" style="display:none;">&#128181; Caixa</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-servicos')" style="display:none;">&#128278; Servicos</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('lab-pacientes')" style="display:none;">&#128101; Pacientes</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-insumos')" style="display:none;">&#128230; Insumos</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-fornecedores')" style="display:none;">&#128666; Fornecedores</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-financeiro')" style="display:none;">&#128176; Financeiro</button>
@@ -1399,6 +1400,27 @@
           <tbody id="lcx-tbody-recentes"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ========== LAB PACIENTES ========== -->
+    <div id="page-lab-pacientes" style="display:none;">
+      <div class="page-title">👥 Pacientes</div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn" onclick="abrirCadastroPacienteRapido()">+ Novo Paciente</button>
+        <input id="filtro-lab-pacientes" type="text" placeholder="Buscar paciente..." oninput="renderLabPacientes()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CPF/RG</th>
+            <th>Telefone</th>
+            <th>Cidade</th>
+            <th class="acoes">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-lab-pacientes"></tbody>
+      </table>
     </div>
 
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
@@ -8646,6 +8668,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'usuarios') carregarUsuarios();
     if(pg === 'lab-dashboard') carregarLabDashboard();
     if(pg === 'lab-caixa') carregarLabCaixa();
+    if(pg === 'lab-pacientes') carregarLabPacientes();
     if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
@@ -27179,8 +27202,29 @@ ${conteudo}
   // ======================================================
   // Cadastro rapido de paciente (reusa /api/clientes)
   // ======================================================
-  function abrirCadastroPacienteRapido() {
-    const nomeDigitado = document.getElementById('lcx-paciente-nome').value.trim();
+  function abrirCadastroPacienteRapido(id) {
+    // Se id passado, modo edicao
+    if (id) {
+      const p = (_labPacientes || []).find(x => x.id === id) || (_labClientes || []).find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('mpr-titulo').textContent = 'Editar Paciente';
+      document.getElementById('mpr-id').value = p.id;
+      document.getElementById('mpr-nome').value = p.nome || '';
+      document.getElementById('mpr-doc').value = p.doc || '';
+      document.getElementById('mpr-tel').value = p.telefone || '';
+      document.getElementById('mpr-endereco').value = p.endereco || '';
+      document.getElementById('mpr-cidade').value = p.cidade || '';
+      document.getElementById('mpr-uf').value = p.uf || '';
+      document.getElementById('mpr-erro').style.display = 'none';
+      document.getElementById('modal-paciente-rapido').style.display = 'flex';
+      setTimeout(() => { const el = document.getElementById('mpr-nome'); if (el) el.focus(); }, 100);
+      return;
+    }
+    // Modo cadastro novo
+    document.getElementById('mpr-titulo').textContent = 'Cadastrar Paciente';
+    document.getElementById('mpr-id').value = '';
+    const nomeDigitadoEl = document.getElementById('lcx-paciente-nome');
+    const nomeDigitado = nomeDigitadoEl ? nomeDigitadoEl.value.trim() : '';
     document.getElementById('mpr-nome').value = nomeDigitado;
     document.getElementById('mpr-doc').value = '';
     document.getElementById('mpr-tel').value = '';
@@ -27197,6 +27241,7 @@ ${conteudo}
   }
 
   async function salvarPacienteRapido() {
+    const id = document.getElementById('mpr-id').value;
     const nome = document.getElementById('mpr-nome').value.trim();
     const doc = document.getElementById('mpr-doc').value.trim();
     const telefone = document.getElementById('mpr-tel').value.trim();
@@ -27211,16 +27256,84 @@ ${conteudo}
     }
     erro.style.display = 'none';
     try {
-      const novo = await api('POST', '/api/clientes', { nome, doc, telefone, endereco, cidade, uf });
-      // Recarrega lista e seleciona o novo
+      let novo;
+      if (id) {
+        novo = await api('PUT', '/api/clientes/' + id, { nome, doc, telefone, endereco, cidade, uf });
+      } else {
+        novo = await api('POST', '/api/clientes', { nome, doc, telefone, endereco, cidade, uf });
+      }
+      // Recarrega lista geral de clientes
       _labClientes = await api('GET', '/api/clientes');
-      popularDatalistPacientes();
-      document.getElementById('lcx-paciente-nome').value = novo.nome;
-      labCaixaSelecionarPaciente(novo.nome);
+      // Atualiza telas se abertas
+      if (typeof popularDatalistPacientes === 'function') popularDatalistPacientes();
+      // Se estava no caixa com paciente digitado, preenche
+      const pacEl = document.getElementById('lcx-paciente-nome');
+      if (pacEl && !id) {
+        pacEl.value = novo.nome;
+        labCaixaSelecionarPaciente(novo.nome);
+      }
+      // Se estava na pagina de pacientes, refaz lista
+      if (typeof renderLabPacientes === 'function') { _labPacientes = _labClientes; renderLabPacientes(); }
       fecharCadastroPacienteRapido();
     } catch (err) {
       erro.textContent = err.message;
       erro.style.display = 'block';
+    }
+  }
+
+
+  // ======================================================
+  // LAB PACIENTES - CRUD (reusa /api/clientes)
+  // ======================================================
+  var _labPacientes = [];
+
+  async function carregarLabPacientes() {
+    try {
+      _labPacientes = await api('GET', '/api/clientes');
+      // Tambem atualiza cache geral pro caixa
+      _labClientes = _labPacientes;
+      renderLabPacientes();
+    } catch (err) {
+      alert('Erro ao carregar pacientes: ' + err.message);
+    }
+  }
+
+  function renderLabPacientes() {
+    const tbody = document.getElementById('tbody-lab-pacientes');
+    if (!tbody) return;
+    const filtroEl = document.getElementById('filtro-lab-pacientes');
+    const filtro = (filtroEl ? filtroEl.value : '').toLowerCase().trim();
+    const lista = _labPacientes.filter(p => {
+      if (!filtro) return true;
+      return (p.nome || '').toLowerCase().includes(filtro)
+        || (p.doc || '').toLowerCase().includes(filtro)
+        || (p.telefone || '').toLowerCase().includes(filtro);
+    });
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum paciente cadastrado. Clique em "+ Novo Paciente" para começar.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(p => '<tr>'
+      + '<td style="font-weight:600;">' + escapeHtml(p.nome) + '</td>'
+      + '<td>' + escapeHtml(p.doc || '-') + '</td>'
+      + '<td>' + escapeHtml(p.telefone || '-') + '</td>'
+      + '<td>' + escapeHtml((p.cidade || '') + (p.uf ? '/' + p.uf : '')) + '</td>'
+      + '<td class="acoes" style="text-align:center;white-space:nowrap;">'
+      + '<button onclick="abrirCadastroPacienteRapido(' + p.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px;">Editar</button>'
+      + '<button onclick="excluirLabPaciente(' + p.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Excluir</button>'
+      + '</td></tr>'
+    ).join('');
+  }
+
+  async function excluirLabPaciente(id) {
+    const p = _labPacientes.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm('Excluir paciente "' + p.nome + '"?\n\nAtendimentos antigos manterão o nome registrado.')) return;
+    try {
+      await api('DELETE', '/api/clientes/' + id);
+      await carregarLabPacientes();
+    } catch (err) {
+      alert('Erro: ' + err.message);
     }
   }
 
@@ -27229,7 +27342,8 @@ ${conteudo}
   <!-- Modal: cadastro rapido de paciente -->
   <div id="modal-paciente-rapido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
     <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
-      <h2 style="margin-top:0;color:#0891b2;">Cadastrar Paciente</h2>
+      <h2 id="mpr-titulo" style="margin-top:0;color:#0891b2;">Cadastrar Paciente</h2>
+      <input type="hidden" id="mpr-id" value="">
       <form id="form-paciente-rapido" onsubmit="event.preventDefault(); salvarPacienteRapido();">
         <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Nome *</label>
         <input type="text" id="mpr-nome" required style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
