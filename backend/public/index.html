@@ -28081,7 +28081,13 @@ function labTrocarAbaFin(aba) {
 async function carregarLabFinanceiro() {
   try {
     const url = _labAbaFin === "pagar" ? "/api/contas-pagar" : "/api/contas-receber";
-    _labContasFin = await api("GET", url);
+    const contasBrutas = await api("GET", url);
+    _labContasFin = contasBrutas.map(c => ({
+      ...c,
+      vencimento: c.vencimento ? String(c.vencimento).slice(0,10) : null,
+      dataPagamento: c.dataPagamento ? String(c.dataPagamento).slice(0,10) : null,
+      dataRecebimento: c.dataRecebimento ? String(c.dataRecebimento).slice(0,10) : null
+    }));
     renderLabFinanceiro();
   } catch (err) {
     console.error("[lab-financeiro]", err);
