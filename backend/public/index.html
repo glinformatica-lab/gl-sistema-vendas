@@ -764,6 +764,7 @@
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-financeiro')" style="display:none;">&#128176; Financeiro</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-saidas')" style="display:none;">&#128229; Saida Manual</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('lab-usuarios')" style="display:none;">&#128101; Usuarios</button>
+    <button class="menu-btn feature-laboratorio" onclick="showPage('minha-conta')" style="display:none;">&#128100; Minha Conta</button>
     <button class="menu-btn feature-laboratorio" onclick="showPage('configuracoes')" style="display:none;">&#9881;&#65039; Configuracoes</button>
 
     <!-- Cadastros -->
@@ -28458,6 +28459,7 @@ function aplicarFiltroDeptoLab() {
     const m = oc.match(/showPage\(['\"]([^'\"]+)['\"]\)/);
     if (!m) return;
     const pg = m[1];
+    if (pg === "minha-conta") { btn.style.display = ""; return; }
     if (!pg.startsWith("lab-")) { btn.style.display = "none"; return; }
     if (!perms.includes(pg)) btn.style.display = "none";
     else btn.style.display = "";
