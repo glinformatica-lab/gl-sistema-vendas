@@ -76,7 +76,7 @@
       font-weight: 600;
     }
     /* === Modo Laboratorio: esconde todo o menu padrao === */
-    body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio):not(.permanente-sidebar) {
+    body.modo-lab #menu > *:not(#logo):not(#relogio-menu):not(.feature-laboratorio):not(.permanente-sidebar):not(.lab-submenu) {
       display: none !important;
     }
     body.modo-lab #menu > button.feature-laboratorio {
@@ -591,7 +591,7 @@
       <span>&#128230; Cadastros</span>
       <span class="grupo-seta" id="seta-lab-cadastros">▼</span>
     </button>
-    <div class="submenu feature-laboratorio" id="submenu-lab-cadastros" style="display:none;">
+    <div class="submenu lab-submenu" id="submenu-lab-cadastros" style="display:none;">
       <button class="menu-btn submenu-item" onclick="showPage('lab-pacientes')">&#128101; Pacientes</button>
       <button class="menu-btn submenu-item" onclick="showPage('lab-servicos')">&#128278; Serviços</button>
       <button class="menu-btn submenu-item" onclick="showPage('lab-fornecedores')">&#128666; Fornecedores</button>
