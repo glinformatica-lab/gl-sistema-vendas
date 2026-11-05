@@ -599,6 +599,32 @@
     .tabela-saidas th { background: #f0f0f0; font-weight: 600; }
     .tabela-saidas tr.estornada { opacity: 0.55; text-decoration: line-through; }
     .tabela-saidas tr.estornada td:last-child { text-decoration: none; }
+      /* Lab Financeiro - Abas */
+    .lab-tabs { display:flex; gap:4px; border-bottom:2px solid #ddd; margin-bottom:14px; }
+    .lab-tab { padding: 9px 18px; cursor:pointer; background:#f0f0f0; border:none; border-radius:8px 8px 0 0; font-weight:600; font-size:14px; color:#555; }
+    .lab-tab:hover { background:#e5e5e5; }
+    .lab-tab.active { background:#2e7d32; color:white; }
+    .tabela-financeiro { width:100%; border-collapse: collapse; margin-top: 10px; }
+    .tabela-financeiro th, .tabela-financeiro td { padding: 9px 10px; border-bottom: 1px solid #eee; text-align: left; font-size:14px; }
+    .tabela-financeiro th { background: #f0f0f0; font-weight: 600; }
+    .tabela-financeiro tr.pago { opacity: 0.6; }
+    .status-badge { padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight:600; display:inline-block; }
+    .status-badge.pendente { background: #fff3cd; color: #856404; }
+    .status-badge.pago { background: #d4edda; color: #155724; }
+    .status-badge.recebido { background: #d4edda; color: #155724; }
+    .status-badge.vencido { background: #f8d7da; color: #721c24; }
+    #modal-lab-conta { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    #modal-lab-conta .modal-content { background:#fff; padding:24px; border-radius:10px; width:90%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.25); }
+    #modal-lab-conta .form-group { margin-bottom:12px; }
+    #modal-lab-conta .form-group label { display:block; font-weight:600; margin-bottom:4px; font-size:14px; }
+    #modal-lab-conta .form-group input, #modal-lab-conta .form-group textarea, #modal-lab-conta .form-group select { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; box-sizing:border-box; }
+    .resumo-financeiro-lab { display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+    .resumo-financeiro-lab .card-fin { flex:1; min-width: 180px; padding:14px; border-radius:8px; }
+    .card-fin.pendente { background:#fff8e1; border-left: 4px solid #f9a825; }
+    .card-fin.vencido { background:#ffebee; border-left: 4px solid #c62828; }
+    .card-fin.pago { background:#e8f5e9; border-left: 4px solid #2e7d32; }
+    .card-fin h4 { margin:0 0 6px; font-size:13px; color:#666; text-transform:uppercase; letter-spacing:0.5px; }
+    .card-fin .valor { font-size:22px; font-weight:700; color:#333; }
   </style>
 </head>
 <body>
@@ -1527,6 +1553,30 @@
       </div>
       <div id="lab-saidas-lista"></div>
     </div>
+    <!-- Lab Financeiro -->
+    <div id="page-lab-financeiro" style="display:none">
+      <div class="header-pagina" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">💰 Financeiro</h2>
+        <button onclick="abrirNovaConta()" class="btn btn-primary">+ Nova</button>
+      </div>
+      <div class="lab-tabs">
+        <button class="lab-tab active" id="tab-pagar" onclick="labTrocarAbaFin('pagar')">💸 Contas a Pagar</button>
+        <button class="lab-tab" id="tab-receber" onclick="labTrocarAbaFin('receber')">💰 Contas a Receber</button>
+      </div>
+      <div class="resumo-financeiro-lab" id="fin-cards"></div>
+      <div class="filtros-saida">
+        <label>Status: <select id="fin-filtro-status" onchange="renderLabFinanceiro()">
+          <option value="">Todas</option>
+          <option value="pendente">Pendentes</option>
+          <option value="pago">Pagas/Recebidas</option>
+          <option value="vencido">Vencidas</option>
+        </select></label>
+        <label>De: <input type="date" id="fin-filtro-inicio" onchange="renderLabFinanceiro()"></label>
+        <label>Até: <input type="date" id="fin-filtro-fim" onchange="renderLabFinanceiro()"></label>
+      </div>
+      <div id="lab-financeiro-lista"></div>
+    </div>
+
 
 
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
@@ -8724,6 +8774,8 @@ https://sistema.glinformatica.com.br
   }
 
   function showPage(pg) {
+    if (pg === "lab-financeiro") { setTimeout(() => { if (typeof labTrocarAbaFin === "function") labTrocarAbaFin("pagar"); }, 0); }
+
     if (pg === "lab-saidas") { setTimeout(() => carregarLabSaidas(), 0); }
 
     // REDIRECT_LAB_DASHBOARD: modo lab abre no lab-dashboard, nao no dashboard antigo
@@ -28011,6 +28063,162 @@ async function estornarLabSaida(id) {
   } catch (err) { alert("Erro: " + err.message); }
 }
 
+  
+// ============================================================
+// Lab Financeiro
+// ============================================================
+var _labAbaFin = "pagar";
+var _labContasFin = [];
+
+function labTrocarAbaFin(aba) {
+  _labAbaFin = aba;
+  document.getElementById("tab-pagar").classList.toggle("active", aba === "pagar");
+  document.getElementById("tab-receber").classList.toggle("active", aba === "receber");
+  document.getElementById("label-pessoa").textContent = aba === "pagar" ? "Fornecedor" : "Cliente";
+  carregarLabFinanceiro();
+}
+
+async function carregarLabFinanceiro() {
+  try {
+    const url = _labAbaFin === "pagar" ? "/api/contas-pagar" : "/api/contas-receber";
+    _labContasFin = await api("GET", url);
+    renderLabFinanceiro();
+  } catch (err) {
+    console.error("[lab-financeiro]", err);
+    alert("Erro ao carregar: " + err.message);
+  }
+}
+
+function renderLabFinanceiro() {
+  if (!_labContasFin) return;
+  const status = document.getElementById("fin-filtro-status").value;
+  const inicio = document.getElementById("fin-filtro-inicio").value;
+  const fim = document.getElementById("fin-filtro-fim").value;
+  const hoje = new Date().toISOString().slice(0, 10);
+  let lst = _labContasFin.slice();
+  if (status === "vencido") lst = lst.filter(c => c.status === "pendente" && c.vencimento < hoje);
+  else if (status === "pago") lst = lst.filter(c => c.status === "pago" || c.status === "recebido");
+  else if (status === "pendente") lst = lst.filter(c => c.status === "pendente");
+  if (inicio) lst = lst.filter(c => c.vencimento >= inicio);
+  if (fim) lst = lst.filter(c => c.vencimento <= fim);
+
+  // Cards resumo
+  const pendentesList = _labContasFin.filter(c => c.status === "pendente");
+  const vencidasList = pendentesList.filter(c => c.vencimento < hoje);
+  const pagasList = _labContasFin.filter(c => c.status === "pago" || c.status === "recebido");
+  const totPendente = pendentesList.reduce((s, c) => s + parseFloat(c.valor || 0), 0);
+  const totVencido = vencidasList.reduce((s, c) => s + parseFloat(c.valor || 0), 0);
+  const totPago = pagasList.reduce((s, c) => s + parseFloat(c.valor || 0), 0);
+  const fmt = v => "R$ " + v.toFixed(2).replace(".", ",");
+  document.getElementById("fin-cards").innerHTML =
+    '<div class="card-fin pendente"><h4>Pendentes</h4><div class="valor">' + fmt(totPendente) + '</div><small>' + pendentesList.length + ' conta(s)</small></div>' +
+    '<div class="card-fin vencido"><h4>Vencidas</h4><div class="valor">' + fmt(totVencido) + '</div><small>' + vencidasList.length + ' conta(s)</small></div>' +
+    '<div class="card-fin pago"><h4>Pagas/Recebidas</h4><div class="valor">' + fmt(totPago) + '</div><small>' + pagasList.length + ' conta(s)</small></div>';
+
+  // Tabela
+  const div = document.getElementById("lab-financeiro-lista");
+  if (!lst.length) { div.innerHTML = '<p style="color:#888; padding:20px; text-align:center;">Nenhuma conta encontrada.</p>'; return; }
+  const labelPessoa = _labAbaFin === "pagar" ? "Fornecedor" : "Cliente";
+  const verboPago = _labAbaFin === "pagar" ? "Pagar" : "Receber";
+  let h = '<table class="tabela-financeiro"><thead><tr>';
+  h += "<th>Venc.</th><th>Descrição</th><th>" + labelPessoa + "</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Ações</th>";
+  h += "</tr></thead><tbody>";
+  lst.forEach(c => {
+    const pago = c.status === "pago" || c.status === "recebido";
+    const vencida = c.status === "pendente" && c.vencimento < hoje;
+    const stCls = vencida ? "vencido" : c.status;
+    const stTxt = vencida ? "VENCIDA" : (c.status || "").toUpperCase();
+    const dataVenc = c.vencimento ? c.vencimento.split("-").reverse().join("/") : "-";
+    const pessoa = _labAbaFin === "pagar" ? (c.fornecedor || "-") : (c.cliente || "-");
+    h += '<tr class="' + (pago ? "pago" : "") + '">';
+    h += "<td>" + dataVenc + "</td>";
+    h += "<td>" + (c.descricao || "-") + "</td>";
+    h += "<td>" + pessoa + "</td>";
+    h += "<td>" + (c.categoria || "-") + "</td>";
+    h += "<td><b>" + fmt(parseFloat(c.valor || 0)) + "</b></td>";
+    h += '<td><span class="status-badge ' + stCls + '">' + stTxt + '</span></td>';
+    h += '<td>';
+    if (!pago) h += '<button class="btn-sm" onclick="pagarConta(' + c.id + ')">' + verboPago + '</button> ';
+    h += '<button class="btn-sm btn-danger" onclick="excluirConta(' + c.id + ')">Excluir</button>';
+    h += '</td></tr>';
+  });
+  h += "</tbody></table>";
+  div.innerHTML = h;
+}
+
+function abrirNovaConta() {
+  const aba = _labAbaFin;
+  document.getElementById("modal-conta-titulo").textContent = aba === "pagar" ? "Nova Conta a Pagar" : "Nova Conta a Receber";
+  document.getElementById("label-pessoa").textContent = aba === "pagar" ? "Fornecedor" : "Cliente";
+  document.getElementById("conta-id").value = "";
+  document.getElementById("conta-tipo").value = aba;
+  document.getElementById("conta-pessoa").value = "";
+  document.getElementById("conta-descricao").value = "";
+  document.getElementById("conta-categoria").value = "";
+  document.getElementById("conta-valor").value = "";
+  document.getElementById("conta-vencimento").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("conta-obs").value = "";
+  document.getElementById("modal-lab-conta").style.display = "flex";
+}
+
+function fecharModalConta() {
+  document.getElementById("modal-lab-conta").style.display = "none";
+}
+
+async function salvarLabConta() {
+  const tipo = document.getElementById("conta-tipo").value;
+  const pessoa = document.getElementById("conta-pessoa").value.trim();
+  const descricao = document.getElementById("conta-descricao").value.trim();
+  const categoria = document.getElementById("conta-categoria").value.trim() || null;
+  const valor = parseFloat(document.getElementById("conta-valor").value);
+  const vencimento = document.getElementById("conta-vencimento").value;
+  const obs = document.getElementById("conta-obs").value.trim() || null;
+
+  if (!descricao) { alert("Informe a descrição."); return; }
+  if (!valor || valor <= 0) { alert("Valor deve ser maior que zero."); return; }
+  if (!vencimento) { alert("Informe o vencimento."); return; }
+  if (tipo === "receber" && !pessoa) { alert("Informe o cliente."); return; }
+
+  const url = tipo === "pagar" ? "/api/contas-pagar" : "/api/contas-receber";
+  const body = tipo === "pagar"
+    ? { fornecedor: pessoa || null, descricao, categoria, valor, vencimento, obs, status: "pendente", origem: "lab" }
+    : { cliente: pessoa, descricao, categoria, valor, vencimento, obs, status: "pendente", origem: "lab" };
+
+  try {
+    await api("POST", url, body);
+    fecharModalConta();
+    carregarLabFinanceiro();
+    alert("Conta salva com sucesso!");
+  } catch (err) {
+    alert("Erro: " + err.message);
+  }
+}
+
+async function pagarConta(id) {
+  const tipo = _labAbaFin;
+  const verbo = tipo === "pagar" ? "pagar" : "receber";
+  if (!confirm("Confirma " + verbo + " essa conta?")) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const url = tipo === "pagar" ? "/api/contas-pagar/" + id : "/api/contas-receber/" + id;
+  const body = tipo === "pagar"
+    ? { status: "pago", data_pagamento: hoje }
+    : { status: "recebido", data_recebimento: hoje };
+  try {
+    await api("PUT", url, body);
+    carregarLabFinanceiro();
+  } catch (err) { alert("Erro: " + err.message); }
+}
+
+async function excluirConta(id) {
+  if (!confirm("Excluir essa conta?")) return;
+  const tipo = _labAbaFin;
+  const url = tipo === "pagar" ? "/api/contas-pagar/" + id : "/api/contas-receber/" + id;
+  try {
+    await api("DELETE", url);
+    carregarLabFinanceiro();
+  } catch (err) { alert("Erro: " + err.message); }
+}
+
   </script>
 
   <!-- Modal: cadastro rapido de paciente -->
@@ -28182,5 +28390,43 @@ async function estornarLabSaida(id) {
         </div>
       </div>
     </div>
+  
+    <!-- Modal Conta Lab -->
+    <div id="modal-lab-conta">
+      <div class="modal-content">
+        <h3 id="modal-conta-titulo" style="margin-top:0;">Nova Conta</h3>
+        <input type="hidden" id="conta-id">
+        <input type="hidden" id="conta-tipo">
+        <div class="form-group">
+          <label id="label-pessoa">Fornecedor</label>
+          <input type="text" id="conta-pessoa" placeholder="Nome (opcional)">
+        </div>
+        <div class="form-group">
+          <label>Descrição *</label>
+          <input type="text" id="conta-descricao" placeholder="Ex: Aluguel Novembro">
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <input type="text" id="conta-categoria" placeholder="Ex: Aluguel, Insumos, Salários">
+        </div>
+        <div class="form-group">
+          <label>Valor * (R$)</label>
+          <input type="number" id="conta-valor" step="0.01" min="0.01" placeholder="0,00">
+        </div>
+        <div class="form-group">
+          <label>Vencimento *</label>
+          <input type="date" id="conta-vencimento">
+        </div>
+        <div class="form-group">
+          <label>Observação</label>
+          <textarea id="conta-obs" rows="2" placeholder="Opcional"></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+          <button onclick="fecharModalConta()" class="btn btn-secondary">Cancelar</button>
+          <button onclick="salvarLabConta()" class="btn btn-primary">Salvar</button>
+        </div>
+      </div>
+    </div>
+
   </body>
 </html>
