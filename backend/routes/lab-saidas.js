@@ -148,7 +148,7 @@ router.post('/:id/estornar', async (req, res) => {
 router.get('/meta/usuarios', async (req, res) => {
   try {
     const r = await db.query(
-      'SELECT id, nome FROM usuarios WHERE empresa_id = $1 AND ativo = true ORDER BY nome',
+      'SELECT id, nome FROM usuarios WHERE empresa_id = $1 ORDER BY nome',
       [req.user.empresaId]
     );
     res.json(r.rows);
