@@ -27485,6 +27485,40 @@ ${conteudo}
     }
   }
 
+
+  // ======================================================
+  // MASCARAS LAB - CPF/CNPJ e Telefone
+  // ======================================================
+  function mascaraDocLab(v) {
+    v = (v || '').replace(/\D/g, '');
+    if (v.length <= 11) {
+      // CPF: 000.000.000-00
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+      // CNPJ: 00.000.000/0000-00
+      v = v.slice(0, 14);
+      v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+      v = v.replace(/^(\d{2}\.\d{3})(\d)/, '$1.$2');
+      v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+      v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    }
+    return v;
+  }
+
+  function mascaraTelefoneLab(v) {
+    v = (v || '').replace(/\D/g, '').slice(0, 11);
+    if (v.length <= 10) {
+      v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+      v = v.replace(/(\d{4})(\d{1,4})$/, '$1-$2');
+    } else {
+      v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+      v = v.replace(/(\d{5})(\d{1,4})$/, '$1-$2');
+    }
+    return v;
+  }
+
 </script>
 
   <!-- Modal: cadastro rapido de paciente -->
@@ -27498,11 +27532,11 @@ ${conteudo}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div>
             <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">CPF/RG</label>
-            <input type="text" id="mpr-doc" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+            <input type="text" id="mpr-doc" maxlength="18" oninput="this.value=mascaraDocLab(this.value)" placeholder="CPF ou CNPJ" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
           </div>
           <div>
             <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Telefone</label>
-            <input type="text" id="mpr-tel" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+            <input type="text" id="mpr-tel" maxlength="15" oninput="this.value=mascaraTelefoneLab(this.value)" placeholder="(00) 00000-0000" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
           </div>
         </div>
         <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Endereço (opcional)</label>
@@ -27537,11 +27571,11 @@ ${conteudo}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div>
             <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">CNPJ/CPF</label>
-            <input type="text" id="mlf-doc" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+            <input type="text" id="mlf-doc" maxlength="18" oninput="this.value=mascaraDocLab(this.value)" placeholder="CPF ou CNPJ" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
           </div>
           <div>
             <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Telefone</label>
-            <input type="text" id="mlf-tel" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+            <input type="text" id="mlf-tel" maxlength="15" oninput="this.value=mascaraTelefoneLab(this.value)" placeholder="(00) 00000-0000" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
           </div>
         </div>
         <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">E-mail</label>
