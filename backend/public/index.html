@@ -1552,7 +1552,7 @@
             </div>
           </div>
     <!-- Saida Manual de Insumos -->
-    <div id="page-lab-saida-manual" class="pagina feature-laboratorio" style="display:none">
+    <div id="page-lab-saidas" class="pagina feature-laboratorio" style="display:none">
       <div class="header-pagina" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h2 style="margin:0;">📤 Saída Manual de Insumos</h2>
         <button onclick="abrirNovaSaida()" class="btn btn-primary">+ Nova Saída</button>
@@ -8721,7 +8721,7 @@ https://sistema.glinformatica.com.br
   }
 
   function showPage(pg) {
-    if (pg === "lab-saida-manual") { setTimeout(() => carregarLabSaidas(), 0); }
+    if (pg === "lab-saidas") { setTimeout(() => carregarLabSaidas(), 0); }
 
     // REDIRECT_LAB_DASHBOARD: modo lab abre no lab-dashboard, nao no dashboard antigo
     try {
@@ -27856,9 +27856,7 @@ async function carregarLabSaidas() {
     if (inicio) qs.append("dataInicio", inicio);
     if (fim) qs.append("dataFim", fim);
     if (inclEst === "1") qs.append("incluirEstornadas", "1");
-    const r = await apiFetch("/api/lab-saidas?" + qs.toString());
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const lst = await r.json();
+    const lst = await api("GET", "/api/lab-saidas?" + qs.toString());
     renderLabSaidas(lst);
   } catch (err) { console.error("[lab-saidas]", err); alert("Erro ao carregar saidas: " + err.message); }
 }
@@ -27907,8 +27905,7 @@ async function abrirNovaSaida() {
 
   // Carrega insumos no dropdown
   try {
-    const r = await apiFetch("/api/lab-insumos");
-    const insumos = await r.json();
+    const insumos = await api("GET", "/api/lab-insumos");
     const sel = document.getElementById("saida-produto-id");
     sel.innerHTML = '<option value="">-- Avulso (sem controle de estoque) --</option>';
     insumos.forEach(p => {
@@ -27923,8 +27920,7 @@ async function abrirNovaSaida() {
 
   // Carrega usuarios no dropdown entregue_por
   try {
-    const r = await apiFetch("/api/lab-saidas/meta/usuarios");
-    _labUsuariosSaida = await r.json();
+    _labUsuariosSaida = await api("GET", "/api/lab-saidas/meta/usuarios");
     const sel = document.getElementById("saida-entregue-sel");
     sel.innerHTML = '<option value="">-- Selecione --</option>';
     _labUsuariosSaida.forEach(u => {
@@ -27996,12 +27992,7 @@ async function salvarLabSaida() {
   if (!produtoId && !produtoNome) { alert("Informe o produto (do estoque ou avulso)."); return; }
 
   try {
-    const r = await apiFetch("/api/lab-saidas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data, produtoId, produtoNome, qtd, entreguePor, recebidoPor, obs })
-    });
-    if (!r.ok) { const e = await r.json(); alert("Erro: " + (e.error || "Falha ao salvar")); return; }
+    await api("POST", "/api/lab-saidas", { data, produtoId, produtoNome, qtd, entreguePor, recebidoPor, obs });
     fecharModalSaida();
     carregarLabSaidas();
     alert("Saída registrada com sucesso!");
@@ -28011,8 +28002,7 @@ async function salvarLabSaida() {
 async function estornarLabSaida(id) {
   if (!confirm("Estornar esta saída? O estoque será devolvido.")) return;
   try {
-    const r = await apiFetch("/api/lab-saidas/" + id + "/estornar", { method: "POST" });
-    if (!r.ok) { const e = await r.json(); alert("Erro: " + (e.error || "Falha ao estornar")); return; }
+    await api("POST", "/api/lab-saidas/" + id + "/estornar");
     carregarLabSaidas();
     alert("Saída estornada. Estoque devolvido.");
   } catch (err) { alert("Erro: " + err.message); }
