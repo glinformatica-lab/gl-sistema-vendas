@@ -701,6 +701,34 @@
     .perm-actions { display:flex; gap:8px; margin-top:10px; }
     .perm-actions button { padding:4px 10px; font-size:12px; border:1px solid #ccc; background:#fff; border-radius:5px; cursor:pointer; }
     .perm-actions button:hover { background:#f0f0f0; }
+    /* Lab Financeiro - Relatorio */
+    .rel-painel { display:none; }
+    .rel-painel.active { display:block; }
+    .rel-filtros { background:#f7f7f7; border-radius:8px; padding:12px; margin-bottom:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .rel-filtros label { font-size:13px; display:flex; flex-direction:column; gap:3px; }
+    .rel-filtros input, .rel-filtros select { padding:6px 8px; border:1px solid #ccc; border-radius:5px; font-size:14px; }
+    .rel-filtros .acoes { display:flex; gap:6px; margin-left:auto; }
+    .rel-filtros .acoes button { padding:7px 14px; border:1px solid #bbb; border-radius:6px; background:#fff; cursor:pointer; font-size:13px; font-weight:500; }
+    .rel-filtros .acoes button:hover { background:#f0f0f0; }
+    .rel-filtros .acoes button.primary { background:linear-gradient(135deg, #2e7d32, #43a047); color:#fff; border:none; }
+    .rel-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; margin-bottom:14px; }
+    .rel-card { background:#fff; border:1px solid #e0e0e0; border-radius:10px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+    .rel-card h4 { margin:0 0 6px; font-size:11px; color:#777; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+    .rel-card .valor { font-size:22px; font-weight:700; color:#333; }
+    .rel-card.verde { border-left:4px solid #2e7d32; }
+    .rel-card.azul  { border-left:4px solid #1565c0; }
+    .rel-card.laranja { border-left:4px solid #e65100; }
+    .rel-card.roxo { border-left:4px solid #6a1b9a; }
+    .tabela-rel { width:100%; border-collapse:collapse; margin-top:10px; }
+    .tabela-rel th, .tabela-rel td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left; font-size:14px; }
+    .tabela-rel th { background:#f0f0f0; font-weight:600; font-size:13px; }
+    .tabela-rel tfoot td { font-weight:700; background:#fafafa; border-top:2px solid #333; }
+    @media print {
+      body * { visibility: hidden; }
+      #fin-painel-relatorio.print-area, #fin-painel-relatorio.print-area * { visibility: visible; }
+      #fin-painel-relatorio.print-area { position: absolute; left:0; top:0; width:100%; padding:10px; }
+      .rel-filtros .acoes, .tabela-rel .col-acoes { display:none !important; }
+    }
 </style>
 </head>
 <body>
@@ -1638,6 +1666,7 @@
       <div class="lab-tabs">
         <button class="lab-tab active" id="tab-pagar" onclick="labTrocarAbaFin('pagar')">💸 Contas a Pagar</button>
         <button class="lab-tab" id="tab-receber" onclick="labTrocarAbaFin('receber')">💰 Contas a Receber</button>
+        <button class="lab-tab" id="tab-relatorio" onclick="labTrocarAbaFin('relatorio')">📊 Relatório</button>
       </div>
       <div class="resumo-financeiro-lab" id="fin-cards"></div>
       <div class="filtros-saida">
@@ -1650,7 +1679,30 @@
         <label>De: <input type="date" id="fin-filtro-inicio" onchange="renderLabFinanceiro()"></label>
         <label>Até: <input type="date" id="fin-filtro-fim" onchange="renderLabFinanceiro()"></label>
       </div>
-      <div id="lab-financeiro-lista"></div>
+      <div id="lab-financeiro-lista">
+    </div>
+      <div id="fin-painel-relatorio" style="display:none;">
+        <div class="rel-filtros">
+          <label>De<input type="date" id="rel-inicio"></label>
+          <label>Até<input type="date" id="rel-fim"></label>
+          <label>Paciente<input type="text" id="rel-paciente" placeholder="Nome ou CPF"></label>
+          <label>Pagamento<select id="rel-pagamento">
+            <option value="">Todas</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="pix">Pix</option>
+            <option value="cartao-debito">Cartão Débito</option>
+            <option value="cartao-credito">Cartão Crédito</option>
+            <option value="transferencia">Transferência</option>
+          </select></label>
+          <div class="acoes">
+            <button class="primary" onclick="carregarRelatorioLab()">🔍 Buscar</button>
+            <button onclick="exportarRelatorioCSV()">📥 CSV</button>
+            <button onclick="imprimirRelatorio()">🖨 Imprimir</button>
+          </div>
+        </div>
+        <div class="rel-cards" id="rel-cards"></div>
+        <div id="rel-lista"></div>
+      </div>
     </div>
     <!-- Lab Usuarios -->
     <div id="page-lab-usuarios" style="display:none">
@@ -28169,8 +28221,18 @@ function labTrocarAbaFin(aba) {
   _labAbaFin = aba;
   document.getElementById("tab-pagar").classList.toggle("active", aba === "pagar");
   document.getElementById("tab-receber").classList.toggle("active", aba === "receber");
-  document.getElementById("label-pessoa").textContent = aba === "pagar" ? "Fornecedor" : "Cliente";
-  carregarLabFinanceiro();
+  const tabRel = document.getElementById("tab-relatorio");
+  if (tabRel) tabRel.classList.toggle("active", aba === "relatorio");
+  // Mostra/esconde painéis
+  const ehRel = aba === "relatorio";
+  const cards = document.getElementById("fin-cards"); if (cards) cards.style.display = ehRel ? "none" : "";
+  const lista = document.getElementById("lab-financeiro-lista"); if (lista) lista.style.display = ehRel ? "none" : "";
+  const filtros = document.querySelectorAll("#page-lab-financeiro .filtros-saida"); filtros.forEach(f => f.style.display = ehRel ? "none" : "");
+  const header = document.querySelector("#page-lab-financeiro .header-pagina button"); if (header) header.style.display = ehRel ? "none" : "";
+  const painelRel = document.getElementById("fin-painel-relatorio"); if (painelRel) painelRel.style.display = ehRel ? "block" : "none";
+  const labelPessoa = document.getElementById("label-pessoa"); if (labelPessoa) labelPessoa.textContent = aba === "pagar" ? "Fornecedor" : "Cliente";
+  if (ehRel) carregarRelatorioLab();
+  else carregarLabFinanceiro();
 }
 
 async function carregarLabFinanceiro() {
@@ -28530,7 +28592,126 @@ if (typeof window !== "undefined" && !window._filtroAplicadoLab) {
     } catch(e) { console.warn("obs erro", e); }
   }, 2000);
 }
-</script>
+
+// ============================================================
+// Relatorio de Atendimentos (aba Relatorio)
+// ============================================================
+var _relAtendimentos = [];
+
+async function carregarRelatorioLab() {
+  const inicio = document.getElementById("rel-inicio").value;
+  const fim = document.getElementById("rel-fim").value;
+  const pacQ = (document.getElementById("rel-paciente").value || "").trim().toLowerCase();
+  const pagQ = document.getElementById("rel-pagamento").value;
+  try {
+    const qs = new URLSearchParams();
+    if (inicio) qs.append("dataInicio", inicio);
+    if (fim) qs.append("dataFim", fim);
+    let lst = await api("GET", "/api/lab-atendimentos?" + qs.toString());
+    // Filtros client-side
+    if (pacQ) lst = lst.filter(a => (a.pacienteNome || "").toLowerCase().includes(pacQ) || (a.pacienteDoc || "").includes(pacQ));
+    if (pagQ) lst = lst.filter(a => (a.formaPagamento || "") === pagQ);
+    _relAtendimentos = lst;
+    renderRelatorio();
+  } catch (err) { alert("Erro ao carregar relatorio: " + err.message); }
+}
+
+function renderRelatorio() {
+  const lst = _relAtendimentos;
+  const fmt = v => "R$ " + (Number(v) || 0).toFixed(2).replace(".", ",");
+  // Totais
+  const total = lst.reduce((s, a) => s + Number(a.valorTotal || 0), 0);
+  const qtd = lst.length;
+  const ticket = qtd > 0 ? total / qtd : 0;
+  const porForma = {};
+  lst.forEach(a => {
+    const f = a.formaPagamento || "sem-info";
+    porForma[f] = (porForma[f] || 0) + Number(a.valorTotal || 0);
+  });
+  let cards = "";
+  cards += '<div class="rel-card verde"><h4>Total do período</h4><div class="valor">' + fmt(total) + '</div></div>';
+  cards += '<div class="rel-card azul"><h4>Nº atendimentos</h4><div class="valor">' + qtd + '</div></div>';
+  cards += '<div class="rel-card laranja"><h4>Ticket médio</h4><div class="valor">' + fmt(ticket) + '</div></div>';
+  Object.entries(porForma).forEach(([f, v]) => {
+    cards += '<div class="rel-card roxo"><h4>' + f + '</h4><div class="valor">' + fmt(v) + '</div></div>';
+  });
+  document.getElementById("rel-cards").innerHTML = cards;
+  // Lista
+  const div = document.getElementById("rel-lista");
+  if (!lst.length) { div.innerHTML = '<p style="color:#888; padding:20px; text-align:center;">Nenhum atendimento encontrado no período.</p>'; return; }
+  let h = '<table class="tabela-rel"><thead><tr>';
+  h += "<th>Data</th><th>Paciente</th><th>Documento</th><th>Telefone</th><th>Pagamento</th><th>Valor</th><th class=\"col-acoes\">Ações</th>";
+  h += "</tr></thead><tbody>";
+  lst.forEach(a => {
+    const data = a.data ? String(a.data).slice(0,10).split("-").reverse().join("/") : "-";
+    h += "<tr>";
+    h += "<td>" + data + "</td>";
+    h += "<td>" + (a.pacienteNome || "-") + "</td>";
+    h += "<td>" + (a.pacienteDoc || "-") + "</td>";
+    h += "<td>" + (a.pacienteTel || "-") + "</td>";
+    h += "<td>" + (a.formaPagamento || "-") + "</td>";
+    h += "<td><b>" + fmt(a.valorTotal) + "</b></td>";
+    h += '<td class="col-acoes">';
+    h += '<button class="btn-acao-fin btn-pagar" onclick="verReciboAtendimento(' + a.id + ')">👁 Ver</button>';
+    h += '<button class="btn-acao-fin btn-receber" onclick="imprimirReciboLab(' + a.id + ')">🖨</button>';
+    h += '<button class="btn-acao-fin btn-excluir" onclick="estornarAtendimento(' + a.id + ')">🗑️</button>';
+    h += "</td></tr>";
+  });
+  h += "</tbody><tfoot><tr>";
+  h += "<td colspan=\"5\" style=\"text-align:right;\">TOTAL</td>";
+  h += "<td><b>" + fmt(total) + "</b></td><td class=\"col-acoes\"></td>";
+  h += "</tr></tfoot></table>";
+  div.innerHTML = h;
+}
+
+function exportarRelatorioCSV() {
+  if (!_relAtendimentos.length) { alert("Sem dados pra exportar."); return; }
+  const headers = ["Data", "Paciente", "Documento", "Telefone", "Pagamento", "Valor"];
+  const rows = _relAtendimentos.map(a => [
+    (a.data || "").slice(0,10),
+    (a.pacienteNome || "").replaceAll(";", ","),
+    (a.pacienteDoc || ""),
+    (a.pacienteTel || ""),
+    (a.formaPagamento || ""),
+    String(a.valorTotal || 0).replace(".", ",")
+  ]);
+  const csv = [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+  const bom = "\uFEFF"; // UTF-8 BOM pra Excel reconhecer acentos
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "relatorio-atendimentos-" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function imprimirRelatorio() {
+  const painel = document.getElementById("fin-painel-relatorio");
+  painel.classList.add("print-area");
+  window.print();
+  setTimeout(() => painel.classList.remove("print-area"), 300);
+}
+
+function verReciboAtendimento(id) {
+  if (typeof imprimirReciboAtendimento === "function") imprimirReciboAtendimento(id);
+  else alert("Função imprimirReciboAtendimento nao encontrada.");
+}
+function imprimirReciboLab(id) {
+  if (typeof imprimirReciboAtendimento === "function") imprimirReciboAtendimento(id);
+  else alert("Funcao de impressao nao encontrada.");
+}
+
+async function estornarAtendimento(id) {
+  if (!confirm("Excluir este atendimento? O valor sera removido dos relatorios.")) return;
+  try {
+    await api("DELETE", "/api/lab-atendimentos/" + id);
+    carregarRelatorioLab();
+    alert("Atendimento excluido.");
+  } catch (err) { alert("Erro: " + err.message); }
+}
+
+  </script>
 
   <!-- Modal: cadastro rapido de paciente -->
   <div id="modal-paciente-rapido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
