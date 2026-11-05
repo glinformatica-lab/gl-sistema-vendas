@@ -5590,6 +5590,21 @@
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+        <!-- Card LABORATORIO -->
+        <div id="card-laboratorio" onclick="selecionarPlanoRenovacao('laboratorio')" style="display:none;border:3px solid #0891b2;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#ecfeff,#fff);position:relative;grid-column:1/-1;">
+          <span style="position:absolute;top:-12px;right:12px;background:#0891b2;color:#fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;">SEU PLANO</span>
+          <h3 style="color:#0e7490;margin:0 0 6px 0;font-size:16px;">🧪 Módulo Laboratório</h3>
+          <div style="font-size:32px;font-weight:900;color:#0e7490;">R$ 149,90</div>
+          <div style="color:#668;font-size:12px;margin-bottom:10px;">/mês</div>
+          <ul style="font-size:12px;color:#445;padding-left:18px;margin:0;line-height:1.7;">
+            <li>🩺 Atendimentos de laboratório com recibo</li>
+            <li>👥 Cadastro de pacientes (CPF/CNPJ)</li>
+            <li>🧪 Controle de insumos (validade, estoque mínimo)</li>
+            <li>📥 Saída manual com rastreamento</li>
+            <li>💰 Financeiro + Relatório detalhado</li>
+            <li>👥 Usuários por permissão granular</li>
+          </ul>
+        </div>
         <!-- Card SALÃO (só aparece pra empresas com módulo salão ativo) -->
         <div id="card-salao" onclick="selecionarPlanoRenovacao('salao')"
              style="display:none;border:3px solid #7c3aed;border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#faf5ff,#fff);position:relative;grid-column:1/-1;">
@@ -25499,6 +25514,7 @@ ${conteudo}
         'pro': 'Pro (R$ 149,90/mês)',
         'pro-fiscal': 'Pro Fiscal (R$ 249,90/mês)',
         'salao': 'Módulo Salão (R$ 149,90/mês)',
+        'laboratorio': 'Módulo Laboratório (R$ 149,90/mês)',
         'basico-anual': 'Básico Anual (R$ 1.078,92/ano)',
         'pro-anual': 'Pro Anual (R$ 1.618,92/ano)',
         'pro-fiscal-anual': 'Pro Fiscal Anual (R$ 2.698,92/ano)',
