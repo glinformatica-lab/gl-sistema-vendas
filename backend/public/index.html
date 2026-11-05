@@ -26985,9 +26985,10 @@ ${conteudo}
         data, pacienteNome, pacienteDoc, pacienteTel, formaPagamento, obs,
         itens: itensValidos.map(it => ({ servicoId: it.servicoId, servicoNome: it.nome, valor: it.valor }))
       });
-      alert('✅ Atendimento salvo!\n\nTotal: ' + formatarBRL(resp.valorTotal));
+      const quer = confirm('✅ Atendimento salvo!\n\nTotal: ' + formatarBRL(resp.valorTotal) + '\n\nDeseja imprimir o recibo?');
       labCaixaLimpar();
       await carregarLabCaixa();
+      if (quer) imprimirReciboAtendimento(resp.id);
     } catch (err) {
       erro.textContent = err.message;
       erro.style.display = 'block';
@@ -27007,6 +27008,7 @@ ${conteudo}
       + '<td style="text-align:right;font-weight:600;">' + formatarBRL(a.valorTotal) + '</td>'
       + '<td>' + escapeHtml(a.formaPagamento || '-') + '</td>'
       + '<td class="acoes" style="text-align:center;">'
+      + '<button onclick="imprimirReciboAtendimento(' + a.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">🖨️ Imprimir</button>'
       + '<button onclick="excluirLabAtendimento(' + a.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">Excluir</button>'
       + '</td></tr>'
     ).join('');
@@ -27019,6 +27021,116 @@ ${conteudo}
       await carregarLabCaixa();
     } catch (err) {
       alert('Erro: ' + err.message);
+    }
+  }
+
+
+  // ======================================================
+  // LAB RECIBO A4 - imprimir recibo do atendimento
+  // ======================================================
+  async function imprimirReciboAtendimento(id) {
+    try {
+      const a = await api('GET', '/api/lab-atendimentos/' + id);
+      const emp = JSON.parse(localStorage.getItem('empresa') || '{}');
+      const nomeEmp = emp.nome || 'Laboratório';
+      const cnpjEmp = emp.cnpj ? 'CNPJ: ' + emp.cnpj : '';
+      const endEmp = [emp.endereco, emp.cidade, emp.uf].filter(Boolean).join(' - ') || '';
+      const telEmp = emp.telefone ? 'Tel: ' + emp.telefone : '';
+
+      // Monta linhas dos itens
+      const linhasItens = (a.itens || []).map(it =>
+        '<tr>'
+        + '<td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;">' + escapeHtml(it.servicoNome) + '</td>'
+        + '<td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;">' + formatarBRL(it.valor) + '</td>'
+        + '</tr>'
+      ).join('');
+
+      // Dados do paciente (so mostra se tiver)
+      const dadosPaciente = [];
+      if (a.pacienteNome) dadosPaciente.push('<div><strong>Paciente:</strong> ' + escapeHtml(a.pacienteNome) + '</div>');
+      if (a.pacienteDoc) dadosPaciente.push('<div><strong>Documento:</strong> ' + escapeHtml(a.pacienteDoc) + '</div>');
+      if (a.pacienteTel) dadosPaciente.push('<div><strong>Telefone:</strong> ' + escapeHtml(a.pacienteTel) + '</div>');
+      const htmlPaciente = dadosPaciente.length > 0 ? dadosPaciente.join('') : '<div style="color:#94a3b8;">— Atendimento sem identificação do paciente —</div>';
+
+      // Data formatada
+      const dataFmt = formatarDataBR(a.data);
+      const horaFmt = a.criadoEm ? new Date(a.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+
+      // HTML do recibo
+      const html = [
+        '<!DOCTYPE html>',
+        '<html lang="pt-BR">',
+        '<head>',
+        '  <meta charset="UTF-8">',
+        '  <title>Recibo #' + a.id + ' - ' + escapeHtml(nomeEmp) + '</title>',
+        '  <style>',
+        '    @page { size: A4; margin: 15mm; }',
+        '    body { font-family: Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 13px; }',
+        '    .recibo { max-width: 180mm; margin: 0 auto; padding: 10mm; }',
+        '    .cabecalho { text-align: center; border-bottom: 2px solid #0f766e; padding-bottom: 10px; margin-bottom: 20px; }',
+        '    .cabecalho h1 { margin: 0; font-size: 20px; color: #0f766e; }',
+        '    .cabecalho .sub { font-size: 11px; color: #64748b; margin-top: 4px; }',
+        '    .titulo { text-align: center; font-size: 15px; font-weight: 700; margin: 16px 0; color: #0f766e; }',
+        '    .info-box { background: #f1f5f9; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }',
+        '    .info-box div { margin: 2px 0; }',
+        '    table.itens { width: 100%; border-collapse: collapse; margin-bottom: 16px; }',
+        '    table.itens th { background: #0f766e; color: #fff; padding: 8px 10px; text-align: left; font-size: 12px; }',
+        '    table.itens th.r { text-align: right; }',
+        '    .total { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 12px 14px; background: #ecfdf5; border-radius: 6px; margin-top: 10px; }',
+        '    .total .label { font-size: 14px; color: #64748b; }',
+        '    .total .valor { font-size: 22px; font-weight: 700; color: #0f766e; }',
+        '    .forma { margin-top: 12px; font-size: 12px; text-align: right; color: #475569; }',
+        '    .rodape { margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }',
+        '    .assinatura { margin-top: 50px; border-top: 1px solid #334155; width: 60%; margin-left: auto; margin-right: auto; padding-top: 4px; text-align: center; font-size: 11px; color: #64748b; }',
+        '    .btn-imprimir { display: inline-block; background: #0891b2; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }',
+        '    .no-print { text-align: center; padding: 20px; background: #fef3c7; }',
+        '    @media print { .no-print { display: none !important; } }',
+        '  </style>',
+        '</head>',
+        '<body>',
+        '  <div class="no-print">',
+        '    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Recibo</button>',
+        '    <button onclick="window.close()" style="margin-left:8px;background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;">Fechar</button>',
+        '  </div>',
+        '  <div class="recibo">',
+        '    <div class="cabecalho">',
+        '      <h1>' + escapeHtml(nomeEmp) + '</h1>',
+        '      <div class="sub">' + [cnpjEmp, endEmp, telEmp].filter(Boolean).join(' &middot; ') + '</div>',
+        '    </div>',
+        '    <div class="titulo">RECIBO DE ATENDIMENTO Nº ' + String(a.id).padStart(6, '0') + '</div>',
+        '    <div class="info-box">',
+        '      <div><strong>Data:</strong> ' + dataFmt + (horaFmt ? ' às ' + horaFmt : '') + '</div>',
+        htmlPaciente,
+        '    </div>',
+        '    <table class="itens">',
+        '      <thead><tr><th>Serviço</th><th class="r">Valor</th></tr></thead>',
+        '      <tbody>' + linhasItens + '</tbody>',
+        '    </table>',
+        '    <div class="total">',
+        '      <div class="label">TOTAL:</div>',
+        '      <div class="valor">' + formatarBRL(a.valorTotal) + '</div>',
+        '    </div>',
+        '    <div class="forma"><strong>Forma de pagamento:</strong> ' + escapeHtml(a.formaPagamento || '-') + '</div>',
+        (a.obs ? '    <div style="margin-top:12px;font-size:11px;color:#64748b;"><strong>Observações:</strong> ' + escapeHtml(a.obs) + '</div>' : ''),
+        '    <div class="assinatura">Assinatura do responsável</div>',
+        '    <div class="rodape">Recibo emitido em ' + new Date().toLocaleString('pt-BR') + '</div>',
+        '  </div>',
+        '</body>',
+        '</html>'
+      ].join('\n');
+
+      // Abre em nova janela
+      const w = window.open('', '_blank', 'width=800,height=900');
+      if (!w) {
+        alert('Popup bloqueado. Habilite popups pra imprimir recibos.');
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      // Dispara impressao apos carregar
+      w.addEventListener('load', () => { setTimeout(() => w.print(), 300); });
+    } catch (err) {
+      alert('Erro ao imprimir recibo: ' + err.message);
     }
   }
 
