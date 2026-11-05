@@ -431,7 +431,7 @@ router.post('/renovar', async (req, res) => {
     });
   } catch (err) {
     console.error('[assinaturas/renovar]', err);
-    res.status(500).json({ error: 'Erro ao processar renovação. Tente novamente.' });
+    res.status(500).json({ error: 'Erro ao processar renovação: ' + err.message });
   }
 });
 
