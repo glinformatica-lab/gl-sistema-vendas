@@ -24,23 +24,23 @@ router.get('/me', async (req, res) => {
       [req.user.userId, req.user.empresaId]
     );
     if (!r.rowCount) {
-      // Fallback: usuario do token (ex: admin master)
       return res.json({
         id: req.user.userId,
         email: req.user.email || null,
         nome: req.user.nome || 'Admin',
         papel: req.user.papel || 'admin',
-        departamento: null
+        departamento: null,
+        permissoes: []
       });
     }
-    res.json(camelizar(r.rows[0]));
+    const row = r.rows[0];
+    res.json({ ...camelizar(row), permissoes: parsePerms(row.permissoes) });
   } catch (err) {
     console.error('[lab-usuarios/me]', err);
-    res.status(500).json({ error: 'Erro ao buscar usuario.' });
+    res.status(500).json({ error: 'Erro ao buscar usuario: ' + err.message });
   }
 });
 
-// Lista usuarios da empresa
 router.get('/', async (req, res) => {
   try {
     const r = await db.query(
