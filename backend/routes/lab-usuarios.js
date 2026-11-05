@@ -94,7 +94,7 @@ router.put('/:id', async (req, res) => {
   if (email !== undefined) { sets.push(`email = $${i++}`); vals.push(String(email).toLowerCase().trim()); }
   if (nome !== undefined)  { sets.push(`nome = $${i++}`);  vals.push(String(nome).trim()); }
   if (departamento !== undefined) { sets.push(`departamento = ${i++}`); vals.push(departamento || null); }
-  if (permissoes !== undefined) { sets.push(`permissoes = ${i++}`); vals.push(serializePerms(permissoes)); }
+  if (permissoes !== undefined) { sets.push(`permissoes = $${i++}`); vals.push(serializePerms(permissoes)); }
   if (papel !== undefined) { sets.push(`papel = $${i++}`); vals.push(papel); }
   if (senha && String(senha).length >= 4) {
     const hash = await bcrypt.hash(senha, 10);
