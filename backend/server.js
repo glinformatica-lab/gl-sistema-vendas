@@ -41,6 +41,7 @@ app.use('/api/lab-atendimentos', autenticar, verificarAcesso, require('./routes/
 app.use('/api/lab-dashboard',    autenticar, verificarAcesso, require('./routes/lab-dashboard'));
 app.use('/api/lab-insumos',     autenticar, verificarAcesso, require('./routes/lab-insumos'));
 app.use('/api/lab-saidas',      autenticar, verificarAcesso, require('./routes/lab-saidas'));
+app.use('/api/lab-usuarios',   autenticar, verificarAcesso, require('./routes/lab-usuarios'));
 app.use('/api/fiscal',          autenticar, verificarAcesso, require('./routes/fiscal'));
 // Módulo Salão
 app.use('/api/profissionais',     autenticar, verificarAcesso, require('./routes/profissionais'));
