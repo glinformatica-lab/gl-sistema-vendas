@@ -25479,18 +25479,29 @@ ${conteudo}
     // === MODO SALÃO: mostra só o card do salão ===
     // Se a empresa tem módulo salão, escondemos os planos da loja pra evitar confusão
     let ehModoSalao = false;
+    let ehModoLab = false;
     try {
       const empresa = JSON.parse(localStorage.getItem('empresa') || '{}');
       ehModoSalao = !!empresa.moduloSalao;
+      ehModoLab = !!empresa.moduloLaboratorio;
     } catch(e) {}
 
     const cardSalao = document.getElementById('card-salao');
+    const cardLab = document.getElementById('card-laboratorio');
     const cardBasico = document.getElementById('card-basico');
     const cardPro = document.getElementById('card-pro');
     const cardProFiscal = document.getElementById('card-pro-fiscal');
     const cardAnual = document.getElementById('card-anual');
 
-    if (ehModoSalao) {
+    if (ehModoLab) {
+          // Modo laboratorio: so o card lab
+          if (cardLab) cardLab.style.display = 'block';
+          if (cardSalao) cardSalao.style.display = 'none';
+          if (cardBasico) cardBasico.style.display = 'none';
+          if (cardPro) cardPro.style.display = 'none';
+          if (cardProFiscal) cardProFiscal.style.display = 'none';
+          if (cardAnual) cardAnual.style.display = 'none';
+        } else if (ehModoSalao) {
       // Modo salão: só o card salão
       if (cardSalao) cardSalao.style.display = 'block';
       if (cardBasico) cardBasico.style.display = 'none';
@@ -25499,6 +25510,7 @@ ${conteudo}
       if (cardAnual) cardAnual.style.display = 'none';
     } else {
       // Modo loja normal: cards antigos
+      if (cardLab) cardLab.style.display = 'none';
       if (cardSalao) cardSalao.style.display = 'none';
       if (cardBasico) cardBasico.style.display = '';
       if (cardPro) cardPro.style.display = '';
