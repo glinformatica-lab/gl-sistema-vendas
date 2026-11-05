@@ -565,7 +565,41 @@
     }
     #modal-lab-servico .row { display: flex; gap: 10px; }
     #modal-lab-servico .row > div { flex: 1; }
-</style>
+    /* Saida Manual - Modal */
+    #modal-lab-saida {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    #modal-lab-saida .modal-content {
+      background: #fff;
+      padding: 24px;
+      border-radius: 10px;
+      width: 90%; max-width: 540px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    }
+    #modal-lab-saida .form-group { margin-bottom: 12px; }
+    #modal-lab-saida .form-group label { display:block; font-weight:600; margin-bottom:4px; font-size:14px; }
+    #modal-lab-saida .form-group input, #modal-lab-saida .form-group select, #modal-lab-saida .form-group textarea {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size:14px; box-sizing: border-box;
+    }
+    #modal-lab-saida small { color: #666; font-size: 12px; display:block; margin-top:4px; }
+    #modal-lab-saida small.aviso-venc { color: #c00; font-weight:600; }
+    .filtros-saida { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 12px 0; padding: 12px; background:#f7f7f7; border-radius:8px; }
+    .filtros-saida label { font-size:14px; }
+    .filtros-saida input[type=date] { padding: 6px 8px; border:1px solid #ccc; border-radius:5px; }
+    .tabela-saidas { width:100%; border-collapse: collapse; margin-top: 10px; }
+    .tabela-saidas th, .tabela-saidas td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; font-size:14px; }
+    .tabela-saidas th { background: #f0f0f0; font-weight: 600; }
+    .tabela-saidas tr.estornada { opacity: 0.55; text-decoration: line-through; }
+    .tabela-saidas tr.estornada td:last-child { text-decoration: none; }
+  </style>
 </head>
 <body>
 <button id="menu-toggle" onclick="toggleMenu()" aria-label="Abrir menu">&#9776;</button>
@@ -1517,6 +1551,20 @@
               <input type="number" step="0.01" min="0" id="mls-preco" required>
             </div>
           </div>
+    <!-- Saida Manual de Insumos -->
+    <div id="page-lab-saida-manual" class="pagina feature-laboratorio" style="display:none">
+      <div class="header-pagina" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">📤 Saída Manual de Insumos</h2>
+        <button onclick="abrirNovaSaida()" class="btn btn-primary">+ Nova Saída</button>
+      </div>
+      <div class="filtros-saida">
+        <label>De: <input type="date" id="saida-filtro-inicio" onchange="carregarLabSaidas()"></label>
+        <label>Até: <input type="date" id="saida-filtro-fim" onchange="carregarLabSaidas()"></label>
+        <label><input type="checkbox" id="saida-filtro-estornadas" onchange="carregarLabSaidas()"> Incluir estornadas</label>
+      </div>
+      <div id="lab-saidas-lista"></div>
+    </div>
+
           <label>Nome *</label>
           <input type="text" id="mls-nome" required placeholder="Ex: Consulta Ortopedia">
           <label>Descrição</label>
@@ -8673,6 +8721,8 @@ https://sistema.glinformatica.com.br
   }
 
   function showPage(pg) {
+    if (pg === "lab-saida-manual") { setTimeout(() => carregarLabSaidas(), 0); }
+
     // REDIRECT_LAB_DASHBOARD: modo lab abre no lab-dashboard, nao no dashboard antigo
     try {
       if (pg === 'dashboard') {
@@ -27791,7 +27841,184 @@ ${conteudo}
     }
   }
 
-</script>
+
+// ============================================================
+// Saida Manual de Insumos
+// ============================================================
+var _labUsuariosSaida = [];
+
+async function carregarLabSaidas() {
+  try {
+    const inicio = document.getElementById("saida-filtro-inicio").value;
+    const fim = document.getElementById("saida-filtro-fim").value;
+    const inclEst = document.getElementById("saida-filtro-estornadas").checked ? "1" : "0";
+    const qs = new URLSearchParams();
+    if (inicio) qs.append("dataInicio", inicio);
+    if (fim) qs.append("dataFim", fim);
+    if (inclEst === "1") qs.append("incluirEstornadas", "1");
+    const r = await apiFetch("/api/lab-saidas?" + qs.toString());
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const lst = await r.json();
+    renderLabSaidas(lst);
+  } catch (err) { console.error("[lab-saidas]", err); alert("Erro ao carregar saidas: " + err.message); }
+}
+
+function renderLabSaidas(saidas) {
+  const div = document.getElementById("lab-saidas-lista");
+  if (!saidas || !saidas.length) { div.innerHTML = "<p style=\"color:#888; padding:20px; text-align:center;\">Nenhuma saída encontrada no período.</p>"; return; }
+  let h = '<table class="tabela-saidas"><thead><tr>';
+  h += "<th>Data</th><th>Produto</th><th>Qtd</th><th>Entregue por</th><th>Recebido por</th><th>Obs</th><th>Ações</th>";
+  h += "</tr></thead><tbody>";
+  saidas.forEach(s => {
+    const est = !!s.estornadoEm;
+    const data = s.data ? s.data.split("-").reverse().join("/") : "-";
+    h += '<tr class="' + (est ? "estornada" : "") + '">';
+    h += "<td>" + data + "</td>";
+    h += "<td>" + (s.produtoNome || "-") + "</td>";
+    h += "<td>" + (s.qtd || 0) + "</td>";
+    h += "<td>" + (s.entreguePor || "-") + "</td>";
+    h += "<td>" + (s.recebidoPor || "-") + "</td>";
+    h += "<td>" + (s.obs || "-") + "</td>";
+    if (est) {
+      h += '<td><small>Estornado por ' + (s.estornadoPorNome || "?") + '</small></td>';
+    } else {
+      h += '<td><button class="btn-sm btn-danger" onclick="estornarLabSaida(' + s.id + ')">Estornar</button></td>';
+    }
+    h += "</tr>";
+  });
+  h += "</tbody></table>";
+  div.innerHTML = h;
+}
+
+async function abrirNovaSaida() {
+  // Reset
+  document.getElementById("saida-data").value = new Date().toISOString().slice(0,10);
+  document.getElementById("saida-produto-id").value = "";
+  document.getElementById("saida-produto-nome").value = "";
+  document.getElementById("saida-produto-avulso-wrap").style.display = "block";
+  document.getElementById("saida-qtd").value = "";
+  document.getElementById("saida-estoque-info").innerHTML = "";
+  document.getElementById("saida-entregue-outro").style.display = "none";
+  document.getElementById("saida-entregue-outro").value = "";
+  document.getElementById("saida-recebido-sel").value = "";
+  document.getElementById("saida-recebido-outro").style.display = "none";
+  document.getElementById("saida-recebido-outro").value = "";
+  document.getElementById("saida-obs").value = "";
+
+  // Carrega insumos no dropdown
+  try {
+    const r = await apiFetch("/api/lab-insumos");
+    const insumos = await r.json();
+    const sel = document.getElementById("saida-produto-id");
+    sel.innerHTML = '<option value="">-- Avulso (sem controle de estoque) --</option>';
+    insumos.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.nome + " (estoque: " + (p.estoque || 0) + ")";
+      opt.dataset.estoque = p.estoque || 0;
+      opt.dataset.validade = p.validade || "";
+      sel.appendChild(opt);
+    });
+  } catch (err) { console.error("insumos", err); }
+
+  // Carrega usuarios no dropdown entregue_por
+  try {
+    const r = await apiFetch("/api/lab-saidas/meta/usuarios");
+    _labUsuariosSaida = await r.json();
+    const sel = document.getElementById("saida-entregue-sel");
+    sel.innerHTML = '<option value="">-- Selecione --</option>';
+    _labUsuariosSaida.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u.nome;
+      opt.textContent = u.nome;
+      sel.appendChild(opt);
+    });
+    const outro = document.createElement("option");
+    outro.value = "__outro__";
+    outro.textContent = "Outro...";
+    sel.appendChild(outro);
+  } catch (err) { console.error("usuarios", err); }
+
+  document.getElementById("modal-lab-saida").style.display = "flex";
+}
+
+function fecharModalSaida() {
+  document.getElementById("modal-lab-saida").style.display = "none";
+}
+
+function labSaidaProdutoChange() {
+  const sel = document.getElementById("saida-produto-id");
+  const opt = sel.options[sel.selectedIndex];
+  const avulsoWrap = document.getElementById("saida-produto-avulso-wrap");
+  const info = document.getElementById("saida-estoque-info");
+  if (sel.value === "") {
+    avulsoWrap.style.display = "block";
+    info.innerHTML = "";
+  } else {
+    avulsoWrap.style.display = "none";
+    const est = opt.dataset.estoque || "0";
+    const val = opt.dataset.validade;
+    let txt = "Estoque atual: " + est;
+    if (val) {
+      const hoje = new Date().toISOString().slice(0,10);
+      if (val < hoje) txt += ' <span class="aviso-venc">⚠ VENCIDO em ' + val.split("-").reverse().join("/") + '</span>';
+      else txt += " | Validade: " + val.split("-").reverse().join("/");
+    }
+    info.innerHTML = txt;
+  }
+}
+
+function labSaidaEntregueChange() {
+  const sel = document.getElementById("saida-entregue-sel");
+  document.getElementById("saida-entregue-outro").style.display = sel.value === "__outro__" ? "block" : "none";
+}
+
+function labSaidaRecebidoChange() {
+  const sel = document.getElementById("saida-recebido-sel");
+  document.getElementById("saida-recebido-outro").style.display = sel.value === "__outro__" ? "block" : "none";
+}
+
+async function salvarLabSaida() {
+  const data = document.getElementById("saida-data").value;
+  const produtoIdVal = document.getElementById("saida-produto-id").value;
+  const produtoId = produtoIdVal ? parseInt(produtoIdVal) : null;
+  const produtoNome = document.getElementById("saida-produto-nome").value.trim();
+  const qtd = parseFloat(document.getElementById("saida-qtd").value);
+  let entreguePor = document.getElementById("saida-entregue-sel").value;
+  if (entreguePor === "__outro__") entreguePor = document.getElementById("saida-entregue-outro").value.trim();
+  else if (entreguePor === "") entreguePor = null;
+  let recebidoPor = document.getElementById("saida-recebido-sel").value;
+  if (recebidoPor === "__outro__") recebidoPor = document.getElementById("saida-recebido-outro").value.trim();
+  else if (recebidoPor === "") recebidoPor = null;
+  const obs = document.getElementById("saida-obs").value.trim();
+
+  if (!qtd || qtd <= 0) { alert("Quantidade deve ser maior que zero."); return; }
+  if (!produtoId && !produtoNome) { alert("Informe o produto (do estoque ou avulso)."); return; }
+
+  try {
+    const r = await apiFetch("/api/lab-saidas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data, produtoId, produtoNome, qtd, entreguePor, recebidoPor, obs })
+    });
+    if (!r.ok) { const e = await r.json(); alert("Erro: " + (e.error || "Falha ao salvar")); return; }
+    fecharModalSaida();
+    carregarLabSaidas();
+    alert("Saída registrada com sucesso!");
+  } catch (err) { alert("Erro: " + err.message); }
+}
+
+async function estornarLabSaida(id) {
+  if (!confirm("Estornar esta saída? O estoque será devolvido.")) return;
+  try {
+    const r = await apiFetch("/api/lab-saidas/" + id + "/estornar", { method: "POST" });
+    if (!r.ok) { const e = await r.json(); alert("Erro: " + (e.error || "Falha ao estornar")); return; }
+    carregarLabSaidas();
+    alert("Saída estornada. Estoque devolvido.");
+  } catch (err) { alert("Erro: " + err.message); }
+}
+
+  </script>
 
   <!-- Modal: cadastro rapido de paciente -->
   <div id="modal-paciente-rapido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
@@ -27881,6 +28108,59 @@ ${conteudo}
             <input type="text" id="mli-fornec" placeholder="Nome do fornecedor" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
           </div>
         </div>
+    <!-- Modal Saida Manual -->
+    <div id="modal-lab-saida">
+      <div class="modal-content">
+        <h3 style="margin-top:0;">Nova Saída de Insumo</h3>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="saida-data">
+        </div>
+        <div class="form-group">
+          <label>Produto *</label>
+          <select id="saida-produto-id" onchange="labSaidaProdutoChange()">
+            <option value="">-- Avulso (sem controle de estoque) --</option>
+          </select>
+          <small id="saida-estoque-info"></small>
+        </div>
+        <div class="form-group" id="saida-produto-avulso-wrap" style="display:none;">
+          <label>Nome do produto avulso *</label>
+          <input type="text" id="saida-produto-nome" placeholder="Ex: Luva descartável">
+        </div>
+        <div class="form-group">
+          <label>Quantidade *</label>
+          <input type="number" id="saida-qtd" step="0.001" min="0.001" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Entregue por</label>
+          <select id="saida-entregue-sel" onchange="labSaidaEntregueChange()">
+            <option value="">-- Selecione --</option>
+          </select>
+          <input type="text" id="saida-entregue-outro" placeholder="Nome de quem entregou" style="display:none; margin-top:6px;">
+        </div>
+        <div class="form-group">
+          <label>Recebido por</label>
+          <select id="saida-recebido-sel" onchange="labSaidaRecebidoChange()">
+            <option value="">-- Selecione --</option>
+            <option value="Recepção">Recepção</option>
+            <option value="Sala de coleta">Sala de coleta</option>
+            <option value="Técnica">Técnica</option>
+            <option value="Gerência">Gerência</option>
+            <option value="__outro__">Outro...</option>
+          </select>
+          <input type="text" id="saida-recebido-outro" placeholder="Especifique" style="display:none; margin-top:6px;">
+        </div>
+        <div class="form-group">
+          <label>Observação</label>
+          <textarea id="saida-obs" rows="2" placeholder="Opcional"></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+          <button onclick="fecharModalSaida()" class="btn btn-secondary">Cancelar</button>
+          <button onclick="salvarLabSaida()" class="btn btn-primary">Salvar</button>
+        </div>
+      </div>
+    </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           <div>
             <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque</label>
