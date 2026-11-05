@@ -1452,6 +1452,35 @@
       </table>
     </div>
 
+    <!-- ========== LAB INSUMOS ========== -->
+    <div id="page-lab-insumos" style="display:none;">
+      <div class="page-title">📦 Insumos</div>
+      <div class="actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn" onclick="abrirLabInsumo()">+ Novo Insumo</button>
+        <input id="filtro-lab-insumos" type="text" placeholder="Buscar insumo..." oninput="renderLabInsumos()" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+        <select id="filtro-lab-insumos-status" onchange="renderLabInsumos()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+          <option value="">Todos</option>
+          <option value="baixo">⚠ Estoque baixo</option>
+          <option value="vencendo">📅 Vencendo (30 dias)</option>
+          <option value="vencido">⛔ Vencidos</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:80px;">Código</th>
+            <th>Nome</th>
+            <th style="text-align:right;">Estoque</th>
+            <th style="text-align:right;">Mínimo</th>
+            <th>Validade</th>
+            <th style="text-align:right;">Preço Custo</th>
+            <th class="acoes">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-lab-insumos"></tbody>
+      </table>
+    </div>
+
     <!-- ========== LAB SERVICOS (modulo laboratorio) ========== -->
     <div id="page-lab-servicos" style="display:none;">
       <div class="page-title">🔖 Serviços (Catálogo do Lab)</div>
@@ -8704,6 +8733,7 @@ https://sistema.glinformatica.com.br
     if(pg === 'lab-caixa') carregarLabCaixa();
     if(pg === 'lab-pacientes') carregarLabPacientes();
     if(pg === 'lab-fornecedores') carregarLabFornecedores();
+    if(pg === 'lab-insumos') carregarLabInsumos();
     if(pg === 'lab-servicos') carregarLabServicos();
     if(pg === 'servicos') carregarServicos();
     if(pg === 'ambientes') carregarAmbientes();
@@ -27611,6 +27641,156 @@ ${conteudo}
     return { ok: false, erro: 'Telefone deve ter 10 digitos (fixo) ou 11 digitos (celular)' };
   }
 
+
+  // ======================================================
+  // LAB INSUMOS - CRUD + alertas visuais
+  // ======================================================
+  var _labInsumos = [];
+
+  async function carregarLabInsumos() {
+    try {
+      _labInsumos = await api('GET', '/api/lab-insumos');
+      renderLabInsumos();
+    } catch (err) {
+      alert('Erro ao carregar insumos: ' + err.message);
+    }
+  }
+
+  function statusInsumo(p) {
+    // Retorna { classeBg, classeIcon } pra destacar
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    const dtValidade = p.validade ? new Date(p.validade + 'T12:00:00') : null;
+    const diasPraVencer = dtValidade ? Math.floor((dtValidade - hoje) / (1000*60*60*24)) : null;
+    const estBaixo = (p.estoqueMinimo > 0) && (Number(p.estoque) < Number(p.estoqueMinimo));
+    const vencido = (diasPraVencer !== null) && (diasPraVencer < 0);
+    const vencendo = (diasPraVencer !== null) && (diasPraVencer >= 0) && (diasPraVencer <= 30);
+    return { estBaixo, vencido, vencendo, diasPraVencer };
+  }
+
+  function renderLabInsumos() {
+    const tbody = document.getElementById('tbody-lab-insumos');
+    if (!tbody) return;
+    const filtroEl = document.getElementById('filtro-lab-insumos');
+    const filtroStatusEl = document.getElementById('filtro-lab-insumos-status');
+    const filtro = (filtroEl ? filtroEl.value : '').toLowerCase().trim();
+    const filtroStatus = filtroStatusEl ? filtroStatusEl.value : '';
+    const lista = _labInsumos.filter(p => {
+      if (filtro && !(p.nome || '').toLowerCase().includes(filtro) && !(p.codigo || '').toLowerCase().includes(filtro)) return false;
+      if (filtroStatus) {
+        const s = statusInsumo(p);
+        if (filtroStatus === 'baixo' && !s.estBaixo) return false;
+        if (filtroStatus === 'vencendo' && !s.vencendo) return false;
+        if (filtroStatus === 'vencido' && !s.vencido) return false;
+      }
+      return true;
+    });
+    if (lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">Nenhum insumo encontrado. Clique em "+ Novo Insumo".</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(p => {
+      const s = statusInsumo(p);
+      let bgLinha = '';
+      let avisos = '';
+      if (s.vencido) { bgLinha = 'background:#fef2f2;'; avisos += ' <span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;">⛔ VENCIDO</span>'; }
+      else if (s.vencendo) { bgLinha = 'background:#fffbeb;'; avisos += ' <span style="background:#f59e0b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;">⌛ ' + s.diasPraVencer + 'd</span>'; }
+      if (s.estBaixo) { bgLinha = bgLinha || 'background:#fef2f2;'; avisos += ' <span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;">⚠ ESTOQUE BAIXO</span>'; }
+      const validadeFmt = p.validade ? formatarDataBR(p.validade) : '-';
+      return '<tr style="' + bgLinha + '">'
+        + '<td>' + escapeHtml(p.codigo || '-') + '</td>'
+        + '<td style="font-weight:600;">' + escapeHtml(p.nome) + avisos + '</td>'
+        + '<td style="text-align:right;' + (s.estBaixo ? 'color:#dc2626;font-weight:700;' : '') + '">' + Number(p.estoque).toLocaleString('pt-BR') + '</td>'
+        + '<td style="text-align:right;color:#64748b;">' + (Number(p.estoqueMinimo) > 0 ? Number(p.estoqueMinimo).toLocaleString('pt-BR') : '-') + '</td>'
+        + '<td style="' + (s.vencido ? 'color:#dc2626;font-weight:700;' : (s.vencendo ? 'color:#f59e0b;font-weight:700;' : '')) + '">' + validadeFmt + '</td>'
+        + '<td style="text-align:right;">' + formatarBRL(p.precoCusto) + '</td>'
+        + '<td class="acoes" style="text-align:center;white-space:nowrap;">'
+        + '<button onclick="abrirLabInsumo(' + p.id + ')" style="background:#0891b2;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-right:4px;">Editar</button>'
+        + '<button onclick="excluirLabInsumo(' + p.id + ')" style="background:#dc2626;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;">Excluir</button>'
+        + '</td></tr>';
+    }).join('');
+  }
+
+  function abrirLabInsumo(id) {
+    if (id) {
+      const p = _labInsumos.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('mli-titulo').textContent = 'Editar Insumo';
+      document.getElementById('mli-id').value = p.id;
+      document.getElementById('mli-nome').value = p.nome || '';
+      document.getElementById('mli-codigo').value = p.codigo || '';
+      document.getElementById('mli-fornec').value = p.fornecedor || '';
+      document.getElementById('mli-estoque').value = p.estoque || '';
+      document.getElementById('mli-min').value = p.estoqueMinimo || '';
+      document.getElementById('mli-preco').value = p.precoCusto || '';
+      document.getElementById('mli-validade').value = p.validade || '';
+      document.getElementById('mli-obs').value = p.observacaoInterna || '';
+    } else {
+      document.getElementById('mli-titulo').textContent = 'Cadastrar Insumo';
+      document.getElementById('mli-id').value = '';
+      document.getElementById('mli-nome').value = '';
+      document.getElementById('mli-codigo').value = '';
+      document.getElementById('mli-fornec').value = '';
+      document.getElementById('mli-estoque').value = '0';
+      document.getElementById('mli-min').value = '0';
+      document.getElementById('mli-preco').value = '';
+      document.getElementById('mli-validade').value = '';
+      document.getElementById('mli-obs').value = '';
+    }
+    document.getElementById('mli-erro').style.display = 'none';
+    document.getElementById('modal-lab-insumo').style.display = 'flex';
+    setTimeout(() => { const el = document.getElementById('mli-nome'); if (el) el.focus(); }, 100);
+  }
+
+  function fecharLabInsumo() {
+    document.getElementById('modal-lab-insumo').style.display = 'none';
+  }
+
+  async function salvarLabInsumo() {
+    const id = document.getElementById('mli-id').value;
+    const dados = {
+      nome: document.getElementById('mli-nome').value.trim(),
+      codigo: document.getElementById('mli-codigo').value.trim(),
+      fornecedor: document.getElementById('mli-fornec').value.trim(),
+      estoque: parseFloat(document.getElementById('mli-estoque').value) || 0,
+      estoqueMinimo: parseFloat(document.getElementById('mli-min').value) || 0,
+      precoCusto: parseFloat(document.getElementById('mli-preco').value) || 0,
+      validade: document.getElementById('mli-validade').value || null,
+      observacaoInterna: document.getElementById('mli-obs').value.trim()
+    };
+    const erro = document.getElementById('mli-erro');
+    if (!dados.nome) {
+      erro.textContent = 'Nome e obrigatorio.';
+      erro.style.display = 'block';
+      return;
+    }
+    erro.style.display = 'none';
+    try {
+      if (id) {
+        await api('PUT', '/api/lab-insumos/' + id, dados);
+      } else {
+        await api('POST', '/api/lab-insumos', dados);
+      }
+      fecharLabInsumo();
+      await carregarLabInsumos();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  }
+
+  async function excluirLabInsumo(id) {
+    const p = _labInsumos.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm('Excluir insumo "' + p.nome + '"?')) return;
+    try {
+      await api('DELETE', '/api/lab-insumos/' + id);
+      await carregarLabInsumos();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    }
+  }
+
 </script>
 
   <!-- Modal: cadastro rapido de paciente -->
@@ -27677,6 +27857,51 @@ ${conteudo}
         <div id="mlf-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
         <div style="display:flex;gap:10px;margin-top:16px;">
           <button type="button" onclick="fecharLabFornecedor()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: cadastro/edicao insumo lab -->
+  <div id="modal-lab-insumo" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10003;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto;">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <h2 id="mli-titulo" style="margin-top:0;color:#0891b2;">Cadastrar Insumo</h2>
+      <input type="hidden" id="mli-id" value="">
+      <form id="form-lab-insumo" onsubmit="event.preventDefault(); salvarLabInsumo();">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Nome *</label>
+        <input type="text" id="mli-nome" required style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Código</label>
+            <input type="text" id="mli-codigo" placeholder="Auto" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Fornecedor</label>
+            <input type="text" id="mli-fornec" placeholder="Nome do fornecedor" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque</label>
+            <input type="number" step="0.001" min="0" id="mli-estoque" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Estoque mínimo</label>
+            <input type="number" step="0.001" min="0" id="mli-min" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+          <div>
+            <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Preço custo</label>
+            <input type="number" step="0.01" min="0" id="mli-preco" placeholder="0,00" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;text-align:right;">
+          </div>
+        </div>
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Validade</label>
+        <input type="date" id="mli-validade" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        <label style="display:block;margin-top:10px;font-size:13px;color:#475569;font-weight:600;">Observação</label>
+        <textarea id="mli-obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-top:4px;box-sizing:border-box;"></textarea>
+        <div id="mli-erro" style="display:none;color:#dc2626;background:#fef2f2;padding:10px;border-radius:6px;font-size:13px;margin-top:12px;"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="button" onclick="fecharLabInsumo()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">Cancelar</button>
           <button type="submit" style="flex:1;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:700;cursor:pointer;">Salvar</button>
         </div>
       </form>
