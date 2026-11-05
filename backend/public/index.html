@@ -8845,7 +8845,7 @@ https://sistema.glinformatica.com.br
   function podeAcessarPagina(pg) {
     const papel = window._papelAtual;
     if (papel === 'admin') return true;
-    if (window._deptoAtual && typeof podeAcessarPaginaLab === "function") return podeAcessarPaginaLab(pg);
+    if ((window._deptoAtual || (window._permissoesAtual && window._permissoesAtual.length > 0)) && typeof podeAcessarPaginaLab === "function") return podeAcessarPaginaLab(pg);
     if (papel === 'financeiro') {
       return !_paginasBloqueadasFinanceiro.includes(pg);
     }
