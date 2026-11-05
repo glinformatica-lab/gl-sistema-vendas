@@ -8874,9 +8874,11 @@ https://sistema.glinformatica.com.br
       }
     } catch(e) {}
     if (!podeAcessarPagina(pg)) {
-      // Redirect silencioso pra pagina padrao do depto (sem alert)
-      if ((window._deptoAtual || window._papelAtual) && pg !== 'lab-dashboard' && pg !== 'dashboard') {
-        setTimeout(() => showPage('lab-dashboard'), 0);
+      // Redirect pra primeira pagina permitida do usuario
+      const perms = window._permissoesAtual || [];
+      if (perms.length > 0) {
+        const alvo = perms[0];
+        if (pg !== alvo) setTimeout(() => showPage(alvo), 0);
       }
       return;
     }
@@ -28363,11 +28365,10 @@ async function carregarMeDeptoLab() {
     window._papelAtual = me.papel || null;
     window._permissoesAtual = me.permissoes || [];
     aplicarFiltroDeptoLab();
-    if ((window._permissoesAtual.length > 0 || window._deptoAtual) && window._papelAtual !== "admin") {
-      const current = document.querySelector("[id^=page-]:not([style*=none])");
-      if (current && !current.id.startsWith("page-lab-")) {
-        if (typeof showPage === "function") showPage("lab-dashboard");
-      }
+    if (window._permissoesAtual.length > 0 && window._papelAtual !== "admin") {
+      // Vai pra primeira pagina permitida ao carregar
+      const alvo = window._permissoesAtual.includes("lab-dashboard") ? "lab-dashboard" : window._permissoesAtual[0];
+      if (typeof showPage === "function") showPage(alvo);
     }
   } catch (err) { console.warn("[me depto]", err.message); }
 }
