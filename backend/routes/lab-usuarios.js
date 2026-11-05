@@ -15,9 +15,18 @@ router.get('/me', async (req, res) => {
   try {
     const r = await db.query(
       'SELECT id, email, nome, papel, departamento FROM usuarios WHERE id = $1 AND empresa_id = $2',
-      [req.user.id, req.user.empresaId]
+      [req.user.userId, req.user.empresaId]
     );
-    if (!r.rowCount) return res.status(404).json({ error: 'Usuario nao encontrado.' });
+    if (!r.rowCount) {
+      // Fallback: usuario do token (ex: admin master)
+      return res.json({
+        id: req.user.userId,
+        email: req.user.email || null,
+        nome: req.user.nome || 'Admin',
+        papel: req.user.papel || 'admin',
+        departamento: null
+      });
+    }
     res.json(camelizar(r.rows[0]));
   } catch (err) {
     console.error('[lab-usuarios/me]', err);
@@ -107,7 +116,7 @@ router.delete('/:id', async (req, res) => {
   if (req.user.papel !== 'admin' && req.user.departamento !== 'gerencia') {
     return res.status(403).json({ error: 'Apenas admin/gerencia podem excluir usuarios.' });
   }
-  if (String(req.params.id) === String(req.user.id)) {
+  if (String(req.params.id) === String(req.user.userId)) {
     return res.status(400).json({ error: 'Nao pode excluir o proprio usuario.' });
   }
   try {
